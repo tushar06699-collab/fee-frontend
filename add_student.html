@@ -69,7 +69,7 @@ document.getElementById("save").onclick = function() {
   };
 
   // === SEND TO PYTHON BACKEND ===
-  fetch("http://127.0.0.1:5000/student/add", {
+  fetch("https://fee-backand.onrender.com/student/add", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(studentData)
