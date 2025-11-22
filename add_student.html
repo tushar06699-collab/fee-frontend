@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Add Student</title>
+<style>
+body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:20px}
+.container{max-width:500px;margin:auto;background:#fff;padding:22px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+label{display:block;margin-top:10px;font-weight:600}
+input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;margin-top:6px}
+button{width:100%;padding:10px;border-radius:8px;border:none;cursor:pointer;background:#28a745;color:#fff;font-weight:700;margin-top:10px}
+.back{background:#007bff}
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>Add New Student</h2>
+
+  <label>Student Name</label>
+  <input id="name"/>
+
+  <label>Father Name</label>
+  <input id="father"/>
+
+  <label>Class</label>
+  <select id="classSelect">
+    <option value="">Select Class</option>
+    <option>Nursery</option><option>LKG</option><option>UKG</option>
+    <option>1st</option><option>2nd</option><option>3rd</option><option>4th</option>
+    <option>5th</option><option>6th</option><option>7th</option><option>8th</option>
+    <option>9th</option><option>10th</option>
+    <option>11th_Medical</option><option>11th_Commerce</option><option>11th_Art</option>
+    <option>12th_Medical</option><option>12th_Commerce</option><option>12th_Art</option>
+  </select>
+
+  <label>Roll Number</label>
+  <input id="roll" type="number"/>
+
+  <label>Previous Dues</label>
+  <input id="previousDue" type="number" value="0"/>
+
+  <button id="save">Save Student</button>
+  <button class="back" onclick="location.href='index.html'">⬅ Back</button>
+</div>
+
+<script>
+document.getElementById("save").onclick = function() {
+
+  const name = document.getElementById("name").value.trim();
+  const father = document.getElementById("father").value.trim();
+  const cls = document.getElementById("classSelect").value;
+  const roll = document.getElementById("roll").value.trim();
+  const previousDue = document.getElementById("previousDue").value.trim();
+
+  // basic validation
+  if (!name || !father || !cls || !roll) {
+    alert("Please fill all details");
+    return;
+  }
+
+  // create student object to send to backend
+  const studentData = {
+    name: name,
+    father: father,
+    class_name: cls,
+    roll: roll,
+    previous_due: Number(previousDue)
+  };
+
+  // === SEND TO PYTHON BACKEND ===
+  fetch("http://127.0.0.1:5000/student/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(studentData)
+  })
+  .then(res => res.json())
+  .then(response => {
+      alert("Student added successfully!");
+      window.location.href = "index.html";
+  })
+  .catch(err => {
+      console.error(err);
+      alert("Error saving student to server!");
+  });
+
+};
+</script>
+
+</body>
+</html>

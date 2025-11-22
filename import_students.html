@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Import Students</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:20px}
+.container{max-width:700px;margin:auto;background:#fff;padding:22px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+button,input{display:block;width:100%;padding:10px;margin-top:10px;border-radius:8px}
+.import{background:#6f42c1;color:#fff;border:none}
+.download{background:#ff9800;color:#fff;border:none}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h2>Import Students From Excel</h2>
+  <p>Required headers: <strong>Name, Father, Class, Roll, PreviousDue</strong></p>
+
+  <input type="file" id="file" accept=".xlsx,.xls" />
+
+  <button class="import" onclick="importExcel()">Import to Backend</button>
+  <button class="download" onclick="downloadSample()">Download Sample</button>
+  <button onclick="location.href='index.html'">⬅ Back</button>
+
+  <p id="status"></p>
+</div>
+
+<script>
+const API = "http://127.0.0.1:5000";
+
+const monthlyFees = {
+  "Nursery":1200,"LKG":1300,"UKG":1300,"1st":1300,"2nd":1300,"3rd":1300,"4th":1400,"5th":1400,
+  "6th":1500,"7th":1500,"8th":1700,"9th":1900,"10th":1900,
+  "11th_Medical":2200,"11th_Commerce":2100,"11th_Art":2100,
+  "12th_Medical":2200,"12th_Commerce":2100,"12th_Art":2100
+};
+
+function getFee(c){ return monthlyFees[c] || 0; }
+
+// Normalize different class formats
+function normalizeClassKey(raw){
+  if(!raw) return "";
+  const key = String(raw).trim().replace(/\s+/g,"").toLowerCase();
+
+  const map = {
+    "nursery":"Nursery","lkg":"LKG","ukg":"UKG",
+    "1":"1st","1st":"1st","2":"2nd","2nd":"2nd","3":"3rd","3rd":"3rd",
+    "4":"4th","4th":"4th","5":"5th","5th":"5th","6":"6th","6th":"6th",
+    "7":"7th","7th":"7th","8":"8th","8th":"8th","9":"9th","9th":"9th",
+    "10":"10th","10th":"10th",
+
+    "11medical":"11th_Medical","11thmedical":"11th_Medical",
+    "11commerce":"11th_Commerce","11thcommerce":"11th_Commerce",
+    "11art":"11th_Art","11thart":"11th_Art",
+
+    "12medical":"12th_Medical","12thmedical":"12th_Medical",
+    "12commerce":"12th_Commerce","12thcommerce":"12th_Commerce",
+    "12art":"12th_Art","12thart":"12th_Art"
+  };
+
+  return map[key] || raw;
+}
+
+// --------------------------------------------------------
+// Download Sample Excel WITH PreviousDue Column
+// --------------------------------------------------------
+function downloadSample(){
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet([
+    {
+      Name:"Rahul Sharma",
+      Father:"Suresh Kumar",
+      Class:"6th",
+      Roll:1,
+      PreviousDue:200   // <-- Added
+    }
+  ]);
+  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+  XLSX.writeFile(wb, "student_format.xlsx");
+}
+
+// --------------------------------------------------------
+// Import Excel → POST each student to backend
+// --------------------------------------------------------
+async function importExcel(){
+  const file = document.getElementById("file").files[0];
+  if(!file){ alert("Please select a file"); return; }
+
+  const reader = new FileReader();
+
+  reader.onload = async function(e){
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, { type:"array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+
+    let imported = 0, skipped = 0;
+
+    for(const row of rows){
+      const name = row.Name || row.name;
+      const father = row.Father || row.father || "";
+      const clsRaw = row.Class || row.class;
+      const roll = row.Roll || row.roll;
+      const previousDue = Number(row.PreviousDue || row.previousdue || 0); // <-- NEW
+
+      if(!name || !clsRaw || !roll){
+        skipped++;
+        continue;
+      }
+
+      const class_name = normalizeClassKey(clsRaw);
+      const fee = getFee(class_name);
+
+      // Build months JSON
+      const months = {};
+      ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+      .forEach(m=>{
+        months[m] = {
+          paid: 0,
+          due: fee,
+          status: "Due",
+          date: "",
+          purpose: "",
+          extra: 0
+        };
+      });
+
+      // Include previous due in backend
+      months["previousDue"] = {
+        paid: 0,
+        due: previousDue,
+        status: previousDue > 0 ? "Due" : "OK",
+        date: "",
+        purpose: "Previous Balance",
+        extra: 0
+      };
+
+      // Send to backend
+      const res = await fetch(`${API}/student/add`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          name,
+          father,
+          class_name,
+          roll: String(roll),
+          previous_due: previousDue,   // <-- send properly
+          advance: 0,
+          months
+        })
+      });
+
+      const json = await res.json();
+
+      if(json.success){
+        imported++;
+      } else {
+        skipped++;
+      }
+    }
+
+    alert(`Imported: ${imported}\nSkipped: ${skipped}`);
+    location.href = "index.html";
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Student Fee Overview</title>
+
+<style>
+  body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
+
+  /* TOP NAV BAR */
+  .topbar{
+      width:100%;
+      padding:15px 20px;
+      background:#007bff;
+      color:#fff;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      box-sizing:border-box;
+      position:sticky;
+      top:0;
+      z-index:3000;
+  }
+  .menu-btn{
+      font-size:28px;
+      cursor:pointer;
+      color:#fff;
+      font-weight:900;
+      user-select:none;
+  }
+
+  /* DARK OVERLAY when menu opens */
+  .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      z-index: 1500;
+  }
+  .overlay.show { display:block; }
+
+  /* SIDE MENU */
+  .side-menu{
+      position:fixed;
+      top:0;
+      right:-260px;
+      width:260px;
+      height:100%;
+      background:#fff;
+      box-shadow:-2px 0 8px rgba(0,0,0,0.15);
+      padding:20px;
+      transition:0.3s ease;
+      z-index:2000;
+  }
+  .side-menu.open{ right:0; }
+
+  .menu-item{
+      padding:12px 0;
+      border-bottom:1px solid #eee;
+      cursor:pointer;
+      font-size:16px;
+      font-weight:600;
+      color:#333;
+  }
+  .menu-item:hover{ color:#007bff; }
+
+  .container{max-width:1600px;margin:auto;background:#fff;padding:25px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08);margin-top:15px}
+  h2{text-align:center;margin:0 0 12px}
+
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{border:1px solid #e6e6e6;padding:8px;text-align:center;font-size:14px}
+  th{background:#007bff;color:#fff}
+
+  .paid{background:#c8ffc8;color:#0b7a0b;font-weight:700}
+  .partial{background:#fff3bf;color:#7a5a00;font-weight:700}
+  .due{background:#ffd2d2;color:#b30000;font-weight:700}
+
+  .class-row td{background:#222;color:#fff;text-align:left;padding-left:12px;font-weight:700}
+  .student-name{color:#007bff;cursor:pointer;font-weight:600}
+
+  #search{padding:8px;border-radius:8px;border:1px solid #ccc;flex:1;width:100%;margin-top:15px}
+
+  /* EDIT BUTTON */
+  .edit-btn{
+      margin-top:4px;
+      padding:4px 8px;
+      font-size:12px;
+      background:#ffc107;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+  }
+  .edit-btn:hover{
+      background:#e0a800;
+  }
+
+  .side-menu {
+    overflow-y: auto;  /* prevents hiding top items */
+    display: block;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+    <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay" class="overlay" onclick="closeMenu()"></div>
+
+<!-- SIDE MENU -->
+<!-- SIDE MENU -->
+<div class="side-menu" id="sideMenu">
+
+    <!-- ⭐ Guaranteed Visible Dashboard Button -->
+    
+
+    
+    <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
+ <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
+    <div class="menu-item" onclick="goToPage('add_student.html')">➕ Add Student</div>
+    <div class="menu-item" onclick="goToPage('fees.html')">💰 Fees Modify</div>
+    <div class="menu-item" onclick="goToPage('import_students.html')">📥 Import Students</div>
+    <div class="menu-item" onclick="goToPage('receipt_history.html')">📜 Receipt History</div>
+    <div class="menu-item" onclick="goToPage('delete_student.html')">🗑 Delete Students</div>
+   
+</div>
+
+<div class="container">
+  <input id="search" placeholder="Search by name, roll, class..." />
+
+  <table id="feeTable">
+    <thead>
+      <tr>
+        <th>Student</th><th>Class</th><th>Roll</th><th>Prev Due</th>
+        <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th>
+        <th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
+      </tr>
+    </thead>
+    <tbody id="feeRows"></tbody>
+  </table>
+</div>
+
+<script>
+function toggleMenu(){
+    document.getElementById("sideMenu").classList.toggle("open");
+    document.getElementById("overlay").classList.toggle("show");
+}
+
+function closeMenu(){
+    document.getElementById("sideMenu").classList.remove("open");
+    document.getElementById("overlay").classList.remove("show");
+}
+
+function goToPage(page){
+    closeMenu();
+    window.location.href = page;
+}
+
+// FETCH STUDENTS 
+async function fetchStudents() {
+    try {
+        const response = await fetch("http://127.0.0.1:5000/students");
+        const result = await response.json();
+        return result.students || [];
+    } catch (err) {
+        alert("Cannot load students from backend.");
+        return [];
+    }
+}
+
+const allMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+async function renderTable(filter="") {
+    const tbody = document.getElementById("feeRows");
+    tbody.innerHTML = "";
+
+    let students = await fetchStudents();
+    students.sort((a, b) => (a.class_name || "").localeCompare(b.class_name || ""));
+
+    let currentClass = null;
+
+    students.forEach(s => {
+        s.Name = s.name;
+        s.Father = s.father;
+        s.Class = s.class_name;
+        s.Roll = s.roll;
+        s.previousDue = s.previous_due;
+        if (!s.months) s.months = {};
+
+        const searchText = `${s.Name} ${s.Father} ${s.Roll} ${s.Class}`.toLowerCase();
+        if (filter && !searchText.includes(filter.toLowerCase())) return;
+
+        if (s.Class !== currentClass) {
+            currentClass = s.Class;
+            tbody.innerHTML += `<tr class="class-row"><td colspan="16">Class: ${currentClass}</td></tr>`;
+        }
+
+        let monthsHtml = "";
+        allMonths.forEach(m => {
+            let rec = s.months[m] || { paid: 0, due: 0, status: "Due" };
+            const cls = rec.status === "Paid" ? "paid" : rec.status === "Partial" ? "partial" : "due";
+            monthsHtml += `<td class="${cls}" title="Paid: ${rec.paid} | Due: ${rec.due}">${rec.status}</td>`;
+        });
+
+        tbody.innerHTML += `
+            <tr>
+                <td>
+                    <span class="student-name" data-roll="${s.Roll}" data-class="${s.Class}">
+                        ${s.Name}
+                    </span>
+                    <br>
+                    <button class="edit-btn" data-roll="${s.Roll}" data-class="${s.Class}">
+                        ✏ Edit
+                    </button>
+                </td>
+                <td>${s.Class}</td>
+                <td>${s.Roll}</td>
+                <td>${s.previousDue}</td>
+                ${monthsHtml}
+            </tr>`;
+    });
+
+    document.querySelectorAll(".student-name").forEach(el => {
+        el.onclick = () => {
+            const roll = el.dataset.roll;
+            const cls = el.dataset.class;
+            window.location.href = `student_details.html?roll=${roll}&class=${cls}`;
+        };
+    });
+}
+
+// CLICK EDIT BUTTON
+document.addEventListener("click", function(e){
+    if(e.target.classList.contains("edit-btn")){
+        const roll = e.target.dataset.roll;
+        const cls = e.target.dataset.class;
+        window.location.href = `edit.html?roll=${roll}&class=${cls}`;
+    }
+});
+
+document.getElementById("search").oninput = e => renderTable(e.target.value);
+renderTable();
+
+
+</script>
+
+</body>
+</html>

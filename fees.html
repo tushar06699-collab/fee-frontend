@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Edit Fee Structure</title>
+<style>
+body{font-family:Poppins;background:#f4f6f9;padding:20px}
+.container{max-width:700px;margin:auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.1)}
+table{width:100%;border-collapse:collapse;margin-top:20px}
+th,td{border:1px solid #ddd;padding:10px;text-align:center}
+th{background:#007bff;color:white}
+input{padding:6px;width:100px}
+button{padding:6px 12px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <button onclick="location.href='index.html'" 
+        style="padding:8px 14px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;margin-bottom:12px">
+        ⬅ Back to Home
+</button>
+
+  <h2>Class-wise Monthly Fee Setup</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Class</th>
+        <th>Monthly Fee (₹)</th>
+        <th>Save</th>
+      </tr>
+    </thead>
+    <tbody id="feeBody"></tbody>
+  </table>
+</div>
+
+<script>
+const API = "http://127.0.0.1:5000";
+
+async function loadFees(){
+  const res = await fetch(`${API}/fees/get`);
+  const data = await res.json();
+  if (!data.success) return alert("Error loading fees");
+
+  const body = document.getElementById("feeBody");
+  body.innerHTML = "";
+
+  data.fees.forEach(f => {
+    body.innerHTML += `
+      <tr>
+        <td>${f.class_name}</td>
+        <td><input id="fee_${f.class_name}" value="${f.monthly_fee}" type="number"></td>
+        <td><button onclick="saveFee('${f.class_name}')">Save</button></td>
+      </tr>
+    `;
+  });
+}
+
+async function saveFee(className){
+  const newFee = document.getElementById("fee_" + className).value;
+
+  const res = await fetch(`${API}/fees/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      class_name: className,
+      monthly_fee: Number(newFee)
+    })
+  });
+
+  const data = await res.json();
+  alert(data.message);
+}
+
+loadFees();
+</script>
+
+</body>
+</html>

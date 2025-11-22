@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard – School ERP</title>
+
+<style>
+body{
+    font-family:Poppins, sans-serif;
+    background:#f4f6f9;
+    margin:0;
+    padding:0;
+}
+
+/* TOP BAR */
+.topbar{
+    width:100%;
+    padding:15px 20px;
+    background:#007bff;
+    color:#fff;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    box-sizing:border-box;
+    position:sticky;
+    top:0;
+    z-index:3000;
+    font-size:20px;
+    font-weight:600;
+}
+.menu-btn{
+    font-size:28px;
+    cursor:pointer;
+    font-weight:900;
+}
+
+/* OVERLAY */
+.overlay{
+    position:fixed;
+    top:0;left:0;
+    width:100%;height:100%;
+    background:rgba(0,0,0,.35);
+    display:none;
+    z-index:1400;
+}
+.overlay.show{ display:block; }
+
+/* SIDE MENU */
+.side-menu{
+    position:fixed;
+    top:0;
+    right:-260px;
+    width:260px;
+    height:100%;
+    background:#fff;
+    box-shadow:-2px 0 8px rgba(0,0,0,.15);
+    padding:20px;
+    transition:.3s ease;
+    z-index:2000;
+}
+.side-menu.open{ right:0; }
+
+.menu-item{
+    padding:12px 0;
+    border-bottom:1px solid #eee;
+    cursor:pointer;
+    font-size:16px;
+    font-weight:600;
+}
+.menu-item:hover{ color:#3cccf4; }
+
+/* DASHBOARD GRID */
+.dashboard-boxes{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:15px;
+    padding:20px;
+}
+
+.box{
+    background:#fff;
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 3px 10px rgba(0,0,0,.08);
+    text-align:center;
+    font-weight:600;
+}
+.box-title{
+    font-size:14px;
+    color:#666;
+}
+.box-value{
+    font-size:30px;
+    margin-top:10px;
+    color:#89552b;
+    font-weight:700;
+}
+
+/* QUICK LINKS */
+.quick-links{
+    padding:20px;
+}
+.btn-link{
+    display:block;
+    background:#6fc24f;
+    color:#fff;
+    padding:12px;
+    border-radius:8px;
+    text-align:center;
+    margin-bottom:12px;
+    text-decoration:none;
+    font-weight:600;
+}
+.btn-link:hover{
+    background:#a6d400;
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+    Dashboard
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay" class="overlay" onclick="closeMenu()"></div>
+
+<!-- SIDE MENU -->
+<div id="sideMenu" class="side-menu">
+    <div class="menu-item" onclick="goTo('index.html')">✏️ students</div>
+    <div class="menu-item" onclick="goTo('index.html')">🏠 Home</div>
+    <div class="menu-item" onclick="goTo('add_student.html')">➕ Add Student</div>
+    
+    <div class="menu-item" onclick="goTo('fees.html')">💰 Fees Modify</div>
+    <div class="menu-item" onclick="goTo('receipt_history.html')">📜 Receipt History</div>
+    <div class="menu-item" onclick="goTo('delete_student.html')">🗑 Delete Students</div>
+</div>
+
+<!-- DASHBOARD BOXES -->
+<div class="dashboard-boxes">
+    <div class="box">
+        <div class="box-title">Total Students</div>
+        <div id="totalStudents" class="box-value">0</div>
+    </div>
+
+    <div class="box">
+        <div class="box-title">Total Classes</div>
+        <div id="totalClasses" class="box-value">0</div>
+    </div>
+
+    <div class="box">
+        <div class="box-title">Paid</div>
+        <div id="paidCount" class="box-value">0</div>
+    </div>
+
+    <div class="box">
+        <div class="box-title">Partial</div>
+        <div id="partialCount" class="box-value">0</div>
+    </div>
+
+    <div class="box">
+        <div class="box-title">Due</div>
+        <div id="dueCount" class="box-value">0</div>
+    </div>
+
+    <div class="box">
+        <div class="box-title">Total Collection</div>
+        <div id="totalCollection" class="box-value">₹0</div>
+    </div>
+
+    <div class="box">
+        <div class="box-title">Today's Collection</div>
+        <div id="todayCollection" class="box-value">₹0</div>
+    </div>
+</div>
+
+<!-- QUICK LINKS -->
+<div class="quick-links">
+    <a class="btn-link" href="add_student.html">➕ Add New Student</a>
+    <a class="btn-link" href="fees.html">💰 Modify Fees</a>
+    <a class="btn-link" href="receipt_history.html">📜 Receipt History</a>
+    <a class="btn-link" href="index.html"> students</a>
+</div>
+
+<script>
+const API = "http://127.0.0.1:5000";
+
+/* MENU */
+function toggleMenu(){
+    document.getElementById("sideMenu").classList.toggle("open");
+    document.getElementById("overlay").classList.toggle("show");
+}
+function closeMenu(){
+    document.getElementById("sideMenu").classList.remove("open");
+    document.getElementById("overlay").classList.remove("show");
+}
+function goTo(page){ window.location.href = page; }
+
+/* LOAD DASHBOARD DATA */
+async function loadDashboard(){
+    const res = await fetch(`${API}/students`);
+    const data = await res.json();
+
+    if(!data.success) return;
+
+    const students = data.students;
+
+    // TOTAL STUDENTS
+    document.getElementById("totalStudents").innerText = students.length;
+
+    // TOTAL CLASSES
+    const classes = new Set(students.map(s => s.class_name));
+    document.getElementById("totalClasses").innerText = classes.size;
+
+    // PAID / PARTIAL / DUE Counter (this checks months)
+    let paid = 0, partial = 0, due = 0;
+    let totalCollection = 0;
+    let todayCollection = 0;
+
+    const today = new Date().toISOString().split("T")[0];
+
+    students.forEach(s => {
+        const months = s.months || {};
+
+        Object.keys(months).forEach(m => {
+            const rec = months[m];
+
+            if(rec.status === "Paid") paid++;
+            else if(rec.status === "Partial") partial++;
+            else due++;
+
+            totalCollection += rec.paid || 0;
+
+            if(rec.date === today){
+                todayCollection += rec.paid || 0;
+            }
+        });
+    });
+
+    document.getElementById("paidCount").innerText = paid;
+    document.getElementById("partialCount").innerText = partial;
+    document.getElementById("dueCount").innerText = due;
+    document.getElementById("totalCollection").innerText = "₹" + totalCollection;
+    document.getElementById("todayCollection").innerText = "₹" + todayCollection;
+}
+
+loadDashboard();
+</script>
+
+</body>
+</html>

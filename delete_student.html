@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Delete Students</title>
+
+<style>
+body { font-family: Poppins, sans-serif; background:#f2f4f7; margin:0; padding:20px; }
+.container { max-width:700px; margin:auto; background:#fff; padding:22px;
+    border-radius:12px; box-shadow:0 3px 10px rgba(0,0,0,.08); }
+select { width:100%; padding:10px; margin-top:10px; border-radius:8px; }
+table { width:100%; border-collapse:collapse; margin-top:12px; }
+th,td { border:1px solid #ddd; padding:8px; text-align:center; }
+.btn { padding:8px 12px; border-radius:8px; border:none; cursor:pointer; }
+.del { background:#dc3545; color:#fff; }
+.back { background:#007bff; color:#fff; }
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h2>Delete Students (Class Wise)</h2>
+
+  <select id="classSel" onchange="renderStudents()">
+    <option value="">Select Class</option>
+    <option>Nursery</option><option>LKG</option><option>UKG</option>
+    <option>1st</option><option>2nd</option><option>3rd</option><option>4th</option>
+    <option>5th</option><option>6th</option><option>7th</option><option>8th</option>
+    <option>9th</option><option>10th</option>
+    <option>11th_Medical</option><option>11th_Commerce</option><option>11th_Art</option>
+    <option>12th_Medical</option><option>12th_Commerce</option><option>12th_Art</option>
+  </select>
+
+  <table id="tbl" style="display:none;">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Father</th>
+        <th>Roll</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="tb"></tbody>
+  </table>
+
+  <button class="btn del" onclick="deleteAllInClass()">🗑 Delete All in Class</button>
+  <button class="btn back" onclick="location.href='index.html'">⬅ Back</button>
+</div>
+
+<script>
+const API = "http://127.0.0.1:5000";
+
+let ALL_STUDENTS = [];
+
+// ---------------- LOAD STUDENTS FROM BACKEND ----------------
+async function loadFromBackend() {
+  try {
+    const res = await fetch(`${API}/students`);
+    const data = await res.json();
+
+    if (data.success) {
+      ALL_STUDENTS = data.students;
+    }
+  } catch (err) {
+    alert("❌ Cannot connect to backend!");
+  }
+}
+
+// ---------------- RENDER TABLE ----------------
+async function renderStudents() {
+  await loadFromBackend();
+
+  const cls = document.getElementById("classSel").value;
+  const tbody = document.getElementById("tb");
+  tbody.innerHTML = "";
+
+  if (!cls) {
+    document.getElementById("tbl").style.display = "none";
+    return;
+  }
+
+  const list = ALL_STUDENTS.filter(s => s.class_name === cls);
+
+  if (list.length === 0) {
+    document.getElementById("tbl").style.display = "none";
+    alert("No students in this class");
+    return;
+  }
+
+  document.getElementById("tbl").style.display = "";
+
+  list.forEach(s => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${s.name}</td>
+        <td>${s.father}</td>
+        <td>${s.roll}</td>
+        <td>
+          <button class="btn del" onclick="deleteOne('${s.class_name}', '${s.roll}')">Delete</button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+// ---------------- DELETE ONE STUDENT ----------------
+async function deleteOne(className, roll) {
+
+  if (!confirm("Delete this student?")) return;
+
+  try {
+    const res = await fetch(`${API}/student/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class: className, roll: roll })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Deleted successfully");
+      renderStudents();  // refresh
+    } else {
+      alert("Error: " + data.message);
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("❌ Server connection or CORS issue");
+  }
+}
+
+// ---------------- DELETE ENTIRE CLASS ----------------
+async function deleteAllInClass() {
+  const cls = document.getElementById("classSel").value;
+  if (!cls) return alert("Select a class");
+
+  if (!confirm(`Delete ALL students in ${cls}?`)) return;
+
+  try {
+    const res = await fetch(`${API}/student/delete_class`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class: cls })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("All students deleted");
+      document.getElementById("tbl").style.display = "none";
+    } else {
+      alert("❌ " + data.message);
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("❌ Server error or CORS issue");
+  }
+}
+
+</script>
+</body>
+</html>
