@@ -33,7 +33,7 @@
   .topbar{
       width:100%;padding:15px 20px;background:#007bff;color:#fff;
       display:flex;justify-content:space-between;align-items:center;
-      box-sizing:border-box;position:sticky;top:0;z-index:3000;
+      box-sizing:border-box;position:sticky;top:0;z-index:4000;
   }
   .menu-btn{
       font-size:28px;cursor:pointer;color:#fff;font-weight:900;
@@ -131,8 +131,9 @@ if(localStorage.getItem("loggedIn")==="yes"){
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 
 <div class="side-menu" id="sideMenu">
+     <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
     <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
-    <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
+
     <div class="menu-item" onclick="goToPage('add_student.html')">➕ Add Student</div>
     <div class="menu-item" onclick="goToPage('fees.html')">💰 Fees Modify</div>
     <div class="menu-item" onclick="goToPage('import_students.html')">📥 Import Students</div>
