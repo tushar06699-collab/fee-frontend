@@ -5,172 +5,155 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Student Fee Overview</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-
 <style>
-  :root{
-    --blue:#007bff;
-    --muted:#f2f4f7;
-    --card:#fff;
-    --success:#28a745;
-    --danger:#dc3545;
-    --accent:#ffc107;
+  body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
+
+  /* LOGIN SCREEN */
+  #loginBox{
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:#0d6efd;display:flex;justify-content:center;
+      align-items:center;z-index:5000;
   }
+  #loginCard{
+      background:white;padding:30px;border-radius:12px;width:320px;
+      box-shadow:0 4px 12px rgba(0,0,0,.25);text-align:center;
+  }
+  #loginCard h2{margin-bottom:15px;color:#0d6efd;}
+  #loginCard input{
+      width:100%;padding:10px;margin:8px 0;border-radius:8px;
+      border:1px solid #ccc;font-size:16px;
+  }
+  #loginCard button{
+      width:100%;padding:10px;background:#0d6efd;color:white;
+      border:0;border-radius:8px;font-size:18px;cursor:pointer;
+  }
+  #loginCard button:hover{background:#0b5ed7;}
 
-  body{font-family:Poppins, sans-serif;background:var(--muted);margin:0;padding:0;color:#222}
-
-/* TOP NAV BAR */
+  /* TOP NAV BAR */
   .topbar{
-      width:100%;
-      padding:12px 18px;
-      background:var(--blue);
-      color:#fff;
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      box-sizing:border-box;
-      position:sticky;
-      top:0;
-      z-index:3000;
+      width:100%;padding:15px 20px;background:#007bff;color:#fff;
+      display:flex;justify-content:space-between;align-items:center;
+      box-sizing:border-box;position:sticky;top:0;z-index:3000;
   }
-  .brand { font-size:18px; font-weight:700; }
-  .menu-btn{ font-size:24px; cursor:pointer; color:#fff; font-weight:900; user-select:none; }
+  .menu-btn{
+      font-size:28px;cursor:pointer;color:#fff;font-weight:900;
+      user-select:none;
+  }
 
-  /* overlay for side menu */
-  .overlay { position: fixed; inset:0; background: rgba(0,0,0,0.35); display:none; z-index:1400; }
+  /* DARK OVERLAY */
+  .overlay {position: fixed;top:0;left:0;width:100%;height:100%;
+      background: rgba(0,0,0,0.35);display:none;z-index:1500;}
   .overlay.show { display:block; }
 
   /* SIDE MENU */
   .side-menu{
-      position:fixed;
-      top:0;
-      right:-280px;
-      width:280px;
-      height:100%;
-      background:#fff;
-      box-shadow:-2px 0 18px rgba(0,0,0,0.12);
-      padding:18px;
-      transition:0.28s ease;
-      z-index:2000;
-      overflow-y:auto;
+      position:fixed;top:0;right:-260px;width:260px;height:100%;
+      background:#fff;box-shadow:-2px 0 8px rgba(0,0,0,0.15);
+      padding:20px;transition:0.3s ease;z-index:2000;overflow-y:auto;
   }
   .side-menu.open{ right:0; }
-  .menu-item{ padding:12px 10px; border-radius:8px; margin-bottom:8px; cursor:pointer; font-weight:600; color:#333; display:flex; align-items:center; gap:8px }
-  .menu-item:hover{ background:#f3f7ff; color:var(--blue) }
-
-  .container{max-width:1400px;margin:20px auto;background:var(--card);padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
-  .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  #search{padding:10px;border-radius:8px;border:1px solid #ddd;flex:1;min-width:180px}
-
-  table{width:100%;border-collapse:collapse;margin-top:18px}
-  th,td{border:1px solid #e6e6e6;padding:10px;text-align:center;font-size:14px}
-  th{background:var(--blue);color:#fff; font-weight:700}
-  .class-row td{background:#111;color:#fff;text-align:left;padding-left:12px;font-weight:700}
-
-  .student-name{color:var(--blue);cursor:pointer;font-weight:600;display:inline-block}
-  .edit-btn{margin-top:6px;padding:6px 10px;font-size:13px;background:var(--accent);border:none;border-radius:6px;cursor:pointer}
-  .edit-btn:hover{filter:brightness(.95)}
-
-  .paid{background:#e6ffea;color:#067a29;font-weight:700}
-  .partial{background:#fff7e6;color:#8a5a00;font-weight:700}
-  .due{background:#ffecec;color:#a40000;font-weight:700}
-
-  /* prev due styling */
-  .prev-paid{background:#e6ffea;color:#067a29;font-weight:700}
-  .prev-due{background:#ffecec;color:#a40000;font-weight:700}
-
-  /* small screens */
-  @media (max-width:900px){
-    th,td{font-size:12px;padding:8px}
-    .container{padding:12px;margin:8px}
+  .menu-item{
+      padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+      font-size:16px;font-weight:600;color:#333;
   }
+  .menu-item:hover{ color:#007bff; }
 
-  /* LOGIN modal styling */
-  .login-screen{
-    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-    background:linear-gradient(180deg, rgba(2,6,23,0.55), rgba(2,6,23,0.5));
-    z-index:4000;
+  /* TABLE + UI */
+  .container{max-width:1600px;margin:auto;background:#fff;padding:25px;
+      border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08);margin-top:15px}
+  h2{text-align:center;margin:0 0 12px}
+
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{border:1px solid #e6e6e6;padding:8px;text-align:center;font-size:14px}
+  th{background:#007bff;color:#fff}
+
+  .paid{background:#c8ffc8;color:#0b7a0b;font-weight:700}
+  .partial{background:#fff3bf;color:#7a5a00;font-weight:700}
+  .due{background:#ffd2d2;color:#b30000;font-weight:700}
+
+  .class-row td{background:#222;color:#fff;text-align:left;padding-left:12px;
+      font-weight:700}
+
+  .student-name{color:#007bff;cursor:pointer;font-weight:600}
+
+  #search{padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;
+      margin-top:15px}
+
+  .edit-btn{
+      margin-top:4px;padding:4px 8px;font-size:12px;background:#ffc107;
+      border:none;border-radius:6px;cursor:pointer;
   }
-  .login-card{
-    width:360px; max-width:92%;
-    background:#fff; padding:22px; border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,0.25);
-    animation:pop .32s ease;
-  }
-  @keyframes pop{ from{transform:translateY(12px);opacity:0} to{transform:none;opacity:1}}
-  .login-card h2{text-align:center;margin:0 0 12px}
-  .field{margin-top:10px}
-  .field label{display:block;font-weight:600;margin-bottom:6px}
-  .field input{width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px}
-  .btn-login{width:100%;padding:12px;margin-top:14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer}
-  .btn-logout{background:#fff;color:var(--blue);border:1px solid var(--blue);padding:8px 10px;border-radius:8px;cursor:pointer}
+  .edit-btn:hover{background:#e0a800;}
 
-  .msg{margin-top:10px;text-align:center;display:none}
-
-  /* small helper row */
-  .top-actions { display:flex; gap:10px; align-items:center }
-  .badge { background:#f1f5f9; padding:6px 9px; border-radius:8px; font-weight:700; color:#333 }
+  /* PREVIOUS DUE COLORS */
+  .prev-green{color:#0b7a0b;font-weight:700;}
+  .prev-red{color:#b30000;font-weight:700;}
 </style>
 </head>
+
 <body>
 
-<!-- TOPBAR -->
-<div class="topbar">
-  <div class="brand">P.S. Public School</div>
-  <div class="top-actions">
-    <div id="userBadge" class="badge" style="display:none">Signed in</div>
-    <div class="menu-btn" onclick="toggleMenu()">☰</div>
-  </div>
+<!-- LOGIN SCREEN -->
+<div id="loginBox">
+    <div id="loginCard">
+        <h2>Admin Login</h2>
+        <input id="username" placeholder="Username">
+        <input id="password" type="password" placeholder="Password">
+        <button onclick="doLogin()">Login</button>
+    </div>
 </div>
 
-<!-- overlay for closing menu -->
+<script>
+function doLogin(){
+    let u = document.getElementById("username").value.trim();
+    let p = document.getElementById("password").value.trim();
+
+    if(u === "admin" && p === "1234"){
+        localStorage.setItem("loggedIn","yes");
+        document.getElementById("loginBox").style.display="none";
+    } else {
+        alert("Invalid credentials");
+    }
+}
+
+if(localStorage.getItem("loggedIn")==="yes"){
+    document.getElementById("loginBox").style.display="none";
+}
+</script>
+
+<!-- TOP BAR -->
+<div class="topbar">
+    <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+</div>
+
+<!-- SIDEBAR -->
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 
-<!-- SIDE MENU -->
 <div class="side-menu" id="sideMenu">
-  <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
-  <div class="menu-item" onclick="goToPage('add_student.html')">➕ Add Student</div>
-  <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
-  <div class="menu-item" onclick="goToPage('fees.html')">💰 Fees Modify</div>
-  <div class="menu-item" onclick="goToPage('import_students.html')">📥 Import Students</div>
-  <div class="menu-item" onclick="goToPage('receipt_history.html')">📜 Receipt History</div>
-  <div class="menu-item" onclick="goToPage('delete_student.html')">🗑 Delete Students</div>
-  <div style="height:18px"></div>
-  <div style="font-size:13px;color:#666">Account</div>
-  <div style="display:flex;gap:8px;margin-top:8px">
-    <button class="menu-item" style="flex:1;background:#fff;border:1px solid #eee" onclick="doLogout()">Logout</button>
-  </div>
+    <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
+    <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
+    <div class="menu-item" onclick="goToPage('add_student.html')">➕ Add Student</div>
+    <div class="menu-item" onclick="goToPage('fees.html')">💰 Fees Modify</div>
+    <div class="menu-item" onclick="goToPage('import_students.html')">📥 Import Students</div>
+    <div class="menu-item" onclick="goToPage('receipt_history.html')">📜 Receipt History</div>
+    <div class="menu-item" onclick="goToPage('delete_student.html')">🗑 Delete Students</div>
 </div>
 
-<!-- LOGIN SCREEN (shown until login) -->
-<div id="loginScreen" class="login-screen" style="display:none">
-  <div class="login-card" role="dialog" aria-modal="true">
-    <h2>Sign in to School ERP</h2>
-    <div class="field">
-      <label for="loginUser">Username</label>
-      <input id="loginUser" type="text" placeholder="admin">
-    </div>
-    <div class="field">
-      <label for="loginPass">Password</label>
-      <input id="loginPass" type="password" placeholder="12345">
-    </div>
-    <button class="btn-login" onclick="performLogin()">Sign in</button>
-    <div id="loginMsg" class="msg" style="color:var(--danger)"></div>
-  </div>
-</div>
+<script>
+function toggleMenu(){
+    document.getElementById("sideMenu").classList.toggle("open");
+    document.getElementById("overlay").classList.toggle("show");
+}
+function closeMenu(){
+    document.getElementById("sideMenu").classList.remove("open");
+    document.getElementById("overlay").classList.remove("show");
+}
+function goToPage(p){closeMenu();window.location.href=p;}
+</script>
 
-<!-- MAIN CONTENT -->
-<div class="container" id="mainContent" style="display:none">
-
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-    <div class="controls" style="flex:1">
-      <input id="search" placeholder="Search by name, roll, class..." />
-    </div>
-
-    <div style="display:flex;gap:10px;align-items:center">
-      <button id="btnRefresh" class="edit-btn" title="Refresh" onclick="renderTable()">↻ Refresh</button>
-      <button id="logoutSmall" class="btn-logout" onclick="doLogout()" style="display:none">Logout</button>
-    </div>
-  </div>
+<div class="container">
+  <input id="search" placeholder="Search by name, roll, class..." />
 
   <table id="feeTable">
     <thead>
@@ -185,211 +168,86 @@
 </div>
 
 <script>
-/* -------------------------
-   CONFIG
-   ------------------------- */
-const API = "https://fee-backend-ntas.onrender.com"; // your backend base
-// Example full endpoint: `${API}/students`
-
-/* -------------------------
-   LOGIN / SESSION
-   - Demo client-side login
-   - Replace with backend auth later
-   ------------------------- */
-function isLoggedIn(){
-  return !!sessionStorage.getItem("erp_user");
-}
-function showLoginScreen(show){
-  document.getElementById("loginScreen").style.display = show ? "flex" : "none";
-  document.getElementById("mainContent").style.display = show ? "none" : "block";
-  document.getElementById("userBadge").style.display = show ? "none" : "inline-block";
-  document.getElementById("logoutSmall").style.display = show ? "none" : "inline-block";
-}
-function performLogin(){
-  const u = document.getElementById("loginUser").value.trim();
-  const p = document.getElementById("loginPass").value.trim();
-  const msg = document.getElementById("loginMsg");
-  msg.style.display = "none";
-  if(!u || !p){ msg.innerText = "Enter username & password"; msg.style.display = "block"; return; }
-
-  // Demo credentials — change to server login if you add backend auth.
-  if(u === "admin" && p === "12345"){
-    sessionStorage.setItem("erp_user", JSON.stringify({username:u}));
-    showLoginScreen(false);
-    renderTable();
-  } else {
-    msg.innerText = "Invalid username or password";
-    msg.style.display = "block";
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem("erp_user");
-  showLoginScreen(true);
-}
-
-/* -------------------------
-   Side menu helpers
-   ------------------------- */
-function toggleMenu(){
-  document.getElementById("sideMenu").classList.toggle("open");
-  document.getElementById("overlay").classList.toggle("show");
-}
-function closeMenu(){
-  document.getElementById("sideMenu").classList.remove("open");
-  document.getElementById("overlay").classList.remove("show");
-}
-function goToPage(page){
-  closeMenu();
-  window.location.href = page;
-}
-
-/* -------------------------
-   FETCH STUDENTS
-   ------------------------- */
-async function fetchStudents() {
-  try {
-    const res = await fetch(`${API}/students`);
-    if(!res.ok) throw new Error("Bad status: " + res.status);
-    const json = await res.json();
-    return json.students || [];
-  } catch (err) {
-    console.error("fetchStudents error:", err);
-    alert("Cannot load students from backend. See console for details.");
-    return [];
-  }
-}
-
-/* -------------------------
-   RENDER TABLE
-   - restores: click student -> student_details
-   - restores: edit button opens edit.html?roll=..&class=..
-   - previous due cell colored: green if paid (0), red if >0
-   ------------------------- */
+const API = "https://fee-backend-ntas.onrender.com";
 const allMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-async function renderTable(filter=""){
-  // ensure logged in
-  if(!isLoggedIn()){
-    showLoginScreen(true);
-    return;
-  } else {
-    showLoginScreen(false);
-  }
-
-  const tbody = document.getElementById("feeRows");
-  tbody.innerHTML = "";
-  let students = await fetchStudents();
-
-  // normalize
-  students = students.map(s => {
-    s.Name = s.name || "";
-    s.Father = s.father || "";
-    s.Class = s.class_name || "";
-    s.Roll = s.roll || "";
-    s.previousDue = Number(s.previous_due || 0);
-    if(!s.months) s.months = {};
-    return s;
-  });
-
-  // sort by class then roll
-  students.sort((a,b) => {
-    const c = (a.Class||"").localeCompare(b.Class||"");
-    if(c !== 0) return c;
-    return (Number(a.Roll)||0) - (Number(b.Roll)||0);
-  });
-
-  let currentClass = null;
-  students.forEach((s, index) => {
-
-    const searchText = `${s.Name} ${s.Father} ${s.Roll} ${s.Class}`.toLowerCase();
-    if(filter && !searchText.includes(filter.toLowerCase())) return;
-
-    if(s.Class !== currentClass){
-      currentClass = s.Class;
-      tbody.insertAdjacentHTML("beforeend", `<tr class="class-row"><td colspan="16">Class: ${currentClass}</td></tr>`);
+async function fetchStudents(){
+    try{
+        const res = await fetch(API + "/students");
+        const data = await res.json();
+        return data.students || [];
     }
+    catch(e){
+        alert("Cannot load students from backend");
+        return [];
+    }
+}
 
-    // build months HTML
-    let monthsHtml = "";
-    allMonths.forEach(m => {
-      const rec = s.months[m] || { paid: 0, due: 0, status: "Due" };
-      const cls = rec.status === "Paid" ? "paid" : rec.status === "Partial" ? "partial" : "due";
-      monthsHtml += `<td class="${cls}" title="Paid: ${rec.paid} | Due: ${rec.due}">${rec.status}</td>`;
+async function renderTable(filter=""){
+    const tbody = document.getElementById("feeRows");
+    tbody.innerHTML = "";
+
+    let students = await fetchStudents();
+    students.sort((a,b)=>a.class_name.localeCompare(b.class_name));
+
+    let currentClass = null;
+
+    students.forEach(s=>{
+        s.months = s.months || {};
+
+        let searchTxt = (s.name+" "+s.father+" "+s.roll+" "+s.class_name).toLowerCase();
+        if(filter && !searchTxt.includes(filter.toLowerCase())) return;
+
+        // CLASS HEADING (ONLY ONCE)
+        if(s.class_name !== currentClass){
+            currentClass = s.class_name;
+            tbody.innerHTML += `<tr class='class-row'><td colspan='16'>Class: ${currentClass}</td></tr>`;
+        }
+
+        // PREV DUE COLOR RULE
+        let prevCls = (s.previous_due==0) ? "prev-green" : "prev-red";
+
+        let monthsHtml = "";
+        allMonths.forEach(m=>{
+            let rec = s.months[m] || {paid:0, due:0, status:"Due"};
+            let cls = rec.status=="Paid" ? "paid" : rec.status=="Partial" ? "partial" : "due";
+            monthsHtml += `<td class="${cls}">${rec.status}</td>`;
+        });
+
+        tbody.innerHTML += `
+        <tr>
+            <td>
+                <span class="student-name" data-roll="${s.roll}" data-class="${s.class_name}">
+                    ${s.name}
+                </span><br>
+                <button class="edit-btn" data-roll="${s.roll}" data-class="${s.class_name}">✏ Edit</button>
+            </td>
+            <td>${s.class_name}</td>
+            <td>${s.roll}</td>
+            <td class="${prevCls}">${s.previous_due}</td>
+            ${monthsHtml}
+        </tr>`;
     });
 
-    // previous due cell: green if 0, red if >0
-    const prevClass = (s.previousDue === 0) ? "prev-paid" : "prev-due";
-    const prevText = (s.previousDue === 0) ? `Paid` : `₹${s.previousDue}`;
+    // CLICK STUDENT NAME → DETAILS PAGE
+    document.querySelectorAll(".student-name").forEach(el=>{
+        el.onclick = ()=>{
+            window.location.href = `student_details.html?roll=${el.dataset.roll}&class=${el.dataset.class}`;
+        };
+    });
 
-    const rowHtml = `
-      <tr>
-        <td style="min-width:150px;">
-          <div>
-            <span class="student-name" data-roll="${encodeURIComponent(s.Roll)}" data-class="${encodeURIComponent(s.Class)}">${escapeHtml(s.Name)}</span>
-          </div>
-          <div>
-            <button class="edit-btn" data-roll="${encodeURIComponent(s.Roll)}" data-class="${encodeURIComponent(s.Class)}">✏ Edit</button>
-          </div>
-        </td>
-        <td>${escapeHtml(s.Class)}</td>
-        <td>${escapeHtml(s.Roll)}</td>
-        <td class="${prevClass}">${prevText}</td>
-        ${monthsHtml}
-      </tr>
-    `;
-    tbody.insertAdjacentHTML("beforeend", rowHtml);
-  });
-
-  // attach handlers
-  document.querySelectorAll(".student-name").forEach(el => {
-    el.onclick = () => {
-      const roll = decodeURIComponent(el.dataset.roll);
-      const cls = decodeURIComponent(el.dataset.class);
-      window.location.href = `student_details.html?roll=${roll}&class=${cls}`;
-    };
-  });
-
-  // edit buttons
-  document.querySelectorAll(".edit-btn").forEach(b => {
-    b.onclick = () => {
-      const roll = decodeURIComponent(b.dataset.roll);
-      const cls = decodeURIComponent(b.dataset.class);
-      window.location.href = `edit.html?roll=${roll}&class=${cls}`;
-    };
-  });
+    // EDIT BUTTON
+    document.querySelectorAll(".edit-btn").forEach(btn=>{
+        btn.onclick = ()=>{
+            window.location.href = `edit.html?roll=${btn.dataset.roll}&class=${btn.dataset.class}`;
+        };
+    });
 }
 
-/* -------------------------
-   small helper: escape HTML
-   ------------------------- */
-function escapeHtml(text){
-  if(text === null || text === undefined) return "";
-  return String(text)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
+document.getElementById("search").oninput = e => renderTable(e.target.value);
 
-/* -------------------------
-   search input handler
-   ------------------------- */
-document.getElementById("search").addEventListener("input", (e) => {
-  renderTable(e.target.value);
-});
-
-/* -------------------------
-   On load: decide login or show table
-   ------------------------- */
-window.addEventListener("load", () => {
-  if(isLoggedIn()){
-    showLoginScreen(false);
-    renderTable();
-  } else {
-    showLoginScreen(true);
-  }
-});
+renderTable();
 </script>
+
 </body>
 </html>
