@@ -169,7 +169,7 @@ function goToPage(page){
 // FETCH STUDENTS 
 async function fetchStudents() {
     try {
-        const response = await fetch("https://fee-backand.onrender.com/students");
+        const response = await fetch("https://fee-backend-ntas.onrender.com");
         const result = await response.json();
         return result.students || [];
     } catch (err) {
