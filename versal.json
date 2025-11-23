@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "name": "school-erp-frontend",
+  "name": "fee-frontend",
   "builds": [
-    { "src": "*.html", "use": "@vercel/static" },
+    { "src": "index.html", "use": "@vercel/static" },
     { "src": "assets/**", "use": "@vercel/static" }
   ],
   "routes": [
