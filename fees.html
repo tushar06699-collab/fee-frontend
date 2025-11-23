@@ -2,9 +2,88 @@
 <html>
 <head>
 <title>Edit Fee Structure</title>
+
 <style>
-body{font-family:Poppins;background:#f4f6f9;padding:20px}
-.container{max-width:700px;margin:auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.1)}
+body{
+    font-family:Poppins, sans-serif;
+    background:#f4f6f9;
+    margin:0;
+    padding:0;
+}
+
+/* TOP BAR */
+.topbar{
+    width:100%;
+    padding:15px 20px;
+    background:#007bff;
+    color:#fff;
+    display:flex;
+    justify-content:flex-start;
+    align-items:center;
+    gap:15px;
+    box-sizing:border-box;
+    position:sticky;
+    top:0;
+    z-index:3000;
+    font-size:20px;
+    font-weight:600;
+}
+
+/* LEFT HAMBURGER BUTTON */
+.menu-btn{
+    font-size:28px;
+    cursor:pointer;
+    font-weight:900;
+    user-select:none;
+}
+
+/* OVERLAY */
+.overlay{
+    position:fixed;
+    top:0;left:0;
+    width:100%;height:100%;
+    background:rgba(0,0,0,.35);
+    display:none;
+    z-index:1400;
+}
+.overlay.show{ display:block; }
+
+/* LEFT SLIDE SIDEBAR */
+.side-menu{
+    position:fixed;
+    top:0;
+    left:-280px;
+    width:260px;
+    height:100%;
+    background:#fff;
+    box-shadow:2px 0 8px rgba(0,0,0,.15);
+    padding:20px;
+    transition:left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+    z-index:2000;
+    border-radius:0 18px 18px 0;
+}
+.side-menu.open{ left:0; }
+
+.menu-item{
+    padding:12px 0;
+    border-bottom:1px solid #eee;
+    cursor:pointer;
+    font-size:16px;
+    font-weight:600;
+}
+.menu-item:hover{ color:#007bff; }
+
+/* MAIN CONTENT */
+.container{
+    max-width:700px;
+    margin:auto;
+    background:#fff;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 4px 12px rgba(0,0,0,.1);
+    margin-top:20px;
+}
+
 table{width:100%;border-collapse:collapse;margin-top:20px}
 th,td{border:1px solid #ddd;padding:10px;text-align:center}
 th{background:#007bff;color:white}
@@ -15,12 +94,48 @@ button{padding:6px 12px;background:#28a745;color:white;border:none;border-radius
 
 <body>
 
+<!-- TOP BAR -->
+<div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    Edit Fee Structure
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay" class="overlay" onclick="closeMenu()"></div>
+
+<!-- LEFT SLIDE SIDE MENU -->
+<div id="sideMenu" class="side-menu">
+  <div class="menu-item" onclick="goTo('fees.html')">💰 Fees Modify</div>
+    <div class="menu-item" onclick="goTo('index.html')">📋 Students</div>
+    <div class="menu-item" onclick="goTo('dashboard.html')">🏠 Dashboard</div>
+    <div class="menu-item" onclick="goTo('add_student.html')">➕ Add Student</div>
+    
+    <div class="menu-item" onclick="goTo('receipt_history.html')">📜 Receipt History</div>
+    <div class="menu-item" onclick="goTo('delete_student.html')">🗑 Delete Students</div>
+</div>
+
+<script>
+function toggleMenu(){
+    document.getElementById("sideMenu").classList.toggle("open");
+    document.getElementById("overlay").classList.toggle("show");
+}
+function closeMenu(){
+    document.getElementById("sideMenu").classList.remove("open");
+    document.getElementById("overlay").classList.remove("show");
+}
+function goTo(p){
+    closeMenu();
+    window.location.href = p;
+}
+</script>
+
+<!-- MAIN CONTENT -->
 <div class="container">
 
   <button onclick="location.href='index.html'" 
         style="padding:8px 14px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;margin-bottom:12px">
         ⬅ Back to Home
-</button>
+  </button>
 
   <h2>Class-wise Monthly Fee Setup</h2>
 
@@ -71,7 +186,7 @@ async function saveFee(className){
   });
 
   const data = await res.json();
-  alert(data.message);
+  alert(data.message ?? "Saved!");
 }
 
 loadFees();

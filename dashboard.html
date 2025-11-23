@@ -20,8 +20,9 @@ body{
     background:#007bff;
     color:#fff;
     display:flex;
-    justify-content:space-between;
+    justify-content:flex-start;
     align-items:center;
+    gap:15px;
     box-sizing:border-box;
     position:sticky;
     top:0;
@@ -29,10 +30,17 @@ body{
     font-size:20px;
     font-weight:600;
 }
+
+/* LEFT HAMBURGER */
 .menu-btn{
     font-size:28px;
     cursor:pointer;
     font-weight:900;
+    user-select:none;
+    transition:0.3s;
+}
+.menu-btn:hover{
+    opacity:0.8;
 }
 
 /* OVERLAY */
@@ -46,20 +54,21 @@ body{
 }
 .overlay.show{ display:block; }
 
-/* SIDE MENU */
+/* LEFT SLIDING SIDE MENU */
 .side-menu{
     position:fixed;
     top:0;
-    right:-260px;
+    left:-280px;
     width:260px;
     height:100%;
     background:#fff;
-    box-shadow:-2px 0 8px rgba(0,0,0,.15);
+    box-shadow:2px 0 8px rgba(0,0,0,.15);
     padding:20px;
-    transition:.3s ease;
+    transition:left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
     z-index:2000;
+    border-radius:0 18px 18px 0;
 }
-.side-menu.open{ right:0; }
+.side-menu.open{ left:0; }
 
 .menu-item{
     padding:12px 0;
@@ -68,7 +77,7 @@ body{
     font-size:16px;
     font-weight:600;
 }
-.menu-item:hover{ color:#3cccf4; }
+.menu-item:hover{ color:#007bff; }
 
 /* DASHBOARD GRID */
 .dashboard-boxes{
@@ -113,7 +122,7 @@ body{
     font-weight:600;
 }
 .btn-link:hover{
-    background:#a6d400;
+    background:#57a63e;
 }
 </style>
 </head>
@@ -122,20 +131,19 @@ body{
 
 <!-- TOPBAR -->
 <div class="topbar">
-    Dashboard
     <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    Dashboard
 </div>
 
 <!-- OVERLAY -->
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 
-<!-- SIDE MENU -->
+<!-- LEFT SLIDE MENU -->
 <div id="sideMenu" class="side-menu">
-    <div class="menu-item" onclick="goTo('index.html')">✏️ students</div>
-    <div class="menu-item" onclick="goTo('index.html')">🏠 Home</div>
+     <div class="menu-item" onclick="goTo('dashboard.html')">🏠 Dashboard</div>
+    <div class="menu-item" onclick="goTo('index.html')">📋 Students List</div>
     <div class="menu-item" onclick="goTo('add_student.html')">➕ Add Student</div>
-    
-    <div class="menu-item" onclick="goTo('fees.html')">💰 Fees Modify</div>
+    <div class="menu-item" onclick="goTo('fees.html')">💰 class wise Fee</div>
     <div class="menu-item" onclick="goTo('receipt_history.html')">📜 Receipt History</div>
     <div class="menu-item" onclick="goTo('delete_student.html')">🗑 Delete Students</div>
 </div>
@@ -183,22 +191,28 @@ body{
     <a class="btn-link" href="add_student.html">➕ Add New Student</a>
     <a class="btn-link" href="fees.html">💰 Modify Fees</a>
     <a class="btn-link" href="receipt_history.html">📜 Receipt History</a>
-    <a class="btn-link" href="index.html"> students</a>
+    <a class="btn-link" href="index.html">📋 Students</a>
 </div>
 
 <script>
 const API = "https://fee-backend-ntas.onrender.com";
 
-/* MENU */
+/* LEFT SLIDE MENU */
 function toggleMenu(){
-    document.getElementById("sideMenu").classList.toggle("open");
-    document.getElementById("overlay").classList.toggle("show");
+    let menu = document.getElementById("sideMenu");
+    let overlay = document.getElementById("overlay");
+
+    menu.classList.toggle("open");
+    overlay.classList.toggle("show");
 }
 function closeMenu(){
     document.getElementById("sideMenu").classList.remove("open");
     document.getElementById("overlay").classList.remove("show");
 }
-function goTo(page){ window.location.href = page; }
+function goTo(p){
+    closeMenu();
+    window.location.href = p;
+}
 
 /* LOAD DASHBOARD DATA */
 async function loadDashboard(){
@@ -216,27 +230,24 @@ async function loadDashboard(){
     const classes = new Set(students.map(s => s.class_name));
     document.getElementById("totalClasses").innerText = classes.size;
 
-    // PAID / PARTIAL / DUE Counter (this checks months)
-    let paid = 0, partial = 0, due = 0;
-    let totalCollection = 0;
-    let todayCollection = 0;
+    // PAID / PARTIAL / DUE Counter + Collections
+    let paid=0, partial=0, due=0;
+    let totalCollection=0, todayCollection=0;
 
     const today = new Date().toISOString().split("T")[0];
 
-    students.forEach(s => {
+    students.forEach(s=>{
         const months = s.months || {};
-
-        Object.keys(months).forEach(m => {
-            const rec = months[m];
+        Object.keys(months).forEach(m=>{
+            const rec = months[m] || {};
 
             if(rec.status === "Paid") paid++;
             else if(rec.status === "Partial") partial++;
             else due++;
 
-            totalCollection += rec.paid || 0;
-
+            totalCollection += Number(rec.paid || 0);
             if(rec.date === today){
-                todayCollection += rec.paid || 0;
+                todayCollection += Number(rec.paid || 0);
             }
         });
     });

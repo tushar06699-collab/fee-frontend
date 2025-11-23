@@ -32,26 +32,35 @@
   /* TOP NAV BAR */
   .topbar{
       width:100%;padding:15px 20px;background:#007bff;color:#fff;
-      display:flex;justify-content:space-between;align-items:center;
-      box-sizing:border-box;position:sticky;top:0;z-index:4000;
+      display:flex;justify-content:flex-start;align-items:center;
+      gap:15px;box-sizing:border-box;position:sticky;top:0;z-index:4000;
   }
+
+  /* HAMBURGER LEFT */
   .menu-btn{
       font-size:28px;cursor:pointer;color:#fff;font-weight:900;
       user-select:none;
+      transition:0.3s;
   }
+  .menu-btn:hover{opacity:0.8;}
 
   /* DARK OVERLAY */
-  .overlay {position: fixed;top:0;left:0;width:100%;height:100%;
-      background: rgba(0,0,0,0.35);display:none;z-index:1500;}
+  .overlay {
+      position: fixed;top:0;left:0;width:100%;height:100%;
+      background: rgba(0,0,0,0.35);display:none;z-index:1500;
+  }
   .overlay.show { display:block; }
 
-  /* SIDE MENU */
+  /* LEFT SLIDING SIDE MENU */
   .side-menu{
-      position:fixed;top:0;right:-260px;width:260px;height:100%;
-      background:#fff;box-shadow:-2px 0 8px rgba(0,0,0,0.15);
-      padding:20px;transition:0.3s ease;z-index:2000;overflow-y:auto;
+      position:fixed;top:0;left:-280px;width:260px;height:100%;
+      background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+      padding:20px;overflow-y:auto;z-index:2000;
+      transition: left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+      border-radius:0 18px 18px 0;
   }
-  .side-menu.open{ right:0; }
+  .side-menu.open{ left:0; }
+
   .menu-item{
       padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
       font-size:16px;font-weight:600;color:#333;
@@ -59,8 +68,11 @@
   .menu-item:hover{ color:#007bff; }
 
   /* TABLE + UI */
-  .container{max-width:1600px;margin:auto;background:#fff;padding:25px;
-      border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08);margin-top:15px}
+  .container{
+      max-width:1600px;margin:auto;background:#fff;padding:25px;
+      border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08);
+      margin-top:15px
+  }
   h2{text-align:center;margin:0 0 12px}
 
   table{width:100%;border-collapse:collapse;margin-top:12px}
@@ -71,13 +83,17 @@
   .partial{background:#fff3bf;color:#7a5a00;font-weight:700}
   .due{background:#ffd2d2;color:#b30000;font-weight:700}
 
-  .class-row td{background:#222;color:#fff;text-align:left;padding-left:12px;
-      font-weight:700}
+  .class-row td{
+      background:#222;color:#fff;text-align:left;padding-left:12px;
+      font-weight:700
+  }
 
   .student-name{color:#007bff;cursor:pointer;font-weight:600}
 
-  #search{padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;
-      margin-top:15px}
+  #search{
+      padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;
+      margin-top:15px
+  }
 
   .edit-btn{
       margin-top:4px;padding:4px 8px;font-size:12px;background:#ffc107;
@@ -123,17 +139,16 @@ if(localStorage.getItem("loggedIn")==="yes"){
 
 <!-- TOP BAR -->
 <div class="topbar">
-    <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
     <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
 </div>
 
 <!-- SIDEBAR -->
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 
 <div class="side-menu" id="sideMenu">
-     <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
+    <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
     <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
-
     <div class="menu-item" onclick="goToPage('add_student.html')">➕ Add Student</div>
     <div class="menu-item" onclick="goToPage('fees.html')">💰 Fees Modify</div>
     <div class="menu-item" onclick="goToPage('import_students.html')">📥 Import Students</div>
@@ -143,14 +158,20 @@ if(localStorage.getItem("loggedIn")==="yes"){
 
 <script>
 function toggleMenu(){
-    document.getElementById("sideMenu").classList.toggle("open");
-    document.getElementById("overlay").classList.toggle("show");
+    let menu = document.getElementById("sideMenu");
+    let overlay = document.getElementById("overlay");
+
+    menu.classList.toggle("open");
+    overlay.classList.toggle("show");
 }
 function closeMenu(){
     document.getElementById("sideMenu").classList.remove("open");
     document.getElementById("overlay").classList.remove("show");
 }
-function goToPage(p){closeMenu();window.location.href=p;}
+function goToPage(p){
+    closeMenu();
+    window.location.href = p;
+}
 </script>
 
 <div class="container">
@@ -199,13 +220,11 @@ async function renderTable(filter=""){
         let searchTxt = (s.name+" "+s.father+" "+s.roll+" "+s.class_name).toLowerCase();
         if(filter && !searchTxt.includes(filter.toLowerCase())) return;
 
-        // CLASS HEADING (ONLY ONCE)
         if(s.class_name !== currentClass){
             currentClass = s.class_name;
             tbody.innerHTML += `<tr class='class-row'><td colspan='16'>Class: ${currentClass}</td></tr>`;
         }
 
-        // PREV DUE COLOR RULE
         let prevCls = (s.previous_due==0) ? "prev-green" : "prev-red";
 
         let monthsHtml = "";
@@ -230,14 +249,12 @@ async function renderTable(filter=""){
         </tr>`;
     });
 
-    // CLICK STUDENT NAME → DETAILS PAGE
     document.querySelectorAll(".student-name").forEach(el=>{
         el.onclick = ()=>{
             window.location.href = `student_details.html?roll=${el.dataset.roll}&class=${el.dataset.class}`;
         };
     });
 
-    // EDIT BUTTON
     document.querySelectorAll(".edit-btn").forEach(btn=>{
         btn.onclick = ()=>{
             window.location.href = `edit.html?roll=${btn.dataset.roll}&class=${btn.dataset.class}`;
