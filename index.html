@@ -8,6 +8,32 @@
 <style>
   body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
 
+  /* LOGIN SCREEN */
+  #loginBox{
+      position:fixed;
+      top:0;left:0;width:100%;height:100%;
+      background:#ffffff;
+      display:flex;flex-direction:column;
+      justify-content:center;align-items:center;
+      gap:20px;
+      z-index:5000;
+  }
+  #loginBox input{
+      padding:12px 15px;
+      width:260px;
+      border-radius:8px;
+      border:1px solid #aaa;
+      font-size:16px;
+  }
+  #loginBtn{
+      padding:12px 15px;
+      width:260px;font-size:18px;
+      border:none;border-radius:8px;
+      background:#007bff;color:white;
+      cursor:pointer;
+  }
+  #loginBtn:hover{background:#0069d9;}
+
   /* TOP NAV BAR */
   .topbar{
       width:100%;
@@ -30,46 +56,39 @@
       user-select:none;
   }
 
-  /* DARK OVERLAY when menu opens */
   .overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0;left: 0;width: 100%;height: 100%;
       background: rgba(0,0,0,0.35);
       display: none;
       z-index: 1500;
   }
   .overlay.show { display:block; }
 
-  /* SIDE MENU */
   .side-menu{
-      position:fixed;
-      top:0;
-      right:-260px;
-      width:260px;
-      height:100%;
+      position:fixed;top:0;right:-260px;
+      width:260px;height:100%;
       background:#fff;
       box-shadow:-2px 0 8px rgba(0,0,0,0.15);
-      padding:20px;
-      transition:0.3s ease;
+      padding:20px;transition:0.3s ease;
       z-index:2000;
+      overflow-y:auto;
   }
   .side-menu.open{ right:0; }
 
   .menu-item{
-      padding:12px 0;
+      padding:12px 0;cursor:pointer;
       border-bottom:1px solid #eee;
-      cursor:pointer;
-      font-size:16px;
-      font-weight:600;
-      color:#333;
+      font-size:16px;font-weight:600;color:#333;
   }
   .menu-item:hover{ color:#007bff; }
 
-  .container{max-width:1600px;margin:auto;background:#fff;padding:25px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08);margin-top:15px}
-  h2{text-align:center;margin:0 0 12px}
+  .container{
+      max-width:1600px;margin:auto;background:#fff;
+      padding:25px;border-radius:12px;
+      box-shadow:0 3px 10px rgba(0,0,0,.08);
+      margin-top:15px
+  }
 
   table{width:100%;border-collapse:collapse;margin-top:12px}
   th,td{border:1px solid #e6e6e6;padding:8px;text-align:center;font-size:14px}
@@ -79,34 +98,46 @@
   .partial{background:#fff3bf;color:#7a5a00;font-weight:700}
   .due{background:#ffd2d2;color:#b30000;font-weight:700}
 
-  .class-row td{background:#222;color:#fff;text-align:left;padding-left:12px;font-weight:700}
+  /* Previous due special colors */
+  .prevPaid{
+      background:#c8ffc8 !important;
+      font-weight:bold;
+      color:#0b7a0b;
+  }
+  .prevDue{
+      background:#ffd2d2 !important;
+      font-weight:bold;
+      color:#b30000;
+  }
+
+  .class-row td{
+      background:#222;color:#fff;
+      text-align:left;padding-left:12px;
+      font-weight:700
+  }
+
   .student-name{color:#007bff;cursor:pointer;font-weight:600}
 
-  #search{padding:8px;border-radius:8px;border:1px solid #ccc;flex:1;width:100%;margin-top:15px}
+  #search{padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;margin-top:15px}
 
-  /* EDIT BUTTON */
   .edit-btn{
-      margin-top:4px;
-      padding:4px 8px;
-      font-size:12px;
-      background:#ffc107;
-      border:none;
-      border-radius:6px;
+      margin-top:4px;padding:4px 8px;font-size:12px;
+      background:#ffc107;border:none;border-radius:6px;
       cursor:pointer;
   }
-  .edit-btn:hover{
-      background:#e0a800;
-  }
-
-  .side-menu {
-    overflow-y: auto;  /* prevents hiding top items */
-    display: block;
-}
-
+  .edit-btn:hover{background:#e0a800;}
 </style>
 </head>
 
 <body>
+
+<!-- LOGIN FIRST -->
+<div id="loginBox">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Enter username">
+    <input type="password" id="password" placeholder="Enter password">
+    <button id="loginBtn">Login</button>
+</div>
 
 <!-- TOP BAR -->
 <div class="topbar">
@@ -118,26 +149,18 @@
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 
 <!-- SIDE MENU -->
-<!-- SIDE MENU -->
 <div class="side-menu" id="sideMenu">
-
-    <!-- ⭐ Guaranteed Visible Dashboard Button -->
-    
-
-    
+    <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
     <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
- <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
     <div class="menu-item" onclick="goToPage('add_student.html')">➕ Add Student</div>
     <div class="menu-item" onclick="goToPage('fees.html')">💰 Fees Modify</div>
     <div class="menu-item" onclick="goToPage('import_students.html')">📥 Import Students</div>
     <div class="menu-item" onclick="goToPage('receipt_history.html')">📜 Receipt History</div>
     <div class="menu-item" onclick="goToPage('delete_student.html')">🗑 Delete Students</div>
-   
 </div>
 
 <div class="container">
   <input id="search" placeholder="Search by name, roll, class..." />
-
   <table id="feeTable">
     <thead>
       <tr>
@@ -155,18 +178,42 @@ function toggleMenu(){
     document.getElementById("sideMenu").classList.toggle("open");
     document.getElementById("overlay").classList.toggle("show");
 }
-
 function closeMenu(){
     document.getElementById("sideMenu").classList.remove("open");
     document.getElementById("overlay").classList.remove("show");
 }
-
 function goToPage(page){
     closeMenu();
     window.location.href = page;
 }
 
-// FETCH STUDENTS 
+/* -------------------------
+   LOGIN SYSTEM
+--------------------------- */
+document.getElementById("loginBtn").onclick = function () {
+
+    const u = document.getElementById("username").value.trim();
+    const p = document.getElementById("password").value.trim();
+
+    if (u === "admin" && p === "1234") {
+        localStorage.setItem("loggedIn", "yes");
+        document.getElementById("loginBox").style.display = "none";
+        renderTable();
+    } else {
+        alert("Wrong username or password!");
+    }
+};
+
+window.onload = () => {
+    if (localStorage.getItem("loggedIn") === "yes") {
+        document.getElementById("loginBox").style.display = "none";
+        renderTable();
+    }
+};
+
+/* -------------------------
+   FETCH STUDENTS
+--------------------------- */
 async function fetchStudents() {
     try {
         const response = await fetch("https://fee-backend-ntas.onrender.com/students");
@@ -180,78 +227,57 @@ async function fetchStudents() {
 
 const allMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+/* -------------------------
+   RENDER TABLE
+--------------------------- */
 async function renderTable(filter="") {
+
     const tbody = document.getElementById("feeRows");
     tbody.innerHTML = "";
 
-    let students = await fetchStudents();
-    students.sort((a, b) => (a.class_name || "").localeCompare(b.class_name || ""));
+    const students = await fetchStudents();
 
     let currentClass = null;
 
+    students.sort((a,b)=>(a.class_name||"").localeCompare(b.class_name||""));
+
     students.forEach(s => {
-        s.Name = s.name;
-        s.Father = s.father;
-        s.Class = s.class_name;
-        s.Roll = s.roll;
-        s.previousDue = s.previous_due;
-        if (!s.months) s.months = {};
+        const prev = Number(s.previous_due || 0);
 
-        const searchText = `${s.Name} ${s.Father} ${s.Roll} ${s.Class}`.toLowerCase();
-        if (filter && !searchText.includes(filter.toLowerCase())) return;
+        const prevClass = prev === 0 ? "prevPaid" : "prevDue";  // << COLOR RULE APPLIED
 
-        if (s.Class !== currentClass) {
-            currentClass = s.Class;
+        if (s.class_name !== currentClass) {
+            currentClass = s.class_name;
             tbody.innerHTML += `<tr class="class-row"><td colspan="16">Class: ${currentClass}</td></tr>`;
         }
 
         let monthsHtml = "";
         allMonths.forEach(m => {
-            let rec = s.months[m] || { paid: 0, due: 0, status: "Due" };
+            let rec = s.months?.[m] || { paid: 0, due: 0, status: "Due" };
             const cls = rec.status === "Paid" ? "paid" : rec.status === "Partial" ? "partial" : "due";
-            monthsHtml += `<td class="${cls}" title="Paid: ${rec.paid} | Due: ${rec.due}">${rec.status}</td>`;
+            monthsHtml += `<td class="${cls}" title="Paid ${rec.paid}, Due ${rec.due}">${rec.status}</td>`;
         });
 
         tbody.innerHTML += `
             <tr>
                 <td>
-                    <span class="student-name" data-roll="${s.Roll}" data-class="${s.Class}">
-                        ${s.Name}
+                    <span class="student-name" data-roll="${s.roll}" data-class="${s.class_name}">
+                        ${s.name}
                     </span>
                     <br>
-                    <button class="edit-btn" data-roll="${s.Roll}" data-class="${s.Class}">
+                    <button class="edit-btn" data-roll="${s.roll}" data-class="${s.class_name}">
                         ✏ Edit
                     </button>
                 </td>
-                <td>${s.Class}</td>
-                <td>${s.Roll}</td>
-                <td>${s.previousDue}</td>
+                <td>${s.class_name}</td>
+                <td>${s.roll}</td>
+                <td class="${prevClass}">${prev}</td>
                 ${monthsHtml}
             </tr>`;
     });
 
-    document.querySelectorAll(".student-name").forEach(el => {
-        el.onclick = () => {
-            const roll = el.dataset.roll;
-            const cls = el.dataset.class;
-            window.location.href = `student_details.html?roll=${roll}&class=${cls}`;
-        };
-    });
 }
-
-// CLICK EDIT BUTTON
-document.addEventListener("click", function(e){
-    if(e.target.classList.contains("edit-btn")){
-        const roll = e.target.dataset.roll;
-        const cls = e.target.dataset.class;
-        window.location.href = `edit.html?roll=${roll}&class=${cls}`;
-    }
-});
-
 document.getElementById("search").oninput = e => renderTable(e.target.value);
-renderTable();
-
-
 </script>
 
 </body>
