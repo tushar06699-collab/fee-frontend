@@ -13,12 +13,17 @@ input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;mar
 #update{width:100%;padding:10px;border-radius:8px;border:none;cursor:pointer;background:#ffc107;color:#000;font-weight:700;margin-top:10px}
 .back{background:#007bff;color:#fff;padding:10px;width:100%;border-radius:8px;margin-top:10px;border:none;cursor:pointer}
 .warning{color:#d9534f;margin-top:10px;text-align:center;font-weight:600}
+.row { display:flex; gap:8px; align-items:center; margin-top:8px; }
+#sessionSelect { padding:8px; border-radius:6px; border:1px solid #ccc; width:100%; }
 </style>
 </head>
 
 <body>
 <div class="container">
   <h2>Edit Student Details</h2>
+
+  <label>Session</label>
+  <select id="sessionSelect"></select>
 
   <input type="hidden" id="originalClass"/>
   <input type="hidden" id="originalRoll"/>
@@ -51,96 +56,184 @@ input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;mar
   </p>
 
   <button id="update">Update Details</button>
-  <button class="back" onclick="location.href='index.html'">⬅ Back</button>
+  <button class="back" onclick="goBack()">⬅ Back</button>
 </div>
 
 <script>
+/*
+  Session-aware Edit Student page.
+  - Loads sessions from /session/list
+  - Loads fees for the selected session (/fees/get)
+  - Loads student from /student/:class/:roll?session=...
+  - Updates student using POST /update_student with X-Session header
+*/
+
 const API = "https://fee-backend-ntas.onrender.com";
-const params = new URLSearchParams(window.location.search);
-const roll = params.get("roll");
-const className = params.get("class");
+const urlParams = new URLSearchParams(window.location.search);
+const initialRoll = urlParams.get("roll");
+const initialClass = urlParams.get("class");
 
-const monthlyFees = {
-  "Nursery":1200,"LKG":1300,"UKG":1300,"1st":1300,"2nd":1300,"3rd":1300,"4th":1400,"5th":1400,
-  "6th":1500,"7th":1500,"8th":1700,"9th":1900,"10th":1900,
-  "11th_Medical":2200,"11th_Commerce":2100,"11th_Art":2100,
-  "12th_Medical":2200,"12th_Commerce":2100,"12th_Art":2100
-};
-function getFee(cls){ return monthlyFees[cls]||0; }
-
+let currentSession = localStorage.getItem("session") || urlParams.get("session") || "2024_25";
 let loadedStudent = null;
+let sessionFees = {}; // class -> monthly_fee (and annual_fee if returned)
 
-// ----------------------- LOAD STUDENT FROM BACKEND -----------------------
-async function loadStudent() {
+// UI refs
+const sessionSelect = document.getElementById("sessionSelect");
+const nameInput = document.getElementById("name");
+const fatherInput = document.getElementById("father");
+const classSelect = document.getElementById("classSelect");
+const rollInput = document.getElementById("roll");
+const prevDueInput = document.getElementById("previousDue");
+const originalClassInput = document.getElementById("originalClass");
+const originalRollInput = document.getElementById("originalRoll");
+
+// go back helper
+function goBack(){
+  // navigate back to index with same session
+  location.href = 'index.html?session=' + encodeURIComponent(currentSession);
+}
+
+/* --- sessions --- */
+async function loadSessions(){
   try {
-    const res = await fetch(`${API}/student/${className}/${roll}`);
-    const data = await res.json();
-
-    if (!data.success) {
-      alert("Student not found");
-      return location.href = "index.html";
+    const res = await fetch(API + "/session/list");
+    const json = await res.json();
+    if(!json.success || !Array.isArray(json.sessions)){
+      console.warn("session/list returned unexpected:", json);
+      sessionSelect.innerHTML = '<option value="2024_25">2024_25</option>';
+      currentSession = "2024_25";
+      localStorage.setItem("session", currentSession);
+      return;
     }
+    sessionSelect.innerHTML = "";
+    json.sessions.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      sessionSelect.appendChild(opt);
+    });
 
-    loadedStudent = data.student;
-
-    document.getElementById("name").value = loadedStudent.name;
-    document.getElementById("father").value = loadedStudent.father;
-    document.getElementById("classSelect").value = loadedStudent.class_name;
-    document.getElementById("roll").value = loadedStudent.roll;
-    document.getElementById("previousDue").value = loadedStudent.previous_due;
-
-    document.getElementById("originalClass").value = loadedStudent.class_name;
-    document.getElementById("originalRoll").value = loadedStudent.roll;
-  }
-  catch (err) {
-    alert("❌ Cannot connect to backend");
+    if(!json.sessions.includes(currentSession)){
+      currentSession = json.sessions[0];
+    }
+    sessionSelect.value = currentSession;
+    localStorage.setItem("session", currentSession);
+  } catch (e) {
+    console.error("loadSessions error:", e);
+    sessionSelect.innerHTML = '<option value="2024_25">2024_25</option>';
+    currentSession = "2024_25";
+    localStorage.setItem("session", currentSession);
   }
 }
 
-window.onload = loadStudent;
+sessionSelect?.addEventListener("change", async () => {
+  currentSession = sessionSelect.value;
+  localStorage.setItem("session", currentSession);
+  // reload fees & student for this session
+  await loadFees();
+  if (originalClassInput.value && originalRollInput.value) {
+    await loadStudent(originalClassInput.value, originalRollInput.value);
+  }
+});
 
+/* --- fees for session --- */
+async function loadFees(){
+  sessionFees = {};
+  try {
+    const res = await fetch(API + "/fees/get", { headers: { "X-Session": currentSession }});
+    const json = await res.json();
+    if(json && Array.isArray(json.fees)){
+      json.fees.forEach(f => {
+        sessionFees[f.class_name] = {
+          monthly_fee: Number(f.monthly_fee || 0),
+          annual_fee: Number(f.annual_fee || f.annual_charge || 0)
+        };
+      });
+    }
+  } catch (e) {
+    console.error("loadFees error:", e);
+  }
+}
 
-// ----------------------- UPDATE STUDENT -----------------------
-document.getElementById("update").onclick = async function () {
+/* helper to get default monthly fee for a class in current session */
+function getFeeForClass(cls){
+  if(sessionFees[cls]) return sessionFees[cls].monthly_fee || 0;
+  // fallback to built-in default mapping if you want; keep simple:
+  return 0;
+}
 
-  const newName = document.getElementById("name").value.trim();
-  const newFather = document.getElementById("father").value.trim();
-  const newClass = document.getElementById("classSelect").value;
-  const newRoll = document.getElementById("roll").value.trim();
-  const newPrevDue = Number(document.getElementById("previousDue").value || 0);
+/* --- student load/save --- */
+async function loadStudent(cls, roll){
+  if(!cls || !roll) {
+    // try initial query params
+    cls = cls || initialClass;
+    roll = roll || initialRoll;
+    if(!cls || !roll) return;
+  }
+  try {
+    const url = `${API}/student/${encodeURIComponent(cls)}/${encodeURIComponent(roll)}?session=${encodeURIComponent(currentSession)}`;
+    const res = await fetch(url, { headers: { "X-Session": currentSession }});
+    const data = await res.json();
+    if(!data.success){
+      alert("Student not found in session " + currentSession);
+      // redirect to index for convenience
+      return location.href = 'index.html?session=' + encodeURIComponent(currentSession);
+    }
 
-  const originalClass = document.getElementById("originalClass").value;
-  const originalRoll = document.getElementById("originalRoll").value;
+    loadedStudent = data.student || {};
+    // fill UI
+    nameInput.value = loadedStudent.name || "";
+    fatherInput.value = loadedStudent.father || "";
+    classSelect.value = loadedStudent.class_name || cls;
+    rollInput.value = loadedStudent.roll || roll;
+    prevDueInput.value = Number(loadedStudent.previous_due || 0);
+
+    originalClassInput.value = loadedStudent.class_name || cls;
+    originalRollInput.value = loadedStudent.roll || roll;
+  } catch (e) {
+    console.error("loadStudent error:", e);
+    alert("Cannot connect to backend for session " + currentSession);
+  }
+}
+
+/* --- update --- */
+document.getElementById("update").addEventListener("click", async () => {
+  const newName = nameInput.value.trim();
+  const newFather = fatherInput.value.trim();
+  const newClass = classSelect.value;
+  const newRoll = rollInput.value.trim();
+  const newPrevDue = Number(prevDueInput.value || 0);
+
+  const originalClass = originalClassInput.value;
+  const originalRoll = originalRollInput.value;
 
   if (!newName || !newClass || !newRoll) {
     return alert("Please fill all required fields");
   }
 
-  let updatedMonths = loadedStudent.months;
+  // prepare months: if class changed, reset months using session's fee for newClass
+  let updatedMonths = loadedStudent.months || {};
 
-  // If class changed → reset fee structure
   if (newClass !== originalClass) {
-    if (!confirm(`Changing class from ${originalClass} to ${newClass} will reset dues. Continue?`)) {
+    if (!confirm(`Changing class from ${originalClass} to ${newClass} will reset dues based on new session fees. Continue?`)) {
       return;
     }
-
-    const fee = getFee(newClass);
+    const fee = getFeeForClass(newClass);
+    const keys = ["previousDue","Annual","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     updatedMonths = {};
-
-    const keys = ["previousDue","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     keys.forEach(m => {
+      const due = (m === "previousDue") ? newPrevDue : (m === "Annual" ? (sessionFees[newClass]?.annual_fee || 0) : fee);
       updatedMonths[m] = {
         paid: 0,
-        due: m === "previousDue" ? newPrevDue : fee,
-        status: "Due",
+        due: Number(due || 0),
+        status: Number(due || 0) === 0 ? "Paid" : "Due",
         date: "",
-        purpose: "",
+        purpose: m === "Annual" ? "Annual Charge" : (m === "previousDue" ? "Previous Dues" : "Monthly Fee"),
         extra: 0
       };
     });
   }
 
-  // Send to backend
   const payload = {
     class: originalClass,
     roll: originalRoll,
@@ -150,7 +243,7 @@ document.getElementById("update").onclick = async function () {
       class_name: newClass,
       roll: newRoll,
       previous_due: newPrevDue,
-      advance: loadedStudent.advance,
+      advance: (loadedStudent.advance || 0),
       months: updatedMonths
     }
   };
@@ -158,23 +251,28 @@ document.getElementById("update").onclick = async function () {
   try {
     const res = await fetch(`${API}/update_student`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Session": currentSession },
       body: JSON.stringify(payload)
     });
-
     const data = await res.json();
-
-    if (data.success) {
+    if(data.success){
       alert("Student updated successfully!");
-      location.href = "index.html";
+      location.href = 'index.html?session=' + encodeURIComponent(currentSession);
     } else {
-      alert("Error: " + data.message);
+      alert("Error updating: " + (data.message || JSON.stringify(data)));
     }
+  } catch (e) {
+    console.error("update error:", e);
+    alert("Backend error while updating student");
   }
-  catch (err) {
-    alert("❌ Backend error");
-  }
-};
+});
+
+/* --- initial bootstrap --- */
+(async function init(){
+  await loadSessions();
+  await loadFees();
+  await loadStudent();
+})();
 </script>
 </body>
 </html>

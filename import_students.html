@@ -10,7 +10,7 @@
 <style>
 body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:20px}
 .container{max-width:700px;margin:auto;background:#fff;padding:22px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
-button,input{display:block;width:100%;padding:10px;margin-top:10px;border-radius:8px}
+button,input,select{display:block;width:100%;padding:10px;margin-top:10px;border-radius:8px}
 .import{background:#6f42c1;color:#fff;border:none}
 .download{background:#ff9800;color:#fff;border:none}
 </style>
@@ -19,7 +19,11 @@ button,input{display:block;width:100%;padding:10px;margin-top:10px;border-radius
 <body>
 <div class="container">
   <h2>Import Students From Excel</h2>
-  <p>Required headers: <strong>Name, Father, Class, Roll, PreviousDue</strong></p>
+
+  <label>Select Session</label>
+  <select id="sessionSelect"></select>
+
+  <p>Required headers: <strong>Name, Father, Class, Roll, PreviousDue, AnnualCharge(optional)</strong></p>
 
   <input type="file" id="file" accept=".xlsx,.xls" />
 
@@ -32,17 +36,39 @@ button,input{display:block;width:100%;padding:10px;margin-top:10px;border-radius
 
 <script>
 const API = "https://fee-backend-ntas.onrender.com";
+let currentSession = localStorage.getItem("session") || "2024_25";
 
-const monthlyFees = {
-  "Nursery":1200,"LKG":1300,"UKG":1300,"1st":1300,"2nd":1300,"3rd":1300,"4th":1400,"5th":1400,
-  "6th":1500,"7th":1500,"8th":1700,"9th":1900,"10th":1900,
-  "11th_Medical":2200,"11th_Commerce":2100,"11th_Art":2100,
-  "12th_Medical":2200,"12th_Commerce":2100,"12th_Art":2100
-};
+/* ------------------------------------
+   LOAD SESSION LIST
+------------------------------------ */
+async function loadSessions(){
+    try {
+        const res = await fetch(API + "/session/list");
+        const data = await res.json();
 
-function getFee(c){ return monthlyFees[c] || 0; }
+        const sel = document.getElementById("sessionSelect");
+        sel.innerHTML = "";
 
-// Normalize different class formats
+        data.sessions.forEach(s => {
+            sel.innerHTML += `<option value="${s}">${s}</option>`;
+        });
+
+        sel.value = currentSession;
+        sel.onchange = () => {
+            currentSession = sel.value;
+            localStorage.setItem("session", currentSession);
+        };
+    }
+    catch(err){
+        alert("❌ Failed to load sessions");
+    }
+}
+loadSessions();
+
+
+/* ------------------------------------
+   NORMALIZE CLASS FORMAT
+------------------------------------ */
 function normalizeClassKey(raw){
   if(!raw) return "";
   const key = String(raw).trim().replace(/\s+/g,"").toLowerCase();
@@ -50,14 +76,13 @@ function normalizeClassKey(raw){
   const map = {
     "nursery":"Nursery","lkg":"LKG","ukg":"UKG",
     "1":"1st","1st":"1st","2":"2nd","2nd":"2nd","3":"3rd","3rd":"3rd",
-    "4":"4th","4th":"4th","5":"5th","5th":"5th","6":"6th","6th":"6th",
-    "7":"7th","7th":"7th","8":"8th","8th":"8th","9":"9th","9th":"9th",
+    "4":"4th","4th":"4th","5":"5th","5th":"5th",
+    "6":"6th","6th":"6th","7":"7th","7th":"7th",
+    "8":"8th","8th":"8th","9":"9th","9th":"9th",
     "10":"10th","10th":"10th",
-
     "11medical":"11th_Medical","11thmedical":"11th_Medical",
     "11commerce":"11th_Commerce","11thcommerce":"11th_Commerce",
     "11art":"11th_Art","11thart":"11th_Art",
-
     "12medical":"12th_Medical","12thmedical":"12th_Medical",
     "12commerce":"12th_Commerce","12thcommerce":"12th_Commerce",
     "12art":"12th_Art","12thart":"12th_Art"
@@ -66,9 +91,10 @@ function normalizeClassKey(raw){
   return map[key] || raw;
 }
 
-// --------------------------------------------------------
-// Download Sample Excel WITH PreviousDue Column
-// --------------------------------------------------------
+
+/* ------------------------------------
+   DOWNLOAD SAMPLE EXCEL
+------------------------------------ */
 function downloadSample(){
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet([
@@ -77,16 +103,18 @@ function downloadSample(){
       Father:"Suresh Kumar",
       Class:"6th",
       Roll:1,
-      PreviousDue:200   // <-- Added
+      PreviousDue:200,
+      AnnualCharge:500   // OPTIONAL
     }
   ]);
   XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
   XLSX.writeFile(wb, "student_format.xlsx");
 }
 
-// --------------------------------------------------------
-// Import Excel → POST each student to backend
-// --------------------------------------------------------
+
+/* ------------------------------------
+   IMPORT EXCEL AND SEND TO BACKEND
+------------------------------------ */
 async function importExcel(){
   const file = document.getElementById("file").files[0];
   if(!file){ alert("Please select a file"); return; }
@@ -102,11 +130,12 @@ async function importExcel(){
     let imported = 0, skipped = 0;
 
     for(const row of rows){
-      const name = row.Name || row.name;
-      const father = row.Father || row.father || "";
-      const clsRaw = row.Class || row.class;
-      const roll = row.Roll || row.roll;
-      const previousDue = Number(row.PreviousDue || row.previousdue || 0); // <-- NEW
+      const name = row.Name;
+      const father = row.Father || "";
+      const clsRaw = row.Class;
+      const roll = row.Roll;
+      const previousDue = Number(row.PreviousDue || 0);
+      const annualCharge = Number(row.AnnualCharge || 0);
 
       if(!name || !clsRaw || !roll){
         skipped++;
@@ -114,58 +143,74 @@ async function importExcel(){
       }
 
       const class_name = normalizeClassKey(clsRaw);
-      const fee = getFee(class_name);
 
       // Build months JSON
       const months = {};
+
+      const monthly_fee_res = await fetch(`${API}/fees/get`, {
+        headers: { "X-Session": currentSession }
+      });
+      const feeData = await monthly_fee_res.json();
+
+      const feeRow = feeData.fees.find(x => x.class_name === class_name);
+      const monthlyFee = feeRow ? Number(feeRow.monthly_fee) : 0;
+
       ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
       .forEach(m=>{
         months[m] = {
           paid: 0,
-          due: fee,
+          due: monthlyFee,
           status: "Due",
           date: "",
-          purpose: "",
+          purpose: "Monthly Fee",
           extra: 0
         };
       });
 
-      // Include previous due in backend
       months["previousDue"] = {
         paid: 0,
         due: previousDue,
         status: previousDue > 0 ? "Due" : "OK",
         date: "",
-        purpose: "Previous Balance",
+        purpose: "Previous Dues",
         extra: 0
       };
 
-      // Send to backend
+      months["Annual"] = {
+        paid: 0,
+        due: annualCharge,
+        status: annualCharge > 0 ? "Due" : "OK",
+        date: "",
+        purpose: "Annual Charge",
+        extra: 0
+      };
+
+      // SEND TO BACKEND
       const res = await fetch(`${API}/student/add`, {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
+        headers: {
+            "Content-Type":"application/json",
+            "X-Session": currentSession
+        },
         body: JSON.stringify({
           name,
           father,
           class_name,
           roll: String(roll),
-          previous_due: previousDue,   // <-- send properly
+          previous_due: previousDue,
+          annual_charge: annualCharge,
           advance: 0,
           months
         })
       });
 
       const json = await res.json();
-
-      if(json.success){
-        imported++;
-      } else {
-        skipped++;
-      }
+      if(json.success) imported++;
+      else skipped++;
     }
 
     alert(`Imported: ${imported}\nSkipped: ${skipped}`);
-    location.href = "index.html";
+    location.href = `index.html?session=${currentSession}`;
   };
 
   reader.readAsArrayBuffer(file);

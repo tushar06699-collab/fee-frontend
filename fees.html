@@ -29,7 +29,14 @@ body{
     font-weight:600;
 }
 
-/* LEFT HAMBURGER BUTTON */
+#sessionSelect{
+    margin-left:auto;
+    padding:6px 10px;
+    border-radius:6px;
+    border:none;
+    font-size:15px;
+}
+
 .menu-btn{
     font-size:28px;
     cursor:pointer;
@@ -37,7 +44,6 @@ body{
     user-select:none;
 }
 
-/* OVERLAY */
 .overlay{
     position:fixed;
     top:0;left:0;
@@ -48,7 +54,6 @@ body{
 }
 .overlay.show{ display:block; }
 
-/* LEFT SLIDE SIDEBAR */
 .side-menu{
     position:fixed;
     top:0;
@@ -73,9 +78,8 @@ body{
 }
 .menu-item:hover{ color:#007bff; }
 
-/* MAIN CONTENT */
 .container{
-    max-width:700px;
+    max-width:800px;
     margin:auto;
     background:#fff;
     padding:20px;
@@ -87,110 +91,160 @@ body{
 table{width:100%;border-collapse:collapse;margin-top:20px}
 th,td{border:1px solid #ddd;padding:10px;text-align:center}
 th{background:#007bff;color:white}
-input{padding:6px;width:100px}
+input{padding:6px;width:120px}
 button{padding:6px 12px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer}
 </style>
 </head>
 
 <body>
 
-<!-- TOP BAR -->
 <div class="topbar">
     <div class="menu-btn" onclick="toggleMenu()">☰</div>
     Edit Fee Structure
+    <select id="sessionSelect" onchange="changeSession()"></select>
 </div>
 
-<!-- OVERLAY -->
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 
-<!-- LEFT SLIDE SIDE MENU -->
 <div id="sideMenu" class="side-menu">
-  <div class="menu-item" onclick="goTo('fees.html')">💰 Fees Modify</div>
+    <div class="menu-item" onclick="goTo('fees.html')">💰 Fees Modify</div>
     <div class="menu-item" onclick="goTo('index.html')">📋 Students</div>
     <div class="menu-item" onclick="goTo('dashboard.html')">🏠 Dashboard</div>
     <div class="menu-item" onclick="goTo('add_student.html')">➕ Add Student</div>
-    
     <div class="menu-item" onclick="goTo('receipt_history.html')">📜 Receipt History</div>
     <div class="menu-item" onclick="goTo('delete_student.html')">🗑 Delete Students</div>
+    <div class="menu-item" onclick="goToPage('export.html')">📤 Export Data</div>
 </div>
 
 <script>
+const API = "https://fee-backend-ntas.onrender.com";
+let currentSession = localStorage.getItem("session") || "2024_25";
+
 function toggleMenu(){
-    document.getElementById("sideMenu").classList.toggle("open");
-    document.getElementById("overlay").classList.toggle("show");
+    document.getElementById("sideMenu").classList.add("open");
+    document.getElementById("overlay").classList.add("show");
 }
 function closeMenu(){
     document.getElementById("sideMenu").classList.remove("open");
     document.getElementById("overlay").classList.remove("show");
 }
-function goTo(p){
-    closeMenu();
-    window.location.href = p;
+function goTo(x){ location.href=x; }
+
+/* LOAD SESSIONS */
+async function loadSessions(){
+    try {
+        const res = await fetch(API + "/session/list");
+        const data = await res.json();
+
+        let sel = document.getElementById("sessionSelect");
+        sel.innerHTML = "";
+
+        data.sessions.forEach(s => {
+            sel.innerHTML += `<option value="${s}">${s}</option>`;
+        });
+
+        if(!data.sessions.includes(currentSession)){
+            currentSession = data.sessions[0];
+        }
+
+        sel.value = currentSession;
+        localStorage.setItem("session", currentSession);
+    }
+    catch(err){
+        alert("Error loading sessions!");
+    }
 }
+
+function changeSession(){
+    currentSession = document.getElementById("sessionSelect").value;
+    localStorage.setItem("session", currentSession);
+    loadFees();
+}
+
+/* LOAD FEES */
+async function loadFees(){
+    const res = await fetch(`${API}/fees/get`, {
+        headers: { "X-Session": currentSession }
+    });
+
+    const data = await res.json();
+    if (!data.success) return alert("Error loading fees");
+
+    const body = document.getElementById("feeBody");
+    body.innerHTML = "";
+
+    data.fees.forEach(f => {
+        let monthly = f.monthly_fee ?? 0;
+        let annual = f.annual_charge ?? 0;
+
+        body.innerHTML += `
+          <tr>
+            <td>${f.class_name}</td>
+
+            <td><input id="fee_${f.class_name}" 
+                       value="${monthly}" 
+                       type="number"></td>
+
+            <td><input id="annual_${f.class_name}" 
+                       value="${annual}" 
+                       type="number"></td>
+
+            <td><button onclick="saveFee('${f.class_name}')">Save</button></td>
+          </tr>
+        `;
+    });
+}
+
+/* SAVE FEES */
+async function saveFee(className){
+    const monthly_fee = Number(document.getElementById("fee_" + className).value);
+    const annual_charge = Number(document.getElementById("annual_" + className).value);
+
+    const res = await fetch(`${API}/fees/update`, {
+        method: "POST",
+        headers: { 
+            "Content-Type": "application/json",
+            "X-Session": currentSession
+        },
+        body: JSON.stringify({
+            class_name: className,   // FIXED 🔥
+            monthly_fee,
+            annual_charge
+        })
+    });
+
+    const data = await res.json();
+    alert(data.message ?? "Saved!");
+}
+
+
+/* INIT */
+loadSessions().then(loadFees);
 </script>
 
-<!-- MAIN CONTENT -->
 <div class="container">
 
-  <button onclick="location.href='index.html'" 
+  <button onclick="location.href='index.html?session='+currentSession" 
         style="padding:8px 14px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;margin-bottom:12px">
         ⬅ Back to Home
   </button>
 
-  <h2>Class-wise Monthly Fee Setup</h2>
+  <h2>Class-wise Fee Structure</h2>
 
   <table>
     <thead>
       <tr>
         <th>Class</th>
         <th>Monthly Fee (₹)</th>
+        <th>Annual Charge (₹)</th>
         <th>Save</th>
       </tr>
     </thead>
+
     <tbody id="feeBody"></tbody>
+
   </table>
 </div>
-
-<script>
-const API = "https://fee-backend-ntas.onrender.com";
-
-async function loadFees(){
-  const res = await fetch(`${API}/fees/get`);
-  const data = await res.json();
-  if (!data.success) return alert("Error loading fees");
-
-  const body = document.getElementById("feeBody");
-  body.innerHTML = "";
-
-  data.fees.forEach(f => {
-    body.innerHTML += `
-      <tr>
-        <td>${f.class_name}</td>
-        <td><input id="fee_${f.class_name}" value="${f.monthly_fee}" type="number"></td>
-        <td><button onclick="saveFee('${f.class_name}')">Save</button></td>
-      </tr>
-    `;
-  });
-}
-
-async function saveFee(className){
-  const newFee = document.getElementById("fee_" + className).value;
-
-  const res = await fetch(`${API}/fees/update`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      class_name: className,
-      monthly_fee: Number(newFee)
-    })
-  });
-
-  const data = await res.json();
-  alert(data.message ?? "Saved!");
-}
-
-loadFees();
-</script>
 
 </body>
 </html>

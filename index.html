@@ -36,27 +36,35 @@
       gap:15px;box-sizing:border-box;position:sticky;top:0;z-index:4000;
   }
 
-  /* HAMBURGER LEFT */
-  .menu-btn{
-      font-size:28px;cursor:pointer;color:#fff;font-weight:900;
-      user-select:none;
-      transition:0.3s;
+  #sessionSelect {
+      padding:4px 8px;border-radius:6px;border:none;font-size:14px;
   }
-  .menu-btn:hover{opacity:0.8;}
 
-  /* DARK OVERLAY */
+  #createSessionBtn {
+      margin-left:10px;
+      padding:6px 10px;
+      border-radius:6px;
+      border:0;
+      background:#28a745;
+      color:#fff;
+      font-weight:700;
+      cursor:pointer;
+  }
+
+  /* HAMBURGER */
+  .menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
+
   .overlay {
       position: fixed;top:0;left:0;width:100%;height:100%;
       background: rgba(0,0,0,0.35);display:none;z-index:1500;
   }
   .overlay.show { display:block; }
 
-  /* LEFT SLIDING SIDE MENU */
   .side-menu{
       position:fixed;top:0;left:-280px;width:260px;height:100%;
       background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
       padding:20px;overflow-y:auto;z-index:2000;
-      transition: left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+      transition: left 0.35s;
       border-radius:0 18px 18px 0;
   }
   .side-menu.open{ left:0; }
@@ -65,15 +73,12 @@
       padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
       font-size:16px;font-weight:600;color:#333;
   }
-  .menu-item:hover{ color:#007bff; }
 
-  /* TABLE + UI */
   .container{
       max-width:1600px;margin:auto;background:#fff;padding:25px;
       border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08);
       margin-top:15px
   }
-  h2{text-align:center;margin:0 0 12px}
 
   table{width:100%;border-collapse:collapse;margin-top:12px}
   th,td{border:1px solid #e6e6e6;padding:8px;text-align:center;font-size:14px}
@@ -99,17 +104,20 @@
       margin-top:4px;padding:4px 8px;font-size:12px;background:#ffc107;
       border:none;border-radius:6px;cursor:pointer;
   }
-  .edit-btn:hover{background:#e0a800;}
 
-  /* PREVIOUS DUE COLORS */
+  td:last-child, th:last-child {
+    background:#eaf2ff;
+    font-weight:700;
+    color:#004aad;
+}
+
   .prev-green{color:#0b7a0b;font-weight:700;}
   .prev-red{color:#b30000;font-weight:700;}
 </style>
 </head>
-
 <body>
 
-<!-- LOGIN SCREEN -->
+<!-- LOGIN -->
 <div id="loginBox">
     <div id="loginCard">
         <h2>Admin Login</h2>
@@ -124,16 +132,17 @@ function doLogin(){
     let u = document.getElementById("username").value.trim();
     let p = document.getElementById("password").value.trim();
 
-    if(u === "admin" && p === "1234"){
-        localStorage.setItem("loggedIn","yes");
-        document.getElementById("loginBox").style.display="none";
-    } else {
-        alert("Invalid credentials");
-    }
+    
+    if (u === "admin" && p === "1234") {
+    localStorage.setItem("loggedIn", "yes");
+    document.getElementById("loginBox").style.display = "none";
+} else {
+    alert("Invalid credentials");
+}
 }
 
-if(localStorage.getItem("loggedIn")==="yes"){
-    document.getElementById("loginBox").style.display="none";
+if (localStorage.getItem("loggedIn") === "yes") {
+    document.getElementById("loginBox").style.display = "none";
 }
 </script>
 
@@ -141,11 +150,15 @@ if(localStorage.getItem("loggedIn")==="yes"){
 <div class="topbar">
     <div class="menu-btn" onclick="toggleMenu()">☰</div>
     <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
+
+    <div style="margin-left:auto; display:flex; align-items:center;">
+        <select id="sessionSelect" onchange="changeSession()"></select>
+        <button id="createSessionBtn">➕ New Session</button>
+    </div>
 </div>
 
 <!-- SIDEBAR -->
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
-
 <div class="side-menu" id="sideMenu">
     <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
     <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
@@ -154,117 +167,234 @@ if(localStorage.getItem("loggedIn")==="yes"){
     <div class="menu-item" onclick="goToPage('import_students.html')">📥 Import Students</div>
     <div class="menu-item" onclick="goToPage('receipt_history.html')">📜 Receipt History</div>
     <div class="menu-item" onclick="goToPage('delete_student.html')">🗑 Delete Students</div>
+    <div class="menu-item" onclick="goToPage('export.html')">📤 Export Data</div>
+
 </div>
 
 <script>
-function toggleMenu(){
-    let menu = document.getElementById("sideMenu");
-    let overlay = document.getElementById("overlay");
-
-    menu.classList.toggle("open");
-    overlay.classList.toggle("show");
-}
-function closeMenu(){
-    document.getElementById("sideMenu").classList.remove("open");
-    document.getElementById("overlay").classList.remove("show");
-}
-function goToPage(p){
-    closeMenu();
-    window.location.href = p;
-}
+function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
+function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
+function goToPage(p){ window.location.href = p + "?session=" + currentSession; }
 </script>
 
 <div class="container">
   <input id="search" placeholder="Search by name, roll, class..." />
-
   <table id="feeTable">
     <thead>
-      <tr>
-        <th>Student</th><th>Class</th><th>Roll</th><th>Prev Due</th>
-        <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th>
-        <th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
-      </tr>
-    </thead>
+  <tr>
+    <th>Student</th>
+    <th>Class</th>
+    <th>Roll</th>
+    <th>Prev Due</th>
+    <th>Apr</th>
+    <th>May</th>
+    <th>Jun</th>
+    <th>Jul</th>
+    <th>Aug</th>
+    <th>Sep</th>
+    <th>Oct</th>
+    <th>Nov</th>
+    <th>Dec</th>
+    <th>Jan</th>
+    <th>Feb</th>
+    <th>Mar</th>
+    <th>Total Due</th>
+  </tr>
+</thead>
+
     <tbody id="feeRows"></tbody>
   </table>
 </div>
 
 <script>
 const API = "https://fee-backend-ntas.onrender.com";
-const allMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+let currentSession = localStorage.getItem("session") || "2024_25";
+const allMonths = [
+    "Apr","May","Jun","Jul","Aug","Sep",
+    "Oct","Nov","Dec","Jan","Feb","Mar"
+];
 
-async function fetchStudents(){
+/* -------------- SESSIONS ---------------- */
+async function loadSessions(){
     try{
-        const res = await fetch(API + "/students");
+        const res = await fetch(API + "/session/list");
         const data = await res.json();
-        return data.students || [];
+
+        let sel = sessionSelect;
+        sel.innerHTML = "";
+
+        data.sessions.forEach(s => {
+            sel.innerHTML += `<option value="${s}">${s}</option>`;
+        });
+
+        if(!data.sessions.includes(currentSession)) currentSession = data.sessions[0];
+        sel.value = currentSession;
+        localStorage.setItem("session", currentSession);
+
+    } catch(e){
+        alert("Error loading sessions");
+        console.error(e);
+    }
+}
+
+document.getElementById("createSessionBtn").onclick = createNewSession;
+
+async function createNewSession() {
+    let from = currentSession;
+
+    let extra = prompt("Enter extra fee to add (or 0):", "0");
+    if(extra === null) return; // Cancel clicked
+
+    extra = parseInt(extra) || 0;
+
+    try {
+        const res = await fetch(API + "/session/create_auto", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Session": from
+            },
+            body: JSON.stringify({
+                from_session: from,
+                extra_fee: extra
+            })
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            alert("Session create failed: " + data.message);
+            return;
+        }
+
+        alert("New session created: " + data.new_session);
+
+        // reload dropdown
+        await loadSessions();
+
+        sessionSelect.value = data.new_session;
+        changeSession();
+
+    } catch (e) {
+        alert("Error: " + e);
+        console.error(e);
+    }
+}
+
+function changeSession(){
+    currentSession = sessionSelect.value;
+    localStorage.setItem("session", currentSession);
+    renderTable();
+}
+
+/* ----------- FIXED FETCH STUDENTS ----------- */
+async function fetchStudents(){
+    const headers = { "X-Session": currentSession };
+
+    try{
+        const res = await fetch(API + "/students", { headers });
+        const text = await res.text();
+
+        let json = null;
+        try{ json = JSON.parse(text); } catch(e){}
+
+        if(!res.ok || (json && json.success === false)){
+            alert("Students load failed: " + (json?.message || json?.error || res.status));
+            return [];
+        }
+
+        return json?.students || [];
     }
     catch(e){
         alert("Cannot load students from backend");
+        console.error(e);
         return [];
     }
 }
 
-async function renderTable(filter=""){
-    const tbody = document.getElementById("feeRows");
+/* ----------------- TABLE ----------------- */
+async function renderTable(filter = "") {
+    const tbody = feeRows;
     tbody.innerHTML = "";
 
     let students = await fetchStudents();
-    students.sort((a,b)=>a.class_name.localeCompare(b.class_name));
+    students.sort((a, b) => (a.class_name || "").localeCompare(b.class_name || ""));
 
-    let currentClass = null;
+    let curClass = null;
 
-    students.forEach(s=>{
+    students.forEach(s => {
         s.months = s.months || {};
 
-        let searchTxt = (s.name+" "+s.father+" "+s.roll+" "+s.class_name).toLowerCase();
-        if(filter && !searchTxt.includes(filter.toLowerCase())) return;
+        let match = (
+            (s.name || "") + " " +
+            (s.father || "") + " " +
+            (s.roll || "") + " " +
+            (s.class_name || "")
+        ).toLowerCase();
 
-        if(s.class_name !== currentClass){
-            currentClass = s.class_name;
-            tbody.innerHTML += `<tr class='class-row'><td colspan='16'>Class: ${currentClass}</td></tr>`;
+        if (filter && !match.includes(filter.toLowerCase())) return;
+
+        if (s.class_name !== curClass) {
+            curClass = s.class_name;
+            tbody.innerHTML += `<tr class="class-row"><td colspan="17">Class: ${curClass}</td></tr>`;
         }
 
-        let prevCls = (s.previous_due==0) ? "prev-green" : "prev-red";
+        let prevClass = s.previous_due == 0 ? "prev-green" : "prev-red";
 
+        // ---- build month cells in order Apr → Mar ----
         let monthsHtml = "";
-        allMonths.forEach(m=>{
-            let rec = s.months[m] || {paid:0, due:0, status:"Due"};
-            let cls = rec.status=="Paid" ? "paid" : rec.status=="Partial" ? "partial" : "due";
-            monthsHtml += `<td class="${cls}">${rec.status}</td>`;
+        const monthOrder = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+        let totalDue = 0;
+
+        monthOrder.forEach(m => {
+            let val = s.months[m] || {status: "Due", due: 0};
+            let cls = val.status === "Paid" ? "paid" :
+                      val.status === "Partial" ? "partial" : "due";
+            let dueAmt = val.due || 0;
+
+            monthsHtml += `<td class="${cls}">${val.status}</td>`;
+            totalDue += dueAmt;
         });
+
+        // ---- add previous_due to total ----
+        totalDue += Number(s.previous_due || 0);
 
         tbody.innerHTML += `
         <tr>
-            <td>
-                <span class="student-name" data-roll="${s.roll}" data-class="${s.class_name}">
-                    ${s.name}
-                </span><br>
-                <button class="edit-btn" data-roll="${s.roll}" data-class="${s.class_name}">✏ Edit</button>
-            </td>
-            <td>${s.class_name}</td>
-            <td>${s.roll}</td>
-            <td class="${prevCls}">${s.previous_due}</td>
-            ${monthsHtml}
+          <td>
+              <span class="student-name" data-roll="${s.roll}" data-class="${s.class_name}">
+                  ${s.name}
+              </span><br>
+              <button class="edit-btn" data-roll="${s.roll}" data-class="${s.class_name}">✏ Edit</button>
+          </td>
+          <td>${s.class_name}</td>
+          <td>${s.roll}</td>
+          <td class="${prevClass}">${s.previous_due}</td>
+          ${monthsHtml}
+          <td style="font-weight:700;color:#0047b3;background:#e8f0ff;">${totalDue}</td>
         </tr>`;
     });
 
-    document.querySelectorAll(".student-name").forEach(el=>{
-        el.onclick = ()=>{
-            window.location.href = `student_details.html?roll=${el.dataset.roll}&class=${el.dataset.class}`;
+    document.querySelectorAll(".student-name").forEach(el => {
+        el.onclick = () => {
+            window.location.href =
+                `student_details.html?roll=${el.dataset.roll}&class=${el.dataset.class}&session=${currentSession}`;
         };
     });
 
-    document.querySelectorAll(".edit-btn").forEach(btn=>{
-        btn.onclick = ()=>{
-            window.location.href = `edit.html?roll=${btn.dataset.roll}&class=${btn.dataset.class}`;
+    document.querySelectorAll(".edit-btn").forEach(btn => {
+        btn.onclick = () => {
+            window.location.href =
+                `edit.html?roll=${btn.dataset.roll}&class=${btn.dataset.class}&session=${currentSession}`;
         };
     });
 }
 
-document.getElementById("search").oninput = e => renderTable(e.target.value);
 
-renderTable();
+search.oninput = e => renderTable(e.target.value);
+
+/* INIT */
+loadSessions().then(renderTable);
 </script>
 
 </body>

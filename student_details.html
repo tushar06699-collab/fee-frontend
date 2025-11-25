@@ -48,7 +48,9 @@ th{background:#007bff;color:#fff}
       </div>
 
       <button class="btn primary" onclick="submitPayment()">💳 Submit Payment</button>
-      <button class="btn back" onclick="location.href='index.html'">⬅ Back</button>
+      <button class="btn advance" onclick="applyAdvance()">Apply Advance</button>
+
+      <button class="btn back" onclick="history.back()">⬅ Back</button>
       <button class="btn paid-btn" onclick="generateReceipt()">🧾 Generate Receipt</button>
   </div>
 
@@ -82,292 +84,385 @@ th{background:#007bff;color:#fff}
 <script>
 const API = "https://fee-backend-ntas.onrender.com";
 
-// URL Params
+// ---------------- PARAMS ----------------
 const params = new URLSearchParams(window.location.search);
 const rollParam = params.get("roll");
 const classParam = params.get("class");
+const sessionParam = params.get("session") || "2024_25";
 
-// Student object
 let student = null;
 
-// ---------------------- Load student from backend ----------------------
-async function loadStudent() {
-  try {
-    const res = await fetch(`${API}/student/${classParam}/${rollParam}`);
-    const data = await res.json();
+// months order: previousDue, Annual, Jan..Dec (Annual placed between previousDue and Jan)
+const monthsList = [
+  "previousDue","Annual","Apr","May","Jun",
+  "Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"
+];
 
-    if (!data.success) {
+let monthlyFees = {};   // class_name -> monthly_fee
+let annualFees = {};    // class_name -> annual_fee (Option A: fixed per class)
+
+/* Utility: safe number */
+function cleanNumber(x){
+  return isNaN(Number(x)) ? 0 : Number(x);
+}
+
+/* ---------------- LOAD FEES ----------------
+   We expect backend `fees/get` to return items with:
+   { class_name, monthly_fee, (optional) annual_fee | annual_charge }
+   If annual isn't provided, fallback to 0.
+*/
+async function loadFees(){
+  try{
+    const res = await fetch(`${API}/fees/get`, { headers: { "X-Session": sessionParam } });
+    const data = await res.json();
+    if(!data.success){
+      console.warn("fees/get responded with success=false", data);
+      return;
+    }
+
+    monthlyFees = {};
+    annualFees = {};
+
+    data.fees.forEach(f => {
+      const cls = f.class_name;
+      monthlyFees[cls] = cleanNumber(f.monthly_fee || 0);
+      // Support multiple possible field names from different backends:
+      annualFees[cls] = cleanNumber(f.annual_fee || f.annual_charge || 0);
+    });
+  } catch(e){
+    console.error("Failed to load fees:", e);
+    alert("❌ Cannot load fees from backend");
+  }
+}
+
+function getMonthlyFeeForClass(c){ return monthlyFees[c] || 0; }
+function getAnnualFeeForClass(c){ return annualFees[c] || 0; }
+
+/* ---------------- LOAD STUDENT ----------------
+   Uses endpoint: GET /student/:class/:roll
+   Sends ?session=... and also backend expects X-Session header in other calls.
+*/
+async function loadStudent(){
+  try{
+    const url = `${API}/student/${encodeURIComponent(classParam)}/${encodeURIComponent(rollParam)}?session=${encodeURIComponent(sessionParam)}`;
+    const res = await fetch(url, { headers: { "X-Session": sessionParam } });
+    const data = await res.json();
+    if(!data.success){
       alert("Student not found");
       return;
     }
 
-    student = data.student;
+    student = data.student || {};
+    // ensure numeric fields
+    student.previous_due = cleanNumber(student.previous_due);
+    student.advance = cleanNumber(student.advance);
 
-    // Fix naming
-    student.name = student.name;
-    student.father = student.father;
-    student.class_name = student.class_name;
-    student.roll = student.roll;
-    student.previous_due = student.previous_due;
-    student.months = student.months || {};
-    student.advance = student.advance || 0;
+    // ensure months object exists
+    if(!student.months || typeof student.months !== "object"){
+      student.months = {};
+    }
 
     initializeStudentData();
     render();
-  }
-  catch (err) {
+  } catch(err){
+    console.error("loadStudent error:", err);
     alert("❌ Cannot connect to backend!");
   }
 }
 
-loadStudent();
-
-// ---------------------- Month Setup ----------------------
-const monthsList = [
-  "previousDue","Jan","Feb","Mar","Apr","May","Jun",
-  "Jul","Aug","Sep","Oct","Nov","Dec"
-];
-
-let monthlyFees = {};  // backend loaded fees
-
-async function loadFees() {
-  try {
-    const res = await fetch(`${API}/fees/get`);
-    const data = await res.json();
-
-    if (data.success) {
-      monthlyFees = {};
-      data.fees.forEach(f => {
-        monthlyFees[f.class_name] = f.monthly_fee;
-      });
-    }
-  } catch (e) {
-    alert("Failed to load fee structure from backend");
-  }
-}
-
-// FIXED — proper async loader
-(async () => {
-    await loadFees();
-    await loadStudent();
-})();
-
-
-
-function getFeeForClass(c){ return monthlyFees[c] || 0; }
-
-// ---------------------- Prepare month data ----------------------
+/* ---------------- INITIALIZE MONTHS ----------------
+   Fill missing months with sensible defaults:
+     - previousDue: student.previous_due
+     - Annual: annual fee for student's class (Option A)
+     - months Jan..Dec: monthly fee for class
+*/
 function initializeStudentData(){
-  const fee = getFeeForClass(student.class_name);
-  const previousDue = Number(student.previous_due || 0);
+  const fee = getMonthlyFeeForClass(student.class_name);
+  const annual = getAnnualFeeForClass(student.class_name);
+  const previousDue = cleanNumber(student.previous_due);
 
   monthsList.forEach(m => {
-    if (!student.months[m]) {
+    if (!student.months[m] || typeof student.months[m] !== "object") {
+      // create default record
+      let dueDefault = 0;
+      if (m === "previousDue") {
+    // do NOT add monthly or annual again
+    dueDefault = previousDue;
+} 
+else if (m === "Annual") {
+    // Annual should be 0 in new session unless explicitly set
+    dueDefault = 0;
+} 
+else {
+    // Monthly fee should be the new session's fee
+    dueDefault = fee;
+}
+
       student.months[m] = {
         paid: 0,
-        due: m==="previousDue" ? previousDue : fee,
-        status: "Due",
+        due: dueDefault,
+        status: dueDefault === 0 ? "Paid" : "Due",
         date: "",
-        purpose: "",
+        purpose: m === "Annual" ? "Annual Charge" : (m === "previousDue" ? "Previous Dues" : "Monthly Fee"),
         extra: 0
       };
+    } else {
+      // sanitize existing record
+      student.months[m].paid = cleanNumber(student.months[m].paid);
+      student.months[m].due = cleanNumber(student.months[m].due);
+      student.months[m].extra = cleanNumber(student.months[m].extra);
+      student.months[m].purpose = student.months[m].purpose || (m === "Annual" ? "Annual Charge" : (m === "previousDue" ? "Previous Dues" : "Monthly Fee"));
+      student.months[m].status = student.months[m].status || (student.months[m].due === 0 ? "Paid" : "Due");
+      student.months[m].date = student.months[m].date || "";
+      // If due was 0 but fee exists, set default due only if user never set value
+      if (m !== "previousDue" && m !== "Annual" && student.months[m].due === 0 && fee > 0 && student.months[m].paid === 0) {
+        student.months[m].due = fee;
+        student.months[m].status = "Due";
+      }
+      if (m === "Annual" && student.months[m].due === 0 && annual > 0 && student.months[m].paid === 0) {
+        student.months[m].due = annual;
+        student.months[m].status = "Due";
+      }
     }
   });
 
-  document.getElementById("nm").textContent = student.name;
-  document.getElementById("fa").textContent = student.father;
-  document.getElementById("cl").textContent = student.class_name;
-  document.getElementById("rl").textContent = student.roll;
-  document.getElementById("adv").textContent = student.advance;
+  // top cards
+  document.getElementById("nm").textContent = student.name || "";
+  document.getElementById("fa").textContent = student.father || "";
+  document.getElementById("cl").textContent = student.class_name || classParam || "";
+  document.getElementById("rl").textContent = student.roll || rollParam || "";
+  document.getElementById("adv").textContent = student.advance || 0;
 }
 
-// ---------------------- Save to backend ----------------------
-async function saveToBackend() {
-
+/* ---------------- SAVE ----------------
+   Save entire student object back to backend
+*/
+async function saveToBackend(){
+  if(!student) return;
   const payload = {
     class: student.class_name,
     roll: student.roll,
-    student: {
-      name: student.name,
-      father: student.father,
-      class_name: student.class_name,
-      roll: student.roll,
-      previous_due: student.previous_due,
-      months: student.months,
-      advance: student.advance
-    }
+    student: student
   };
 
-  console.log("Sending:", payload);
-
-  const res = await fetch(`${API}/update_student`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await res.json();
-  console.log("Response:", data);
-
-  if (!data.success) {
-    alert("❌ Error saving to backend: " + data.message);
+  try {
+    const res = await fetch(`${API}/update_student`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session": sessionParam },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(!data.success){
+      console.warn("Save returned success=false:", data);
+    }
+    return data;
+  } catch(e){
+    console.error("saveToBackend error:", e);
+    alert("❌ Failed to save to backend");
+    return null;
   }
 }
 
-// ---------------------- Render Table ----------------------
+/* ---------------- RENDER TABLE ---------------- */
 function render(){
-  const tbody=document.getElementById("tbody");
-  tbody.innerHTML="";
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
 
-  let totalPaid=0, totalDue=0;
+  let totalPaid = 0, totalDue = 0;
 
-  monthsList.forEach((m, idx) => {
+  monthsList.forEach(m => {
     const rec = student.months[m];
 
-    const displayedPaid = Number(rec.paid) + Number(rec.extra);
+    // ensure rec exists (defensive)
+    if(!rec) {
+      student.months[m] = { paid:0, due:0, extra:0, purpose: (m==="Annual"?"Annual Charge":(m==="previousDue"?"Previous Dues":"Monthly Fee")), status: "Due", date: "" };
+    }
 
-    const statusClass = rec.status === "Paid"
-      ? "paid"
-      : rec.status === "Partial"
-      ? "partial"
-      : "due";
+    const displayedPaid = cleanNumber(rec.paid) + cleanNumber(rec.extra);
 
-    const tr=document.createElement("tr");
+    const statusClass =
+      rec.status === "Paid" ? "paid" :
+      rec.status === "Partial" ? "partial" : "due";
+
+    const label = (m==="previousDue") ? "Previous Dues" : m;
+
+    const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${m==="previousDue"?"Previous Dues":m}</td>
-      <td><input class="input-small" value="${rec.purpose}" onchange="updatePurpose('${m}', this.value)"></td>
-      <td><input class="input-small" type="number" value="${rec.extra}" onchange="updateExtra('${m}', this.value)"></td>
+      <td>${label}</td>
+      <td><input class="input-small" value="${rec.purpose || ""}" onchange="updatePurpose('${m}', this.value)"></td>
+      <td><input class="input-small" type="number" value="${rec.extra || 0}" onchange="updateExtra('${m}', this.value)"></td>
       <td class="${statusClass}">${rec.status}</td>
       <td>₹${displayedPaid}</td>
       <td>₹${rec.due}</td>
-      <td>${rec.date}</td>
+      <td>${rec.date || ""}</td>
       <td>
          <button class="btn paid-btn" onclick="markPaid('${m}')">Mark Paid</button>
          <button class="btn due-btn" onclick="markDue('${m}')">Mark Due</button>
       </td>
     `;
-
     tbody.appendChild(tr);
 
     totalPaid += displayedPaid;
     totalDue += rec.due;
   });
 
-  document.getElementById("totalPaid").textContent="₹"+totalPaid;
-  document.getElementById("totalDue").textContent="₹"+totalDue;
+  document.getElementById("totalPaid").textContent = "₹" + totalPaid;
+  document.getElementById("totalDue").textContent = "₹" + totalDue;
 }
 
-// ---------------------- Purpose Update ----------------------
-function updatePurpose(m,val){
+/* ---------------- UPDATE PURPOSE/EXTRA ---------------- */
+function updatePurpose(m, val){
   student.months[m].purpose = val;
   saveToBackend();
 }
-
-// ---------------------- Extra Update ----------------------
-function updateExtra(m,val){
-  student.months[m].extra = Number(val);
+function updateExtra(m, val){
+  student.months[m].extra = cleanNumber(val);
   saveToBackend();
   render();
 }
 
-// ---------------------- Submit Payment ----------------------
-function submitPayment(){
-  let amt = Number(document.getElementById("payAmount").value || 0);
-  if (!amt){ alert("Enter amount"); return; }
+/* ---------------- APPLY ADVANCE ----------------
+   Applies student.advance across months in the monthsList order.
+*/
+async function applyAdvance(){
+  if(!student) { alert("Student not loaded"); return; }
+  let adv = cleanNumber(student.advance);
+  if(adv <= 0){ alert("No advance available."); return; }
 
-  if (student.advance > 0){
-    amt += student.advance;
+  // apply in monthsList order (previousDue -> Annual -> Jan..Dec)
+  for(let m of monthsList){
+    if(adv <= 0) break;
+    const rec = student.months[m];
+    if(!rec) continue;
+    let due = cleanNumber(rec.due || 0);
+    if(due <= 0) continue;
+    const pay = Math.min(due, adv);
+    rec.paid = cleanNumber(rec.paid || 0) + pay;
+    rec.due = due - pay;
+    rec.status = rec.due === 0 ? "Paid" : (rec.paid > 0 ? "Partial" : "Due");
+    rec.date = new Date().toISOString().split("T")[0];
+    adv -= pay;
+  }
+
+  student.advance = adv;
+  await saveToBackend();
+  render();
+  alert("Advance applied.");
+}
+
+/* ---------------- PAYMENT LOGIC ----------------
+   Submit a raw payment amount: uses advance if present (keeps your previous behavior)
+*/
+async function submitPayment(){
+  let amt = cleanNumber(document.getElementById("payAmount").value);
+  if(!amt){ alert("Enter amount"); return; }
+
+  // If student had advance, add it to amt (previous behavior) and zero student's advance
+  if(student.advance && student.advance > 0){
+    amt += cleanNumber(student.advance);
     student.advance = 0;
   }
 
-  for (let i=0; i<monthsList.length && amt>0; i++){
+  // pay in monthsList order
+  for(let i=0; i<monthsList.length && amt>0; i++){
     const key = monthsList[i];
     const rec = student.months[key];
-
-    if (rec.due > 0){
+    if(!rec) continue;
+    if(rec.due > 0){
       const pay = Math.min(rec.due, amt);
-      rec.paid += pay;
-      rec.due -= pay;
+      rec.paid = cleanNumber(rec.paid || 0) + pay;
+      rec.due = cleanNumber(rec.due || 0) - pay;
       rec.status = rec.due === 0 ? "Paid" : "Partial";
       rec.date = new Date().toISOString().split("T")[0];
       amt -= pay;
     }
   }
 
-  if (amt > 0) student.advance = amt;
+  if(amt > 0){
+    // leftover becomes advance
+    student.advance = (student.advance || 0) + amt;
+  }
 
   document.getElementById("payAmount").value = "";
-  saveToBackend();
+  await saveToBackend();
   render();
 }
 
-// ---------------------- Mark Paid ----------------------
-function markPaid(m){
+/* ---------------- MARK PAID / DUE ---------------- */
+async function markPaid(m){
   const rec = student.months[m];
-  rec.paid += rec.due;
+  if(!rec) return;
+  rec.paid = cleanNumber(rec.paid || 0) + cleanNumber(rec.due || 0);
   rec.due = 0;
   rec.status = "Paid";
   rec.date = new Date().toISOString().split("T")[0];
-
-  saveToBackend();
+  await saveToBackend();
   render();
 }
 
-// ---------------------- Mark Due ----------------------
-function markDue(m){
-  const feeNow = m==="previousDue"
-        ? Number(student.previous_due)
-        : getFeeForClass(student.class_name);
-
+async function markDue(m){
   const rec = student.months[m];
+  if(!rec) return;
+  let feeNow;
+  if(m === "previousDue") feeNow = cleanNumber(student.previous_due || 0);
+  else if(m === "Annual") feeNow = getAnnualFeeForClass(student.class_name);
+  else feeNow = getMonthlyFeeForClass(student.class_name);
+
   rec.paid = 0;
   rec.due = feeNow;
-  rec.status = "Due";
+  rec.status = feeNow === 0 ? "Paid" : "Due";
   rec.date = "";
-
-  saveToBackend();
+  await saveToBackend();
   render();
 }
 
-// ---------------------- Generate Receipt ----------------------
-function generateReceipt(){
-  const data = { 
-    student_id: student.id,        // ADD THIS LINE ✔
-    name: student.name, 
-    father: student.father, 
-    class: student.class_name, 
-    roll: student.roll,
-    advance: student.advance,
-    date: new Date().toLocaleDateString('en-IN'),
-    months: []
-  };
+/* ---------------- GENERATE RECEIPT (simple open ) ---------------- */
+function generateReceipt() {
 
-  let tP=0, tD=0;
+    let finalMonths = [];
 
-  monthsList.forEach(m=>{
-    const rec = student.months[m];
-    const displayedPaid = rec.paid + rec.extra;
+    monthsList.forEach(m => {
+        const rec = student.months[m];
+        if (!rec) return;
 
-    data.months.push({
-      month: m==="previousDue" ? "Previous Dues" : m,
-      purpose: rec.purpose,
-      extra: rec.extra,
-      paid: rec.paid,
-      displayedPaid,
-      due: rec.due,
-      status: rec.status
+        finalMonths.push({
+            month: m === "previousDue" ? "Previous Due" : m,
+            paid: rec.paid || 0,
+            due: rec.due || 0,
+            status: rec.status || "Due",
+            purpose: rec.purpose || "",
+            extra: rec.extra || 0
+        });
     });
 
-    tP += displayedPaid;
-    tD += rec.due;
-  });
+    const data = {
+        name: student.name,
+        father: student.father,
+        class: student.class_name,
+        roll: student.roll,
+        date: new Date().toLocaleDateString(),
 
-  data.totalPaid = tP;
-  data.totalDue = tD;
+        totalPaid: finalMonths.reduce((a, m) => a + m.paid, 0),
+        totalDue: finalMonths.reduce((a, m) => a + m.due, 0),
+        advance: student.advance || 0,
 
-  window.open("receipt.html?data="+encodeURIComponent(JSON.stringify(data)), "_blank");
+        months: finalMonths,
+
+        session: sessionParam
+    };
+
+    const link = "receipt.html?data=" + encodeURIComponent(JSON.stringify(data));
+    window.location.href = link;
 }
 
+
+/* ---------------- BOOTSTRAP ----------------
+   load fees first (so initializeStudentData has fees available), then student.
+*/
+(async function init(){
+  await loadFees();
+  await loadStudent();
+})();
 </script>
 
 </body>

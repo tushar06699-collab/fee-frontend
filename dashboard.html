@@ -146,6 +146,7 @@ body{
     <div class="menu-item" onclick="goTo('fees.html')">💰 class wise Fee</div>
     <div class="menu-item" onclick="goTo('receipt_history.html')">📜 Receipt History</div>
     <div class="menu-item" onclick="goTo('delete_student.html')">🗑 Delete Students</div>
+    <div class="menu-item" onclick="goToPage('export.html')">📤 Export Data</div>
 </div>
 
 <!-- DASHBOARD BOXES -->
@@ -195,58 +196,65 @@ body{
 </div>
 
 <script>
-const API = "https://fee-backend-ntas.onrender.com";
+const API = "https://fee-backend-ntas.onrender.com";   // FIXED — same as other pages
+let session = localStorage.getItem("session") || "2024_25";
 
 /* LEFT SLIDE MENU */
 function toggleMenu(){
-    let menu = document.getElementById("sideMenu");
-    let overlay = document.getElementById("overlay");
-
-    menu.classList.toggle("open");
+    sideMenu.classList.toggle("open");
     overlay.classList.toggle("show");
 }
 function closeMenu(){
-    document.getElementById("sideMenu").classList.remove("open");
-    document.getElementById("overlay").classList.remove("show");
+    sideMenu.classList.remove("open");
+    overlay.classList.remove("show");
 }
 function goTo(p){
     closeMenu();
-    window.location.href = p;
+    window.location.href = p + "?session=" + session;
 }
 
-/* LOAD DASHBOARD DATA */
+/* ---------------------------------------
+   FIXED LOAD DASHBOARD (BACKEND COMPATIBLE)
+----------------------------------------*/
 async function loadDashboard(){
-    const res = await fetch(`${API}/students`);
-    const data = await res.json();
+    const res = await fetch(`${API}/students`, {
+        headers:{ "X-Session": session }
+    });
 
+    const data = await res.json();
     if(!data.success) return;
 
-    const students = data.students;
+    const students = data.students || [];
 
-    // TOTAL STUDENTS
+    /* TOTAL STUDENTS */
     document.getElementById("totalStudents").innerText = students.length;
 
-    // TOTAL CLASSES
+    /* TOTAL CLASSES */
     const classes = new Set(students.map(s => s.class_name));
     document.getElementById("totalClasses").innerText = classes.size;
 
-    // PAID / PARTIAL / DUE Counter + Collections
-    let paid=0, partial=0, due=0;
-    let totalCollection=0, todayCollection=0;
+    /* COUNTERS */
+    let paid = 0, partial = 0, due = 0;
+    let totalCollection = 0, todayCollection = 0;
 
     const today = new Date().toISOString().split("T")[0];
 
-    students.forEach(s=>{
+    students.forEach(s => {
         const months = s.months || {};
-        Object.keys(months).forEach(m=>{
+
+        Object.keys(months).forEach(m => {
             const rec = months[m] || {};
 
-            if(rec.status === "Paid") paid++;
-            else if(rec.status === "Partial") partial++;
+            const status = rec.status || "Due";  // FIXED status fallback
+
+            if(status === "Paid") paid++;
+            else if(status === "Partial") partial++;
             else due++;
 
             totalCollection += Number(rec.paid || 0);
-            if(rec.date === today){
+
+            // FIX: check payment date only when available
+            if(rec.date && rec.date === today){
                 todayCollection += Number(rec.paid || 0);
             }
         });
@@ -255,8 +263,12 @@ async function loadDashboard(){
     document.getElementById("paidCount").innerText = paid;
     document.getElementById("partialCount").innerText = partial;
     document.getElementById("dueCount").innerText = due;
-    document.getElementById("totalCollection").innerText = "₹" + totalCollection;
-    document.getElementById("todayCollection").innerText = "₹" + todayCollection;
+
+    document.getElementById("totalCollection").innerText =
+        "₹" + totalCollection;
+
+    document.getElementById("todayCollection").innerText =
+        "₹" + todayCollection;
 }
 
 loadDashboard();

@@ -14,7 +14,7 @@ table { width:100%; border-collapse:collapse; margin-top:12px; }
 th,td { border:1px solid #ddd; padding:8px; text-align:center; }
 .btn { padding:8px 12px; border-radius:8px; border:none; cursor:pointer; }
 .del { background:#dc3545; color:#fff; }
-.back { background:#007bff; color:#fff; }
+.back { background:#007bff; color:#fff; margin-top:10px; }
 </style>
 </head>
 
@@ -49,25 +49,33 @@ th,td { border:1px solid #ddd; padding:8px; text-align:center; }
 </div>
 
 <script>
-const API = "https://fee-backend-ntas.onrender.com";
+const API = "https://fee-backend-ntas.onrender.com";   // YOUR LOCAL BACKEND
+let currentSession = localStorage.getItem("session") || "2024_25";
 
 let ALL_STUDENTS = [];
 
-// ---------------- LOAD STUDENTS FROM BACKEND ----------------
+/* ---------------- LOAD STUDENTS WITH SESSION ---------------- */
 async function loadFromBackend() {
   try {
-    const res = await fetch(`${API}/students`);
+    const res = await fetch(`${API}/students`, {
+      headers: { "X-Session": currentSession }
+    });
+
     const data = await res.json();
 
     if (data.success) {
       ALL_STUDENTS = data.students;
+    } else {
+      alert("Backend error loading students");
     }
+
   } catch (err) {
+    console.error(err);
     alert("❌ Cannot connect to backend!");
   }
 }
 
-// ---------------- RENDER TABLE ----------------
+/* ---------------- RENDER TABLE ---------------- */
 async function renderStudents() {
   await loadFromBackend();
 
@@ -104,15 +112,18 @@ async function renderStudents() {
   });
 }
 
-// ---------------- DELETE ONE STUDENT ----------------
+/* ---------------- DELETE ONE STUDENT ---------------- */
 async function deleteOne(className, roll) {
 
-  if (!confirm("Delete this student?")) return;
+  if (!confirm("Delete this student permanently?")) return;
 
   try {
     const res = await fetch(`${API}/student/delete`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session": currentSession
+      },
       body: JSON.stringify({ class: className, roll: roll })
     });
 
@@ -120,7 +131,7 @@ async function deleteOne(className, roll) {
 
     if (data.success) {
       alert("Deleted successfully");
-      renderStudents();  // refresh
+      renderStudents();
     } else {
       alert("Error: " + data.message);
     }
@@ -131,17 +142,20 @@ async function deleteOne(className, roll) {
   }
 }
 
-// ---------------- DELETE ENTIRE CLASS ----------------
+/* ---------------- DELETE ENTIRE CLASS ---------------- */
 async function deleteAllInClass() {
   const cls = document.getElementById("classSel").value;
   if (!cls) return alert("Select a class");
 
-  if (!confirm(`Delete ALL students in ${cls}?`)) return;
+  if (!confirm(`Delete ALL students in ${cls}? This cannot be undone.`)) return;
 
   try {
     const res = await fetch(`${API}/student/delete_class`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session": currentSession
+      },
       body: JSON.stringify({ class: cls })
     });
 

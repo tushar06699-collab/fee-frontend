@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Add Student</title>
+
 <style>
 body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:20px}
 .container{max-width:500px;margin:auto;background:#fff;padding:22px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
@@ -13,9 +14,13 @@ button{width:100%;padding:10px;border-radius:8px;border:none;cursor:pointer;back
 .back{background:#007bff}
 </style>
 </head>
+
 <body>
 <div class="container">
   <h2>Add New Student</h2>
+
+  <label>Session</label>
+  <select id="sessionSelect"></select>
 
   <label>Student Name</label>
   <input id="name"/>
@@ -45,7 +50,44 @@ button{width:100%;padding:10px;border-radius:8px;border:none;cursor:pointer;back
 </div>
 
 <script>
-document.getElementById("save").onclick = function() {
+const API = "https://fee-backend-ntas.onrender.com";
+let currentSession = localStorage.getItem("session") || "2024_25";
+
+/* ------------------ LOAD SESSION LIST ------------------ */
+async function loadSessions() {
+    try {
+        let res = await fetch(API + "/session/list");
+        let data = await res.json();
+
+        let sel = document.getElementById("sessionSelect");
+        sel.innerHTML = "";
+
+        data.sessions.forEach(s => {
+            sel.innerHTML += `<option value="${s}">${s}</option>`;
+        });
+
+        // select previous session or first available
+        if (!data.sessions.includes(currentSession)) {
+            currentSession = data.sessions[0];
+        }
+
+        sel.value = currentSession;
+        localStorage.setItem("session", currentSession);
+
+        sel.onchange = function () {
+            currentSession = this.value;
+            localStorage.setItem("session", currentSession);
+        };
+
+    } catch (e) {
+        alert("Cannot load sessions from backend");
+    }
+}
+
+loadSessions();
+
+/* ------------------ SAVE STUDENT ------------------ */
+document.getElementById("save").onclick = async function () {
 
   const name = document.getElementById("name").value.trim();
   const father = document.getElementById("father").value.trim();
@@ -53,37 +95,44 @@ document.getElementById("save").onclick = function() {
   const roll = document.getElementById("roll").value.trim();
   const previousDue = document.getElementById("previousDue").value.trim();
 
-  // basic validation
   if (!name || !father || !cls || !roll) {
     alert("Please fill all details");
     return;
   }
 
-  // create student object to send to backend
   const studentData = {
-    name: name,
-    father: father,
+    name,
+    father,
     class_name: cls,
-    roll: roll,
-    previous_due: Number(previousDue)
+    roll,
+    previous_due: Number(previousDue),
+    months: {}   // optional but safe to send
   };
 
-  // === SEND TO PYTHON BACKEND ===
-  fetch("https://fee-backend-ntas.onrender.com/student/add", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(studentData)
-  })
-  .then(res => res.json())
-  .then(response => {
+  try {
+      const res = await fetch(API + "/student/add", {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json",
+              "X-Session": currentSession
+          },
+          body: JSON.stringify(studentData)
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+          alert("Server error: " + data.message);
+          return;
+      }
+
       alert("Student added successfully!");
       window.location.href = "index.html";
-  })
-  .catch(err => {
+
+  } catch (err) {
       console.error(err);
       alert("Error saving student to server!");
-  });
-
+  }
 };
 </script>
 

@@ -3,21 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <title>Receipt History</title>
+
 <style>
-body { font-family: Arial, sans-serif; padding: 20px; background:#f5f5f5; }
-.container { max-width: 900px; margin:auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 0 10px #ccc; }
-h2 { text-align:center; margin-bottom:20px; }
-table { width:100%; border-collapse:collapse; }
-th, td { border:1px solid #444; padding:10px; text-align:center; }
-th { background:#dff0ff; }
-.btn { padding:8px 15px; border:none; border-radius:6px; cursor:pointer; }
-.viewBtn { background:#007bff; color:white; }
-.delBtn { background:#dc3545; color:white; }
-.clearAll { background:red; color:white; padding:12px; width:100%; margin-top:20px; font-size:18px; }
-.backBtn { background:#6c757d; color:white; padding:10px 18px; border-radius:6px; border:none; cursor:pointer; margin-bottom:15px; }
-.backBtn:hover { background:#5a6268; }
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    background: #f5f5f5;
+}
+.container {
+    max-width: 1000px;
+    margin: auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px #ccc;
+}
+h2 { text-align: center; margin-bottom: 20px; }
+table { width: 100%; border-collapse: collapse; }
+th, td {
+    border: 1px solid #444;
+    padding: 8px;
+    text-align: center;
+    font-size: 14px;
+}
+th { background: #dff0ff; }
+
+.btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.viewBtn { background: #007bff; color: #fff; }
+.delBtn { background: #dc3545; color: #fff; }
+
+.clearAll {
+    background: red;
+    color: white;
+    padding: 12px;
+    width: 100%;
+    margin-top: 20px;
+    font-size: 18px;
+}
+
+.backBtn {
+    background: #6c757d;
+    color: white;
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 15px;
+}
+.sessionBox { margin-bottom:20px; font-size:17px; }
+select { padding:8px; font-size:16px; border-radius:6px; }
 </style>
 </head>
+
 <body>
 
 <div class="container">
@@ -26,11 +69,18 @@ th { background:#dff0ff; }
 
     <h2>Receipt History</h2>
 
+    <div class="sessionBox">
+        <strong>Select Session:</strong>
+        <select id="sessionSelect" onchange="loadHistory()"></select>
+    </div>
+
     <table>
         <thead>
             <tr>
                 <th>#</th>
+                <th>Receipt No</th>
                 <th>Name</th>
+                <th>Father</th>
                 <th>Class</th>
                 <th>Roll</th>
                 <th>Date</th>
@@ -48,66 +98,105 @@ th { background:#dff0ff; }
 <script>
 const API = "https://fee-backend-ntas.onrender.com";
 
+/* ---------------- LOAD SESSIONS ---------------- */
+async function loadSessions() {
+    const res = await fetch(`${API}/session/list`);
+    const data = await res.json();
+
+    let sel = document.getElementById("sessionSelect");
+    sel.innerHTML = "";
+
+    data.sessions.forEach(s => {
+        let opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s;
+        sel.appendChild(opt);
+    });
+
+    sel.value = localStorage.getItem("session") || data.sessions[0];
+    loadHistory();
+}
+loadSessions();
+
+/* ---------------- LOAD HISTORY ---------------- */
 async function loadHistory() {
-    try {
-        const res = await fetch(`${API}/receipt/history`);
-        const data = await res.json();
+    const s = document.getElementById("sessionSelect").value;
+    localStorage.setItem("session", s);
 
-        if (!data.success) {
-            alert("Backend error: " + data.message);
-            return;
-        }
+    const res = await fetch(`${API}/receipt/history`, {
+        headers: { "X-Session": s }
+    });
 
-        const history = data.history;
-        let tb = "";
-
-        history.forEach((r, index) => {
-            tb += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>${r.name}</td>
-                    <td>${r.class}</td>
-                    <td>${r.roll}</td>
-                    <td>${r.date}</td>
-                    <td>₹${r.totalPaid}</td>
-
-                    <td>
-                        <button class="btn viewBtn" onclick='viewReceipt(${JSON.stringify(r)})'>View</button>
-
-                        <button class="btn delBtn" onclick="deleteReceipt(${r.id})">Delete</button>
-                    </td>
-                </tr>
-            `;
-        });
-
-        document.getElementById("historyTable").innerHTML =
-            tb || `<tr><td colspan="7">No receipts saved yet.</td></tr>`;
+    const data = await res.json();
+    if (!data.success) {
+        alert("Error loading history");
+        return;
     }
-    catch (err) {
-        alert("❌ Cannot load history from backend");
-        console.log(err);
-    }
+
+    const rows = data.history;
+    let tb = "";
+
+    rows.forEach((r, i) => {
+
+        const finalClass = r.class_name || r.class || "-";
+        const totalPaid = r.total_paid ?? r.totalPaid ?? 0;
+
+        const encoded = encodeURIComponent(JSON.stringify(r));
+
+        tb += `
+        <tr>
+            <td>${i + 1}</td>
+            <td>${r.receipt_number || "-"}</td>
+            <td>${r.name}</td>
+            <td>${r.father}</td>
+            <td>${finalClass}</td>
+            <td>${r.roll}</td>
+            <td>${r.date}</td>
+            <td>₹${totalPaid}</td>
+
+            <td>
+                <button class="btn viewBtn" onclick='viewReceipt("${encoded}")'>View</button>
+                <button class="btn delBtn" onclick="deleteReceipt('${r.id}')">Delete</button>
+            </td>
+        </tr>`;
+    });
+
+    document.getElementById("historyTable").innerHTML =
+        tb || `<tr><td colspan="9">No receipts found.</td></tr>`;
 }
 
-loadHistory();
-
-function viewReceipt(receipt) {
-    let url = "receipt.html?data=" + encodeURIComponent(JSON.stringify(receipt));
-    window.open(url, "_blank");
-}
-
+/* ---------------- DELETE ONE ---------------- */
 async function deleteReceipt(id) {
     if (!confirm("Delete this receipt?")) return;
 
-    await fetch(`${API}/receipt/delete/${id}`, { method:"DELETE" });
+    const s = document.getElementById("sessionSelect").value;
+
+    await fetch(`${API}/receipt/delete/${id}`, {
+        method: "DELETE",
+        headers: { "X-Session": s }
+    });
+
     loadHistory();
 }
 
+/* ---------------- DELETE ALL ---------------- */
 async function clearAll() {
     if (!confirm("Delete ALL receipts?")) return;
 
-    await fetch(`${API}/receipt/delete_all`, { method:"DELETE" });
+    const s = document.getElementById("sessionSelect").value;
+
+    await fetch(`${API}/receipt/delete_all`, {
+        method: "DELETE",
+        headers: { "X-Session": s }
+    });
+
     loadHistory();
+}
+
+/* ---------------- VIEW RECEIPT ---------------- */
+function viewReceipt(encoded) {
+    const obj = JSON.parse(decodeURIComponent(encoded));
+    window.open("receipt.html?data=" + encodeURIComponent(JSON.stringify(obj)), "_blank");
 }
 </script>
 
