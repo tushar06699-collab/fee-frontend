@@ -206,7 +206,7 @@ function goToPage(p){ window.location.href = p + "?session=" + currentSession; }
 </div>
 
 <script>
-const API = "https://fee-backend-ntas.onrender.com";
+const API = "http://127.0.0.1:5000";
 let currentSession = localStorage.getItem("session") || "2024_25";
 const allMonths = [
     "Apr","May","Jun","Jul","Aug","Sep",
@@ -340,8 +340,8 @@ async function renderTable(filter = "") {
         let prevClass = s.previous_due === 0 ? "prev-green" : "prev-red";
 
         const monthOrder = [
-            "previousDue",
-            "Annual",   // 🔥 REQUIRED FIX
+            
+             // 🔥 REQUIRED FIX
             "Apr","May","Jun","Jul","Aug","Sep",
             "Oct","Nov","Dec","Jan","Feb","Mar"
         ];
