@@ -153,7 +153,6 @@ if (localStorage.getItem("loggedIn") === "yes") {
 
     <div style="margin-left:auto; display:flex; align-items:center;">
         <select id="sessionSelect" onchange="changeSession()"></select>
-        <button id="createSessionBtn">➕ New Session</button>
     </div>
 </div>
 
@@ -237,7 +236,6 @@ async function loadSessions(){
     }
 }
 
-document.getElementById("createSessionBtn").onclick = createNewSession;
 
 async function createNewSession() {
     let from = currentSession;
@@ -339,25 +337,26 @@ async function renderTable(filter = "") {
             tbody.innerHTML += `<tr class="class-row"><td colspan="17">Class: ${curClass}</td></tr>`;
         }
 
-        let prevClass = s.previous_due == 0 ? "prev-green" : "prev-red";
+        let prevClass = s.previous_due === 0 ? "prev-green" : "prev-red";
 
-        // ---- build month cells in order Apr → Mar ----
+        const monthOrder = [
+            "previousDue",
+            "Annual",   // 🔥 REQUIRED FIX
+            "Apr","May","Jun","Jul","Aug","Sep",
+            "Oct","Nov","Dec","Jan","Feb","Mar"
+        ];
+
         let monthsHtml = "";
-        const monthOrder = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
         let totalDue = 0;
 
         monthOrder.forEach(m => {
             let val = s.months[m] || {status: "Due", due: 0};
             let cls = val.status === "Paid" ? "paid" :
                       val.status === "Partial" ? "partial" : "due";
-            let dueAmt = val.due || 0;
 
             monthsHtml += `<td class="${cls}">${val.status}</td>`;
-            totalDue += dueAmt;
+            totalDue += val.due || 0;
         });
-
-        // ---- add previous_due to total ----
-        totalDue += Number(s.previous_due || 0);
 
         tbody.innerHTML += `
         <tr>
@@ -369,8 +368,15 @@ async function renderTable(filter = "") {
           </td>
           <td>${s.class_name}</td>
           <td>${s.roll}</td>
-          <td class="${prevClass}">${s.previous_due}</td>
+
+          <!-- previous due cell -->
+          <td class="${prevClass}">
+              ${s.months.previousDue ? s.months.previousDue.due : s.previous_due}
+          </td>
+
+          <!-- insert all months including annual -->
           ${monthsHtml}
+
           <td style="font-weight:700;color:#0047b3;background:#e8f0ff;">${totalDue}</td>
         </tr>`;
     });
@@ -390,11 +396,26 @@ async function renderTable(filter = "") {
     });
 }
 
+window.addEventListener("focus", () => {
+    const flag = localStorage.getItem("paymentMade");
+    if (flag) {
+        localStorage.removeItem("paymentMade");
+
+        // Reload full student list automatically
+        setTimeout(() => {
+            renderTable();    // ✔ correct function
+        }, 300);
+    }
+});
+
 
 search.oninput = e => renderTable(e.target.value);
 
 /* INIT */
 loadSessions().then(renderTable);
+
+/* 🔥 AUTO REFRESH WHEN PAYMENT IS MADE IN student_detail.html */
+
 </script>
 
 </body>

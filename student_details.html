@@ -398,6 +398,10 @@ async function markPaid(m){
   rec.date = new Date().toISOString().split("T")[0];
   await saveToBackend();
   render();
+
+  localStorage.setItem("paymentMade", Date.now());
+
+   alert("Payment Successful!");
 }
 
 async function markDue(m){
@@ -455,6 +459,15 @@ function generateReceipt() {
     window.location.href = link;
 }
 
+window.addEventListener("focus", () => {
+    const flag = localStorage.getItem("paymentMade");
+    if (flag) {
+        localStorage.removeItem("paymentMade");
+        setTimeout(() => {
+            loadStudents();   // <-- your function that reloads index data
+        }, 300);
+    }
+});
 
 /* ---------------- BOOTSTRAP ----------------
    load fees first (so initializeStudentData has fees available), then student.

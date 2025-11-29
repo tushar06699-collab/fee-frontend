@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Manage Sessions – School ERP</title>
+
+<style>
+body{
+    font-family:Poppins, sans-serif;
+    background:#f4f6f9;
+    margin:0;
+    padding:20px;
+}
+
+h2{
+    text-align:center;
+    color:#333;
+}
+
+.session-box{
+    max-width:600px;
+    margin:20px auto;
+    background:#fff;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 3px 10px rgba(0,0,0,.1);
+}
+
+.session-item{
+    padding:12px 15px;
+    background:#f9f9f9;
+    margin-bottom:10px;
+    border-radius:8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.session-name{
+    font-size:18px;
+    font-weight:600;
+}
+
+.btn{
+    padding:8px 12px;
+    border-radius:6px;
+    cursor:pointer;
+    border:none;
+    font-weight:600;
+}
+
+.btn-set{
+    background:#007bff;
+    color:#fff;
+}
+
+.btn-delete{
+    background:#dc3545;
+    color:#fff;
+}
+
+.btn-create{
+    width:100%;
+    background:#28a745;
+    color:white;
+    margin-top:15px;
+}
+</style>
+</head>
+
+<body>
+<!-- Add this inside <body>, e.g., above the <h2> -->
+<div style="max-width:600px;margin:20px auto;text-align:left;">
+    <button class="btn" style="background:#6c757d;color:#fff;" onclick="window.location.href='dashboard.html'">
+        ← Back to Dashboard
+    </button>
+</div>
+
+
+<h2>Session Management</h2>
+
+<div class="session-box">
+    <h3>Available Sessions</h3>
+    <div id="sessionList">Loading...</div>
+
+    <input id="newSession" type="text" placeholder="Enter current session (e.g. 2025_26)"
+           style="margin-top:15px;width:100%;padding:10px;border-radius:6px;border:1px solid #ccc">
+
+    <button class="btn btn-create" onclick="createSession()">➕ Create Session</button>
+</div>
+
+
+<script>
+const API = "https://fee-backend-ntas.onrender.com";
+
+/* Load sessions */
+async function loadSessions(){
+    document.getElementById("sessionList").innerHTML = "Loading...";
+
+    const res = await fetch(`${API}/session/list`);
+    const data = await res.json();
+
+    if(!data.success){
+        document.getElementById("sessionList").innerHTML = "Error loading sessions!";
+        return;
+    }
+
+    const box = document.getElementById("sessionList");
+    box.innerHTML = "";
+
+    const current = localStorage.getItem("session") || "2024_25";
+
+    data.sessions.forEach(s => {
+        const div = document.createElement("div");
+        div.className = "session-item";
+
+        div.innerHTML = `
+            <span class="session-name">${s}</span>
+            <div>
+                <button class="btn btn-set" onclick="setSession('${s}')">Set</button>
+                <button class="btn btn-delete" onclick="deleteSession('${s}')">Delete</button>
+            </div>
+        `;
+
+        if(s === current){
+            div.style.background = "#d1ecf1";
+        }
+
+        box.appendChild(div);
+    });
+}
+
+/* Set active session */
+function setSession(s){
+    localStorage.setItem("session", s);
+    alert("Session switched to: " + s);
+    loadSessions();
+}
+
+/* Create session */
+async function createSession(){
+    const s = document.getElementById("newSession").value.trim();
+    if(!s){ return alert("Enter session name!"); }
+
+    const res = await fetch(`${API}/session/create_auto`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({ from_session:s })
+    });
+
+    const data = await res.json();
+    alert(data.message || "Done");
+
+    loadSessions();
+}
+
+/* Delete session */
+async function deleteSession(s){
+
+    if(!confirm("Delete session: " + s + "?")) return;
+
+    const res = await fetch(`${API}/delete_session`, {
+        method:"POST",
+        headers:{
+            "X-Session": s
+        }
+    });
+
+    const data = await res.json();
+
+    alert(data.message);
+
+    loadSessions();
+}
+
+/* Initial load */
+loadSessions();
+</script>
+
+</body>
+</html>

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta charset="UTF-8">
 <title>Export Data – School ERP</title>
-
 <style>
 body{
     font-family:Poppins, sans-serif;
@@ -11,6 +11,7 @@ body{
     padding:40px 20px;
 }
 
+/* TOP BAR */
 .topbar{
     display:flex;
     align-items:center;
@@ -30,10 +31,18 @@ body{
     box-shadow:0 3px 10px rgba(0,0,0,.15);
     transition:0.3s;
 }
-.home-btn:hover{
-    background:#584fee;
+.home-btn:hover{ background:#584fee; }
+
+.session-badge{
+    margin-left:auto;
+    font-weight:600;
+    background:#ffc107;
+    color:#000;
+    padding:4px 10px;
+    border-radius:6px;
 }
 
+/* CARD */
 .card{
     background:#fff;
     padding:35px;
@@ -74,33 +83,26 @@ p{
     transition:0.3s;
 }
 
-.excel{
-    background:#007bff;
-    color:#fff;
-}
-.excel:hover{
-    background:#005ecb;
-}
+.excel{ background:#007bff; color:#fff; }
+.excel:hover{ background:#005ecb; }
 
-.google{
-    background:#34A853;
-    color:#fff;
-}
-.google:hover{
-    background:#1f7f3e;
-}
+.google{ background:#34A853; color:#fff; }
+.google:hover{ background:#1f7f3e; }
+
 </style>
 </head>
-
 <body>
 
+<!-- TOPBAR -->
 <div class="topbar">
     <a href="dashboard.html" class="home-btn">🏠 Home</a>
+    <span class="session-badge">Session: <span id="currentSession"></span></span>
 </div>
 
+<!-- CARD -->
 <div class="card">
     <h2>📤 Export School Data</h2>
-    <p>Export all student records, fee details, and receipts in your preferred format.</p>
+    <p>Export all student records, fee details, and receipts for the selected session.</p>
 
     <button class="btn excel" onclick="exportExcel()">⬇ Export to Excel</button>
 </div>
@@ -109,26 +111,43 @@ p{
 const API = "https://fee-backend-ntas.onrender.com";
 let session = localStorage.getItem("session") || "2024_25";
 
-async function exportExcel(){
-    const url = `${API}/export/excel?session=${session}`;
-    const res = await fetch(url, { headers:{ "X-Session": session } });
-    const blob = await res.blob();
+// Show current session
+document.getElementById("currentSession").innerText = session;
 
-    const a = document.createElement("a");
-    a.href = window.URL.createObjectURL(blob);
-    a.download = `SchoolData_${session}.xlsx`;
-    a.click();
+// Export to Excel
+async function exportExcel() {
+    try {
+        const res = await fetch(`${API}/export/excel?session=${session}`, {
+            headers: { "X-Session": session }
+        });
+        if (!res.ok) throw new Error("Failed to fetch Excel file");
+
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = window.URL.createObjectURL(blob);
+        a.download = `SchoolData_${session}.xlsx`;
+        a.click();
+    } catch (err) {
+        alert("Error exporting Excel: " + err.message);
+        console.error(err);
+    }
 }
 
-async function exportGoogle(){
-    const url = `${API}/export/google-sheet?session=${session}`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if(data.success){
-        window.open(data.url, "_blank");
-    } else {
-        alert("Google export failed.");
+// Export to Google Sheets
+async function exportGoogle() {
+    try {
+        const res = await fetch(`${API}/export/google-sheet?session=${session}`, {
+            headers: { "X-Session": session }
+        });
+        const data = await res.json();
+        if(data.success && data.url){
+            window.open(data.url, "_blank");
+        } else {
+            alert("Google Sheets export failed");
+        }
+    } catch(err) {
+        alert("Error: " + err.message);
+        console.error(err);
     }
 }
 </script>

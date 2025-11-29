@@ -4,672 +4,409 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Fee Receipt — P.S. Public School</title>
-<style>
-  :root{
-    --page-padding:10mm;
-    --logo-height:48px;
-    --muted:#666;
-    --accent:#0d6efd;
-  }
-  body{font-family:Arial,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",sans-serif;
-       background:#f3f4f6;margin:0;padding:20px;color:#111}
-  .screen-wrap{max-width:980px;margin:18px auto;}
-  .container{background:#fff;border:1px solid #ddd;padding:18px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.04)}
-  .header{display:flex;align-items:center;justify-content:space-between}
-  .header-left{display:flex;align-items:center;gap:12px}
-  .schoolLogo{height:var(--logo-height);width:auto;display:block;border-radius:6px}
-  h1{font-size:18px;margin:0;font-weight:700}
-  .meta p{margin:6px 0;color:var(--muted);font-size:14px}
-  table{width:100%;border-collapse:collapse;margin-top:12px}
-  th,td{border:1px solid #bbb;padding:6px;text-align:center;font-size:13px}
-  th{background:#eef6ff}
-  .controls{display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap}
-  .btn{padding:8px 12px;border-radius:6px;border:0;background:#25D366;color:#fff;cursor:pointer}
-  .btn.gray{background:#6c757d}
-  .btn.blue{background:var(--accent)}
-  .status{padding:8px;border-radius:6px;margin-top:10px;display:none}
-  .status.ok{background:#e6f4ea;color:#0b6b33;display:block}
-  .status.err{background:#ffe6e6;color:#b30000;display:block}
-  .small{font-size:13px;color:var(--muted)}
-  .muted{color:var(--muted);font-size:13px}
 
-  /* responsive */
-  @media (max-width:700px){
-    .header{flex-direction:column;align-items:flex-start;gap:8px}
-    .controls{flex-direction:column;align-items:stretch}
-  }
+<style>
+body{
+    font-family:Arial,sans-serif;
+    background:#f3f4f6;
+    margin:0;
+    padding:20px;
+    color:#111;
+}
+
+.container{
+    max-width:980px;
+    margin:auto;
+    background:#fff;
+    padding:18px;
+    border-radius:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,.04);
+}
+
+.header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+}
+
+.header-left{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.schoolLogo{
+    height:48px;
+    width:auto;
+}
+
+h1{font-size:18px;margin:0;font-weight:700;}
+
+.meta p{margin:6px 0;color:#666;font-size:14px;}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:12px;
+}
+
+th,td{
+    border:1px solid #bbb;
+    padding:6px;
+    text-align:center;
+    font-size:13px;
+}
+
+th{background:#eef6ff;}
+
+.controls{
+    display:flex;
+    gap:10px;
+    margin-top:14px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+
+.btn{
+    padding:8px 12px;
+    border-radius:6px;
+    border:0;
+    background:#25D366;
+    color:#fff;
+    cursor:pointer;
+}
+
+.btn.gray{background:#6c757d;}
+.btn.blue{background:#0d6efd;}
+
+.status{
+    padding:8px;
+    border-radius:6px;
+    margin-top:10px;
+    display:none;
+}
+
+.status.ok{background:#e6f4ea;color:#0b6b33;display:block;}
+.status.err{background:#ffe6e6;color:#b30000;display:block;}
+
+.small{font-size:13px;color:#666;}
+.muted{color:#666;font-size:13px;}
+
+
+/* ---------------------------------- */
+/*        PRINT: 4 RECEIPT BOXES      */
+/* ---------------------------------- */
+@media print {
+
+    body * { visibility: hidden; }
+
+    #printPage, #printPage * {
+        visibility: visible;
+    }
+
+    #printPage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+
+    /* EXACT 4 boxes in A4 */
+    .print-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        height: 100vh;      /* FULL A4 PAGE */
+        padding: 6px;
+        gap: 6px;
+        box-sizing: border-box;
+        page-break-inside: avoid;
+    }
+
+    /* FIXED HEIGHT FOR 1/4 PAGE */
+    .receipt-box {
+        border: 1px solid #000;
+        padding: 6px;
+        box-sizing: border-box;
+        width: 100%;
+        height: calc(100vh / 2 - 9px);   /* EXACT 1/4 OF A4 */
+        overflow: hidden;
+        transform-origin: top left;
+        transform: scale(0.92);          /* SHRINK TO FIT */
+    }
+
+    /* Reduce inside text to match the small size */
+    .receipt-box * {
+        font-size: 7px !important;
+        line-height: 10px !important;
+    }
+
+    .receipt-logo {
+        height: 25px !important;
+    }
+}
 </style>
 </head>
+
 <body>
-<div class="screen-wrap">
-  <div class="container">
-    <div class="header">
-      <div class="header-left">
-        <!-- LOGO: uses uploaded file path from conversation history -->
-        <img src="images/logo1.png"
-             alt="School logo" class="schoolLogo" onerror="this.style.display='none'">
-        <h1>P.S. Public School – Fee Receipt</h1>
-      </div>
 
-      <div style="text-align:right">
-        <div id="showTopReceipt" class="muted"></div>
-      </div>
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <img src="images/logo1.png" alt="School logo" class="schoolLogo">
+      <h1>P.S. Public School – Fee Receipt</h1>
     </div>
-
-    <div id="saveStatus" class="status ok" style="display:none">
-      Receipt saved ✔ — <strong id="receiptNo">NO-ID</strong>
-      <div class="small" id="saveDetails"></div>
+    <div style="text-align:right">
+      <div id="showTopReceipt" class="muted"></div>
     </div>
+  </div>
 
-    <div id="saveError" class="status err" style="display:none"></div>
+  <div id="saveStatus" class="status ok"></div>
+  <div id="saveError" class="status err"></div>
 
-    <div class="controls">
-      <button class="btn gray" onclick="window.location.href='index.html'">Home</button>
+  <div class="controls">
+    <button class="btn gray" onclick="window.location.href='index.html'">Home</button>
 
-      <label class="small" for="sessionSelect">Session:</label>
-      <select id="sessionSelect" style="padding:8px;border-radius:6px;border:1px solid #ccc"></select>
+    <label>Session:</label>
+    <select id="sessionSelect" style="padding:8px;border-radius:6px;border:1px solid #ccc"></select>
 
-      <button class="btn blue" id="btnSave">Save to session</button>
-      <button class="btn" id="btnPrint">Print</button>
+    <button class="btn blue" id="btnSave">Save to session</button>
+    <button class="btn" id="btnPrint">Print</button>
 
-      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-        <div class="small">Auto-save: <span id="autoSaveFlag">waiting</span></div>
-      </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <div class="small">Auto-save: <span id="autoSaveFlag">waiting</span></div>
     </div>
+  </div>
 
-    <div id="info" class="meta" style="margin-top:12px"></div>
+  <div id="info" class="meta" style="margin-top:12px"></div>
 
-    <table id="monthsTbl">
-      <thead>
-        <tr><th>Month</th><th>Paid (₹)</th><th>Due (₹)</th><th>Status</th><th>Purpose</th><th>Extra</th></tr>
-      </thead>
-      <tbody id="monthsTable"></tbody>
-    </table>
+  <table id="monthsTbl">
+    <thead>
+      <tr>
+        <th>Month</th><th>Paid (₹)</th><th>Due (₹)</th><th>Status</th><th>Purpose</th><th>Extra</th>
+      </tr>
+    </thead>
+    <tbody id="monthsTable"></tbody>
+  </table>
 
-    <div style="margin-top:12px">
-      <h3 style="display:inline-block;margin:0 12px 0 0">Total Paid: ₹<span id="tPaid"></span></h3>
-      <h3 style="display:inline-block;margin:0 12px">Total Due: ₹<span id="tDue"></span></h3>
-      <h3 style="display:inline-block;margin:0 12px">Advance Left: ₹<span id="tAdv"></span></h3>
-    </div>
+  <div style="margin-top:12px">
+    <h3 style="display:inline-block;margin:0 12px 0 0">Total Paid: ₹<span id="tPaid"></span></h3>
+    <h3 style="display:inline-block;margin:0 12px">Total Due: ₹<span id="tDue"></span></h3>
+    <h3 style="display:inline-block;margin:0 12px">Advance Left: ₹<span id="tAdv"></span></h3>
+  </div>
 
-    <div style="margin-top:14px" class="small">
-      <label>WhatsApp number: <input id="waNumber" placeholder="919XXXXXXXXX" style="padding:6px;border-radius:6px;border:1px solid #ccc"></label>
-      <button class="btn" id="btnWhats">Send to WhatsApp</button>
-    </div>
+  <div style="margin-top:14px" class="small">
+    <label>WhatsApp number:
+      <input id="waNumber" placeholder="919XXXXXXXXX" style="padding:6px;border-radius:6px;border:1px solid #ccc">
+    </label>
+    <button class="btn" id="btnWhats">Send to WhatsApp</button>
   </div>
 </div>
 
-<!-- Print grid (hidden on screen) -->
-<div id="printCopies" style="display:none"></div>
 
-<style>
-@media print {
-  body * { visibility: hidden; }
-  #printPage, #printPage * { visibility: visible; }
-  #printPage {
-    position: absolute;
-    left: 0; top: 0;
-    width: 100%;
-  }
-}
-
-/* 2×2 grid (4 receipts per page) */
-.print-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 6px;
-  padding: 10px;
-}
-
-.receipt-box {
-  border: 1px solid #000;
-  padding: 10px;
-  height: 350px;          /* ensures exactly 4 fit on 1 A4 */
-  box-sizing: border-box;
-  position: relative;
-  font-family: Arial, sans-serif;
-}
-
-/* School Logo */
-.receipt-logo {
-  height: 35px;
-  width: auto;
-  display: inline-block;
-}
-
-/* Signature line */
-.signature-box {
-  margin-top: 10px;
-  font-size: 12px;
-}
-.signature-line {
-  margin-top: 18px;
-  border-top: 1px solid #000;
-  width: 140px;
-}
-
-/* Cut lines */
-.cut-line-v {
-  width: 0;
-  border-right: 1px dashed #999;
-  position: absolute;
-  top: 0; bottom: 0;
-  left: 50%;
-}
-</style>
-
-<!-- PRINT AREA -->
-<div id="printPage" style="display:none; position:relative;">
-  <div class="cut-line-v"></div>
+<!-- PRINT PAGE -->
+<div id="printPage" style="display:none;">
   <div class="print-grid" id="printGrid"></div>
 </div>
 
 
 <script>
-/* ===========================
-   Configuration
-   - This file is the "multi-session" version:
-     it will automatically detect sessions from backend /session/list,
-     populate session select and auto-save exactly once (unless user clicks Save).
-   - Important: backend endpoint /receipt/add expects keys:
-     name, father, class, roll, date, totalPaid, totalDue, advance, months, receiptKey
-   =========================== */
+/* ----------------------------- */
+/*           JS LOGIC            */
+/* ----------------------------- */
 
 const API = "https://fee-backend-ntas.onrender.com";
 const params = new URLSearchParams(window.location.search);
-const raw = params.get("data") || params.get("receipt");
-const sessionFromUrl = params.get("session") || null;
-
+let dataRaw = params.get("data") || params.get("receipt");
 let data = {};
-try { data = raw ? JSON.parse(raw) : {}; } catch(e){ data = {}; }
 
-/* ---------- Normalize incoming data ---------- */
-data.name = data.name || data.student || "Unknown";
-data.father = data.father || data.parent || "Unknown";
-data.class = data.class || data.class_name || data.className || "-";
-data.roll = data.roll != null ? String(data.roll) : (data.roll_number || "-");
-data.date = data.date || new Date().toLocaleDateString('en-IN');
-data.totalPaid = Number(data.totalPaid || data.total_paid || 0);
-data.totalDue = Number(data.totalDue || data.total_due || 0);
-data.advance = Number(data.advance || 0);
+try { data = dataRaw ? JSON.parse(dataRaw) : {}; }
+catch(e){ data={}; }
 
-/* months can be array or dict -> normalize to array of {month,paid,due,status,purpose,extra} */
-if (!data.months) data.months = [];
-if (!Array.isArray(data.months)) {
-  const arr = [];
-  try {
-    Object.keys(data.months||{}).forEach(k=>{
-      const v = data.months[k] || {};
-      arr.push({
-        month: k,
-        paid: Number(v.paid || 0),
-        due: Number(v.due || 0),
-        status: v.status || v.state || "",
-        purpose: v.purpose || "",
-        extra: Number(v.extra || 0)
-      });
-    });
-  } catch(e){}
-  data.months = arr;
+data.name = data.name||"Unknown";
+data.father = data.father||"Unknown";
+data.class = data.class||"-";
+data.roll = data.roll != null ? String(data.roll) : "-";
+data.totalPaid = Number(data.totalPaid||0);
+data.totalDue = Number(data.totalDue||0);
+data.advance = Number(data.advance||0);
+data.date = data.date||new Date().toLocaleDateString('en-IN');
+
+data.months = Array.isArray(data.months) ? data.months : (
+  data.months ? Object.keys(data.months).map(k=>{
+    const v = data.months[k]||{};
+    return {
+      month:k,
+      paid:Number(v.paid||0),
+      due:Number(v.due||0),
+      status:v.status||"",
+      purpose:v.purpose||"",
+      extra:Number(v.extra||0)
+    };
+  }) : []
+);
+
+let sessionsList = ["2024_25","2025_26"];
+const sel = document.getElementById("sessionSelect");
+sessionsList.forEach(s=>{
+  const opt=document.createElement("option");
+  opt.value=s;
+  opt.textContent=s;
+  sel.appendChild(opt);
+});
+data.session = sel.value;
+
+function generateReceiptKey(){
+  const rand = String(Math.floor(Math.random()*100000)).padStart(5,"0");
+  data.receiptKey = `${data.class}-${data.roll}-${data.session}-${rand}`;
+}
+generateReceiptKey();
+
+function escapeHtml(s){
+  return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 }
 
-/* If the payload already contains a receipt number (re-opened) keep it */
-data.receiptNumber = data.receiptNumber || data.receipt_number || data.receipt_no || null;
-
-/* Make sure a stable receiptKey exists (used to prevent duplicates on backend) */
-if (!data.receiptKey) {
-  // Use a deterministic key when possible (name+class+roll+date+paid), else timestamp fallback
-  const fallback = Date.now();
-  try {
-    const k = `${(data.name||'').trim()}|${(data.class||'')}-${(data.roll||'')}-${(data.date||'')}-${(data.totalPaid||0)}`;
-    data.receiptKey = k.length > 5 ? `RK:${btoa(unescape(encodeURIComponent(k))).slice(0,40)}` : `RK:${fallback}`;
-  } catch(e){
-    data.receiptKey = `RK:${fallback}`;
-  }
-}
-
-/* UI rendering */
 function renderInfo(){
-  const info = document.getElementById("info");
-  info.innerHTML = `
+  document.getElementById("info").innerHTML = `
     <p><strong>Name:</strong> ${escapeHtml(data.name)}</p>
     <p class="muted"><strong>Father:</strong> ${escapeHtml(data.father)}</p>
-    <p class="muted"><strong>Class:</strong> ${escapeHtml(data.class)} &nbsp; <strong>Roll:</strong> ${escapeHtml(data.roll)}</p>
+    <p class="muted"><strong>Class:</strong> ${escapeHtml(data.class)} &nbsp; 
+    <strong>Roll:</strong> ${escapeHtml(data.roll)}</p>
+    <p class="muted"><strong>Session:</strong> ${escapeHtml(data.session)}</p>
     <p class="muted"><strong>Date:</strong> ${escapeHtml(data.date)}</p>
-    <p class="small muted"><strong>Receipt key:</strong> ${escapeHtml(data.receiptKey)}</p>
+    <p class="small muted"><strong>Receipt Key:</strong> ${escapeHtml(data.receiptKey)}</p>
   `;
 }
 
 function renderMonths(){
   const tbody = document.getElementById("monthsTable");
-  let html = "";
-  (data.months || []).forEach(m=>{
-    html += `<tr>
-      <td>${escapeHtml(m.month||"")}</td>
-      <td style="text-align:right">${escapeHtml(Number(m.paid||0))}</td>
-      <td style="text-align:right">${escapeHtml(Number(m.due||0))}</td>
+  tbody.innerHTML = (data.months||[]).map(m=>`
+    <tr>
+      <td>${escapeHtml(m.month)}</td>
+      <td style="text-align:right">${escapeHtml(m.paid||0)}</td>
+      <td style="text-align:right">${escapeHtml(m.due||0)}</td>
       <td>${escapeHtml(m.status||"")}</td>
       <td>${escapeHtml(m.purpose||"")}</td>
-      <td style="text-align:right">${escapeHtml(Number(m.extra||0))}</td>
-    </tr>`;
-  });
-  tbody.innerHTML = html;
-  document.getElementById("tPaid").textContent = Number(data.totalPaid||0);
-  document.getElementById("tDue").textContent = Number(data.totalDue||0);
-  document.getElementById("tAdv").textContent = Number(data.advance||0);
+      <td style="text-align:right">${escapeHtml(m.extra||0)}</td>
+    </tr>
+  `).join("");
+
+  document.getElementById("tPaid").textContent = data.totalPaid;
+  document.getElementById("tDue").textContent = data.totalDue;
+  document.getElementById("tAdv").textContent = data.advance;
 }
 
-/* Escaping helper */
-function escapeHtml(s){
-  if (s === null || s === undefined) return "";
-  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-}
-
-/* ---------- Session loading & auto-detect ---------- */
-let sessionsList = [];
-let autoSaveTriggered = false;
-let savedAlready = false;   // flag to avoid double-saving
-let savingInProgress = false;
-
-async function loadSessions(){
-  const sel = document.getElementById("sessionSelect");
-  sel.disabled = true;
-  sel.innerHTML = `<option>Loading...</option>`;
-  try{
-    const res = await fetch(`${API}/session/list`);
-    const json = await res.json();
-    sessionsList = Array.isArray(json.sessions) ? json.sessions : [];
-    // ensure default if none
-    if (sessionsList.length === 0) sessionsList = ["2024_25"];
-
-    // populate select
-    sel.innerHTML = "";
-    sessionsList.forEach(s=>{
-      const opt = document.createElement("option");
-      opt.value = s;
-      opt.textContent = s;
-      sel.appendChild(opt);
-    });
-
-    // choose session: prefer URL param -> localStorage -> default first in list
-    let chosen = sessionFromUrl || localStorage.getItem("session") || sessionsList[0];
-    if (!sessionsList.includes(chosen)) chosen = sessionsList[0];
-    sel.value = chosen;
-    localStorage.setItem("session", chosen);
-    sel.disabled = false;
-
-    // update UI auto-save flag and attempt auto-save exactly once
-    document.getElementById("autoSaveFlag").textContent = "ready";
-    // Run auto-save microtask to allow UI to render
-    setTimeout(() => attemptAutoSaveOnce(), 200);
-  }catch(err){
-    sel.innerHTML = `<option>Error loading sessions</option>`;
-    console.error("Failed to load sessions", err);
-    document.getElementById("autoSaveFlag").textContent = "error";
-  }
-}
-
-document.getElementById("sessionSelect").addEventListener("change", (e)=>{
-  const v = e.target.value;
-  localStorage.setItem("session", v);
-  // Do NOT auto-resave on session change automatically; only allow manual save to avoid double receipts.
-  document.getElementById("autoSaveFlag").textContent = "session changed (manual save to persist)";
-});
-
-/* ---------- Save (single-shot) ---------- */
-/* Builds payload exactly expected by backend */
-function buildPayload(){
-  // months should be array (backend accepts list or dict but we will send list items)
-  const monthsArray = (data.months || []).map(m => ({
-    month: m.month || "",
-    paid: Number(m.paid || 0),
-    due: Number(m.due || 0),
-    status: m.status || "",
-    purpose: m.purpose || "",
-    extra: Number(m.extra || 0),
-    date: m.date || ""
-  }));
-
-  return {
-    name: data.name,
-    father: data.father,
-    class: data.class,
-    roll: data.roll,
-    date: data.date,
-    totalPaid: Number(data.totalPaid || 0),
-    totalDue: Number(data.totalDue || 0),
-    advance: Number(data.advance || 0),
-    months: monthsArray,
-    receiptKey: data.receiptKey
-  };
-}
-
-/* Attempt to auto-save once after session list is ready.
-   Guarantees only a single auto-save attempt; user can still press Save button. */
-async function attemptAutoSaveOnce(){
-  if (autoSaveTriggered) return;
-  autoSaveTriggered = true;
-
-  // If receipt number already present -> assume already saved; do nothing
-  if (data.receiptNumber && String(data.receiptNumber).trim().length > 0 && data.receiptNumber !== "NO-ID") {
-    document.getElementById("autoSaveFlag").textContent = "already have receipt";
-    showSavedUI(data.receiptNumber, "Loaded existing receipt number — will not auto-save.");
-    return;
-  }
-
-  // Auto-save only if current session loaded
-  const sel = document.getElementById("sessionSelect");
-  if (!sel || sel.options.length === 0) {
-    // try again shortly
-    setTimeout(attemptAutoSaveOnce, 300);
-    return;
-  }
-
-  document.getElementById("autoSaveFlag").textContent = "saving...";
-  await doSave(false); // false => do not force re-save if already saved
-}
-
-/* Main save function: manual=true indicates user clicked Save button; allow re-save if user wants */
-async function doSave(manual = false){
-  // If already saved and not manual re-save, skip
-  if (savedAlready && !manual) return;
-  if (savingInProgress) return;
-
-  // If receiptNumber exists and was saved before, skip (safe-guard)
-  if (data.receiptNumber && !manual) {
-    showSavedUI(data.receiptNumber, "Receipt already exists; skipping save.");
-    savedAlready = true;
-    return;
-  }
-
-  savingInProgress = true;
-  showError(null);
-
-  const session = document.getElementById("sessionSelect").value;
-  if (!session) {
-    showError("No session selected.");
-    savingInProgress = false;
-    return;
-  }
-
-  // Ensure minimal payload validation on client to avoid 400 from backend
-  if (!data.name || !data.class || !data.roll) {
-    showError("Missing required fields (name/class/roll). Fill them before saving.");
-    savingInProgress = false;
-    return;
-  }
-
-  const payload = buildPayload();
-
-  try {
-    const resp = await fetch(`${API}/receipt/add`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Session": session
-      },
-      body: JSON.stringify(payload)
-    });
-
-    // parse JSON body even on non-200 to show backend error message
-    const json = await (async ()=>{ try { return await resp.json(); } catch(e){ return null; } })();
-
-    if (!resp.ok) {
-      // backend returned 4xx/5xx
-      const msg = (json && (json.message || json.error)) ? (json.message || json.error) : (`HTTP ${resp.status}`);
-      showError("Save failed: " + msg);
-      console.error("Save response (error)", resp.status, json);
-      savingInProgress = false;
-      return;
-    }
-
-    // Backend OK. it may respond with {"success": True, "receipt_number": "..."} or similar.
-    const rno = (json && (json.receipt_number || json.receiptNumber || json.receiptNo || json.receipt || json.receipt_number === "" ? json.receipt_number : null)) || null;
-
-    // If backend detected duplicate it may return success=False but 200 with receipt_number in payload.
-    if (json && (json.success === false || json.message && json.message.toLowerCase().includes("duplicate"))) {
-      // If receipt_number included, use that
-      if (json.receipt_number || json.receipt_number === "") {
-        data.receiptNumber = json.receipt_number;
-      } else if (json.receipt_number == null && Array.isArray(json)) {
-        // ignore
-      }
-      // show duplicate message but mark as saved to avoid re-saving duplicate
-      savedAlready = true;
-      savingInProgress = false;
-      showSavedUI(data.receiptNumber || "DUPLICATE", json.message || "Duplicate receipt (backend ignored).");
-      return;
-    }
-
-    if (!rno && json && json.success === true && json.message && !json.receipt_number) {
-      // rare case: backend returned success true but no receipt_number. Try to fetch last inserted id or tell user
-      // We'll set a safe fallback but inform user to check receipts list.
-      data.receiptNumber = "NO-ID";
-      savedAlready = true;
-      savingInProgress = false;
-      showSavedUI(data.receiptNumber, "Saved but backend did not return receipt number. Check Receipt History.");
-      console.warn("Backend saved but no receipt_number returned.", json);
-      return;
-    }
-
-    // Success and have receipt number
-    data.receiptNumber = rno || data.receiptNumber || "NO-ID";
-    savedAlready = true;
-    savingInProgress = false;
-    showSavedUI(data.receiptNumber, "Saved to session: " + session);
-
-    // Update student months/previous due UI if needed (backend has already applied logic server-side).
-    // Optionally: you could fetch student data again here to refresh UI.
-
-  } catch (err) {
-    console.error("Save failed:", err);
-    showError("Save failed: " + (err.message || err));
-    savingInProgress = false;
-  }
-}
-
-/* ---------- UI helpers ---------- */
-function showSavedUI(rno, details = "") {
-  const s = document.getElementById("saveStatus");
-  const no = document.getElementById("receiptNo");
-  const det = document.getElementById("saveDetails");
-  no.textContent = rno || "NO-ID";
-  det.textContent = details || "";
-  s.style.display = "block";
-  document.getElementById("saveError").style.display = "none";
-  document.getElementById("autoSaveFlag").textContent = "done";
-  document.getElementById("showTopReceipt").textContent = rno ? ("Receipt No: " + rno) : "";
-}
-
-function showError(msg) {
-  const e = document.getElementById("saveError");
-  const s = document.getElementById("saveStatus");
-  if (!msg) {
-    e.style.display = "none";
-    return;
-  }
-  e.innerText = msg;
-  e.style.display = "block";
-  s.style.display = "none";
-  document.getElementById("autoSaveFlag").textContent = "error";
-}
-
-/* ---------- Print & WhatsApp ---------- */
-function preparePrintCopies(){
-  // Build 2 copies HTML for printing; minimal styling so print view remains compact.
-  const copies = ["SCHOOL COPY", "PARENT COPY"];
-  const container = document.getElementById("printCopies");
-  container.innerHTML = "";
-  copies.forEach(label => {
-    const div = document.createElement("div");
-    div.innerHTML = buildReceiptHtml(label);
-    container.appendChild(div);
-  });
-  // open print preview
-  window.print();
-}
-
-function buildReceiptHtml(label){
-  const rows = (data.months || []).map(m => `
+function buildReceiptHTML(label){
+  const rows = (data.months||[]).map(m=>`
     <tr>
-      <td style="padding:4px;border:1px solid #ccc">${escapeHtml(m.month||"")}</td>
-      <td style="padding:4px;border:1px solid #ccc;text-align:right">${Number(m.paid||0)}</td>
-      <td style="padding:4px;border:1px solid #ccc;text-align:right">${Number(m.due||0)}</td>
-      <td style="padding:4px;border:1px solid #ccc">${escapeHtml(m.status||"")}</td>
-      <td style="padding:4px;border:1px solid #ccc">${escapeHtml(m.purpose||"")}</td>
-      <td style="padding:4px;border:1px solid #ccc;text-align:right">${Number(m.extra||0)}</td>
-    </tr>`).join("");
-
-  return `
-    <div style="font-family:Arial;padding:8px;border:1px solid #000;margin:6px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <img src="/mnt/data/ChatGPT Image Nov 24, 2025, 11_16_17 PM.png" style="height:28px" onerror="this.style.display='none'">
-        <div style="font-weight:700">${escapeHtml(label)}</div>
-        <div style="margin-left:auto"><strong>Receipt:</strong> ${escapeHtml(data.receiptNumber||"NO-ID")}</div>
-      </div>
-      <div style="margin-top:6px;font-size:12px">
-        Name: ${escapeHtml(data.name)}<br>
-        Father: ${escapeHtml(data.father)}<br>
-        Class: ${escapeHtml(data.class)} | Roll: ${escapeHtml(data.roll)}<br>
-        Date: ${escapeHtml(data.date)}
-      </div>
-      <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px">
-        <thead><tr><th>Month</th><th>Paid</th><th>Due</th><th>Status</th><th>Purpose</th><th>Extra</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div style="margin-top:6px;font-size:12px">
-        <strong>Total Paid:</strong> ₹${Number(data.totalPaid||0)} &nbsp;
-        <strong>Total Due:</strong> ₹${Number(data.totalDue||0)} &nbsp;
-        <strong>Advance:</strong> ₹${Number(data.advance||0)}
-      </div>
-    </div>
-  `;
-}
-
-/* ---------- Wiring ---------- */
-document.getElementById("btnSave").addEventListener("click", ()=>doSave(true));
-document.getElementById("btnPrint").addEventListener("click", preparePrintCopies);
-document.getElementById("btnWhats").addEventListener("click", ()=>{
-  const num = document.getElementById("waNumber").value.trim();
-  if (!num) return alert("Enter WhatsApp number with country code (e.g. 919XXXXXXXXX)");
-  let msg = `P.S. Public School - Fee Receipt\nReceipt No: ${data.receiptNumber||""}\nName: ${data.name}\nFather: ${data.father}\nClass: ${data.class}\nRoll: ${data.roll}\nDate: ${data.date}\n\nDetails:\n`;
-  (data.months || []).forEach(m => {
-    msg += `${m.month}: Paid ${m.paid || 0}, Due ${m.due || 0}\n`;
-  });
-  msg += `\nTotal Paid: ${data.totalPaid}\nTotal Due: ${data.totalDue}\nAdvance: ${data.advance}`;
-  window.open(`https://wa.me/${num}?text=` + encodeURIComponent(msg), "_blank");
-});
-
-
-/* Build real filled receipt */
-function buildRealReceipt(label){
-  const rows = (data.months || []).map(m => `
-    <tr>
-      <td style="border:1px solid #ccc;padding:2px">${m.month}</td>
-      <td style="border:1px solid #ccc;padding:2px;text-align:right">${m.paid}</td>
-      <td style="border:1px solid #ccc;padding:2px;text-align:right">${m.due}</td>
-      <td style="border:1px solid #ccc;padding:2px">${m.status}</td>
+      <td>${m.month||""}</td>
+      <td style="text-align:right">${m.paid||0}</td>
+      <td style="text-align:right">${m.due||0}</td>
+      <td>${m.status||""}</td>
     </tr>
   `).join("");
 
   return `
-    <div class="receipt-box">
-      
-      <!-- HEADER WITH LOGO -->
-      <div style="display:flex;align-items:center;gap:8px;">
-        <img src="images/logo1.png" class="receipt-logo" />
-        <div>
-          <strong>P.S. Public School</strong><br>
-          <small>${label}</small>
-        </div>
-        <div style="margin-left:auto;font-size:12px;">
-          <strong>Receipt:</strong> ${data.receiptNumber}
-        </div>
-      </div>
-
-      <hr>
-
-      <!-- STUDENT INFO -->
-      <div style="font-size:12px;line-height:16px;">
-        Name: ${data.name}<br>
-        Father: ${data.father}<br>
-        Class: ${data.class} | Roll: ${data.roll}<br>
-        Date: ${data.date}
-      </div>
-
-      <!-- TABLE -->
-      <table style="width:100%;border-collapse:collapse;margin-top:5px;font-size:12px">
-        <thead>
-          <tr>
-            <th style="border:1px solid #ccc">Month</th>
-            <th style="border:1px solid #ccc">Paid</th>
-            <th style="border:1px solid #ccc">Due</th>
-            <th style="border:1px solid #ccc">Status</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-
-      <!-- TOTALS -->
-      <div style="margin-top:6px;font-size:12px;">
-        <strong>Total Paid:</strong> ₹${data.totalPaid} &nbsp;&nbsp;
-        <strong>Total Due:</strong> ₹${data.totalDue} &nbsp;&nbsp;
-        <strong>Advance:</strong> ₹${data.advance}
-      </div>
-
-      <!-- SIGNATURES -->
-      <div class="signature-box">
-        <div style="float:left;text-align:center;">
-          <strong>Parent Signature</strong>
-          <div class="signature-line"></div>
-        </div>
-
-        <div style="float:right;text-align:center;">
-          <strong>School Signature</strong>
-          <div class="signature-line"></div>
-        </div>
-      </div>
-
+  <div class="receipt-box">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <img src="images/logo1.png" class="receipt-logo" />
+      <div><strong>P.S. Public School</strong><br><small>${label}</small></div>
+      <div style="margin-left:auto;font-size:12px;"><strong>Receipt Key:</strong> ${data.receiptKey}</div>
     </div>
-  `;
+
+    <hr>
+
+    <div style="font-size:12px;line-height:16px;">
+      Name: ${data.name}<br>
+      Father: ${data.father}<br>
+      Class: ${data.class} | Roll: ${data.roll}<br>
+      Session: ${data.session}<br>
+      Date: ${data.date}
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;margin-top:5px;font-size:12px;">
+      <thead>
+        <tr><th>Month</th><th>Paid</th><th>Due</th><th>Status</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div style="margin-top:6px;font-size:12px;">
+      <strong>Total Paid:</strong> ₹${data.totalPaid} &nbsp;&nbsp;
+      <strong>Total Due:</strong> ₹${data.totalDue} &nbsp;&nbsp;
+      <strong>Advance:</strong> ₹${data.advance}
+    </div>
+
+    <div class="signature-box">
+      Signature:
+      <div class="signature-line"></div>
+    </div>
+  </div>`;
 }
 
-/* Build an empty blank receipt */
-function buildEmptyReceipt(){
-  return `<div class="receipt-box"></div>`;
+async function saveToSession(){
+  try{
+    await fetch(`${API}/receipt/add`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-Session":data.session},
+      body: JSON.stringify({...data})
+    });
+
+    document.getElementById("saveStatus").innerHTML = 
+      `Saved ✔ — Receipt Key: ${data.receiptKey}`;
+    document.getElementById("saveStatus").style.display="block";
+    document.getElementById("saveError").style.display="none";
+    document.getElementById("showTopReceipt").textContent =
+      "Receipt Key: " + data.receiptKey;
+
+  }catch(e){
+    document.getElementById("saveError").innerText = "Save failed: "+e.message;
+    document.getElementById("saveError").style.display="block";
+  }
 }
 
-/* PRINT FUNCTION */
-function preparePrintCopies(){
+function printReceipt(){
   const grid = document.getElementById("printGrid");
-  grid.innerHTML = "";
 
-  /* 4 RECEIPTS ON PAGE */
-  grid.innerHTML += buildRealReceipt("School Copy");   // top-left
-  grid.innerHTML += buildRealReceipt("Student Copy");  // top-right
-  grid.innerHTML += buildEmptyReceipt();               // bottom-left
-  grid.innerHTML += buildEmptyReceipt();               // bottom-right
+  grid.innerHTML = `
+    ${buildReceiptHTML("School Copy")}
+    ${buildReceiptHTML("Student Copy")}
 
-  document.getElementById("printPage").style.display = "block";
+    <!-- blank boxes -->
+    <div class="receipt-box"></div>
+    <div class="receipt-box"></div>
+  `;
 
+  document.getElementById("printPage").style.display="block";
   window.print();
-
-  setTimeout(() => {
-    document.getElementById("printPage").style.display = "none";
-  }, 300);
 }
 
 
+/* BUTTON EVENTS */
+document.getElementById("btnSave").addEventListener("click", saveToSession);
+document.getElementById("btnPrint").addEventListener("click", printReceipt);
 
-/* ---------- Init ---------- */
+document.getElementById("btnWhats").addEventListener("click", ()=>{
+  const num = document.getElementById("waNumber").value.trim();
+  if(!num){ alert("Enter WhatsApp number with country code (e.g. 919XXXXXXXXX)"); return; }
+
+  let msg = `P.S. Public School - Fee Receipt\nReceipt Key: ${data.receiptKey}\nName: ${data.name}\nFather: ${data.father}\nClass: ${data.class}\nRoll: ${data.roll}\nSession: ${data.session}\nDate: ${data.date}\n\nDetails:\n`;
+
+  (data.months||[]).forEach(m=>{
+    msg += `${m.month}: Paid ${m.paid||0}, Due ${m.due||0}\n`;
+  });
+
+  msg += `\nTotal Paid: ${data.totalPaid}\nTotal Due: ${data.totalDue}\nAdvance: ${data.advance}`;
+
+  window.open(`https://wa.me/${num}?text=`+encodeURIComponent(msg), "_blank");
+});
+
+
 renderInfo();
 renderMonths();
-loadSessions();
-
-
-/* Start auto-save only once the session list loads (attemptAutoSaveOnce called in loadSessions) */
-
 </script>
+
 </body>
 </html>

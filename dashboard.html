@@ -120,6 +120,7 @@ body{
     margin-bottom:12px;
     text-decoration:none;
     font-weight:600;
+    cursor: pointer;
 }
 .btn-link:hover{
     background:#57a63e;
@@ -132,7 +133,25 @@ body{
 <!-- TOPBAR -->
 <div class="topbar">
     <div class="menu-btn" onclick="toggleMenu()">☰</div>
-    Dashboard
+    <div style="flex:1">
+        Dashboard
+        <span id="currentSession" style="font-size:14px; margin-left:10px; font-weight:400; color:#ffeeba;"></span>
+    </div>
+
+    <!-- Edit Session Button -->
+    <button onclick="window.location.href='session.html'"
+        style="
+            margin-left:auto;
+            background:#cf6d62;
+            border:none;
+            padding:6px 12px;
+            color:white;
+            border-radius:6px;
+            font-size:13px;
+            cursor:pointer;
+        ">
+        ✏️ Edit Session
+    </button>
 </div>
 
 <!-- OVERLAY -->
@@ -140,13 +159,13 @@ body{
 
 <!-- LEFT SLIDE MENU -->
 <div id="sideMenu" class="side-menu">
-     <div class="menu-item" onclick="goTo('dashboard.html')">🏠 Dashboard</div>
+    <div class="menu-item" onclick="goTo('dashboard.html')">🏠 Dashboard</div>
     <div class="menu-item" onclick="goTo('index.html')">📋 Students List</div>
     <div class="menu-item" onclick="goTo('add_student.html')">➕ Add Student</div>
     <div class="menu-item" onclick="goTo('fees.html')">💰 class wise Fee</div>
     <div class="menu-item" onclick="goTo('receipt_history.html')">📜 Receipt History</div>
     <div class="menu-item" onclick="goTo('delete_student.html')">🗑 Delete Students</div>
-    <div class="menu-item" onclick="goToPage('export.html')">📤 Export Data</div>
+    <div class="menu-item" onclick="goTo('export.html')">📤 Export Data</div>
 </div>
 
 <!-- DASHBOARD BOXES -->
@@ -189,15 +208,14 @@ body{
 
 <!-- QUICK LINKS -->
 <div class="quick-links">
-    <a class="btn-link" href="add_student.html">➕ Add New Student</a>
-    <a class="btn-link" href="fees.html">💰 Modify Fees</a>
-    <a class="btn-link" href="receipt_history.html">📜 Receipt History</a>
-    <a class="btn-link" href="index.html">📋 Students</a>
+    <a class="btn-link" onclick="backupDatabase()">☁️ Backup Database to Drive</a>
+    <p id="backupStatus" style="color:#007bff;font-weight:600;margin-top:10px;"></p>
 </div>
 
 <script>
-const API = "https://fee-backend-ntas.onrender.com";   // FIXED — same as other pages
+const API = "https://fee-backend-ntas.onrender.com";
 let session = localStorage.getItem("session") || "2024_25";
+document.getElementById("currentSession").innerText = "(Session: " + session + ")";
 
 /* LEFT SLIDE MENU */
 function toggleMenu(){
@@ -214,7 +232,7 @@ function goTo(p){
 }
 
 /* ---------------------------------------
-   FIXED LOAD DASHBOARD (BACKEND COMPATIBLE)
+   LOAD DASHBOARD
 ----------------------------------------*/
 async function loadDashboard(){
     const res = await fetch(`${API}/students`, {
@@ -226,34 +244,26 @@ async function loadDashboard(){
 
     const students = data.students || [];
 
-    /* TOTAL STUDENTS */
     document.getElementById("totalStudents").innerText = students.length;
 
-    /* TOTAL CLASSES */
     const classes = new Set(students.map(s => s.class_name));
     document.getElementById("totalClasses").innerText = classes.size;
 
-    /* COUNTERS */
     let paid = 0, partial = 0, due = 0;
     let totalCollection = 0, todayCollection = 0;
-
     const today = new Date().toISOString().split("T")[0];
 
     students.forEach(s => {
         const months = s.months || {};
-
         Object.keys(months).forEach(m => {
             const rec = months[m] || {};
-
-            const status = rec.status || "Due";  // FIXED status fallback
+            const status = rec.status || "Due";
 
             if(status === "Paid") paid++;
             else if(status === "Partial") partial++;
             else due++;
 
             totalCollection += Number(rec.paid || 0);
-
-            // FIX: check payment date only when available
             if(rec.date && rec.date === today){
                 todayCollection += Number(rec.paid || 0);
             }
@@ -264,14 +274,43 @@ async function loadDashboard(){
     document.getElementById("partialCount").innerText = partial;
     document.getElementById("dueCount").innerText = due;
 
-    document.getElementById("totalCollection").innerText =
-        "₹" + totalCollection;
-
-    document.getElementById("todayCollection").innerText =
-        "₹" + todayCollection;
+    document.getElementById("totalCollection").innerText = "₹" + totalCollection;
+    document.getElementById("todayCollection").innerText = "₹" + todayCollection;
 }
 
 loadDashboard();
+
+/* ---------------------------------------
+     ⭐ BACKUP FUNCTION
+/* ---------------------------------------
+     ⭐ BACKUP ALL SESSIONS FUNCTION
+----------------------------------------*/
+async function backupDatabase() {
+    document.getElementById("backupStatus").innerText =
+        "Uploading ALL session backups to Google Drive...";
+
+    try {
+        const res = await fetch(`${API}/backup/save_all_to_drive`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            document.getElementById("backupStatus").innerText =
+                "✅ All session backups uploaded successfully!";
+        } else {
+            document.getElementById("backupStatus").innerText =
+                "❌ Error: " + result.message;
+        }
+    } catch (err) {
+        document.getElementById("backupStatus").innerText =
+            "⚠️ Failed: " + err.message;
+    }
+}
 </script>
 
 </body>
