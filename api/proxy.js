@@ -1,13 +1,19 @@
 export default async function handler(req, res) {
-  const path = req.query.path;
-  const url = `http://pserp.pythonanywhere.com/${path}`;
+  const path = req.query.path;  // example: "students"
+  const backendURL = `http://pserp.pythonanywhere.com/${path}`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(backendURL, {
+      method: req.method,
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: req.method !== "GET" ? JSON.stringify(req.body) : undefined
+    });
+
     const data = await response.json();
-    
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Proxy error", details: err.toString() });
+    res.status(response.status).json(data);
+  } catch (error) {
+    res.status(500).json({ error: "Proxy failed", details: error.toString() });
   }
 }
