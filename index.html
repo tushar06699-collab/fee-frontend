@@ -206,7 +206,7 @@ function goToPage(p){ window.location.href = p + "?session=" + currentSession; }
 </div>
 
 <script>
-const API = "http://pserp.pythonanywhere.com";
+const API =("/api/proxy?path=session/list");
 let currentSession = localStorage.getItem("session") || "2024_25";
 const allMonths = [
     "Apr","May","Jun","Jul","Aug","Sep",
