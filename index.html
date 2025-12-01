@@ -206,7 +206,7 @@ function goToPage(p){ window.location.href = p + "?session=" + currentSession; }
 </div>
 
 <script>
-const API = "http://127.0.0.1:5000";
+const API = "http://pserp.pythonanywhere.com";
 let currentSession = localStorage.getItem("session") || "2024_25";
 const allMonths = [
     "Apr","May","Jun","Jul","Aug","Sep",
@@ -357,6 +357,8 @@ async function renderTable(filter = "") {
             monthsHtml += `<td class="${cls}">${val.status}</td>`;
             totalDue += val.due || 0;
         });
+        totalDue += s.previous_due || 0;
+
 
         tbody.innerHTML += `
         <tr>
