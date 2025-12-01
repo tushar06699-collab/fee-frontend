@@ -217,7 +217,7 @@ th{background:#eef6ff;}
 /*           JS LOGIC            */
 /* ----------------------------- */
 
-const API = "http://pserp.pythonanywhere.com";
+const API = "/api/proxy?path=";
 const params = new URLSearchParams(window.location.search);
 let dataRaw = params.get("data") || params.get("receipt");
 let data = {};

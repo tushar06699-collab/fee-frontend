@@ -68,7 +68,7 @@ input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;mar
   - Updates student using POST /update_student with X-Session header
 */
 
-const API = "http://pserp.pythonanywhere.com";
+const API = "/api/proxy?path=";
 const urlParams = new URLSearchParams(window.location.search);
 const initialRoll = urlParams.get("roll");
 const initialClass = urlParams.get("class");
