@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Summary</title>
+<style>
+:root{
+  --brand:#0f4aa3;
+  --brand-2:#1f6feb;
+  --bg:#eef3fb;
+  --card:#ffffff;
+  --text:#1f2937;
+  --muted:#6b7280;
+  --line:#d8e2f0;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 400px at -10% -20%, #dce9ff 0%, transparent 50%),
+    radial-gradient(900px 300px at 100% 0%, #d7f0ff 0%, transparent 45%),
+    var(--bg);
+}
+.topbar{
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  color:#fff;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;line-height:1}
+.title{font-size:20px;font-weight:700}
+.spacer{flex:1}
+.toolbar{
+  display:flex;
+  align-items:end;
+  gap:12px;
+  flex-wrap:wrap;
+}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+select,input{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px 11px;
+  font-size:14px;
+  background:#fff;
+}
+.overlay {
+  position: fixed;top:0;left:0;width:100%;height:100%;
+  background: rgba(0,0,0,0.35);display:none;z-index:1500;
+}
+.overlay.show { display:block; }
+.side-menu{
+  position:fixed;top:0;left:-280px;width:260px;height:100%;
+  background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+  padding:20px;overflow-y:auto;z-index:2000;
+  transition: left 0.35s;
+  border-radius:0 18px 18px 0;
+}
+.side-menu.open{ left:0; }
+.menu-item{
+  padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+  font-size:16px;font-weight:600;color:#333;
+}
+.wrap{max-width:1280px;margin:18px auto;padding:0 14px}
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:0 10px 28px rgba(15,74,163,.10);
+  padding:16px;
+}
+.cards{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(5,minmax(150px,1fr));
+  gap:10px;
+}
+.card{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#f8fbff;
+  padding:12px;
+}
+.k{color:var(--muted);font-size:12px}
+.v{font-size:22px;font-weight:800;margin-top:4px}
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-top:14px;
+}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th,td{border-bottom:1px solid var(--line);padding:9px 8px;font-size:14px;text-align:left}
+th{background:#f2f7ff;color:#0f3c84;font-weight:700}
+.money{font-weight:700}
+.empty{text-align:center;color:var(--muted);padding:18px 8px}
+.btn{
+  border:none;border-radius:8px;padding:6px 10px;cursor:pointer;
+  background:#0f4aa3;color:#fff;font-size:12px;
+}
+.muted{color:var(--muted)}
+@media (max-width:1000px){
+  .cards{grid-template-columns:1fr 1fr}
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div class="title">Date-wise Summary</div>
+    <div class="spacer"></div>
+  </div>
+
+  <div id="overlay" class="overlay" onclick="closeMenu()"></div>
+  <div id="sideMenu" class="side-menu"></div>
+
+  <div class="wrap">
+    <div class="panel">
+      <div class="toolbar">
+        <div>
+          <label>Session</label>
+          <select id="sessionSelect"></select>
+        </div>
+        <div>
+          <label>Search Date (dd/mm/yyyy or yyyy-mm-dd)</label>
+          <input id="searchDate" placeholder="Type date..." />
+        </div>
+      </div>
+
+      <div class="cards">
+        <div class="card"><div class="k">Total Receipts</div><div class="v" id="totalReceipts">0</div></div>
+        <div class="card"><div class="k">Total Paid</div><div class="v" id="totalPaid">Rs. 0</div></div>
+        <div class="card"><div class="k">Total Due</div><div class="v" id="totalDue">Rs. 0</div></div>
+        <div class="card"><div class="k">Today's Receipts</div><div class="v" id="todayReceipts">0</div></div>
+        <div class="card"><div class="k">Today's Paid</div><div class="v" id="todayPaid">Rs. 0</div></div>
+      </div>
+
+      <div class="grid">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Receipts</th>
+                <th>Total Paid</th>
+                <th>Total Due</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="dateSummaryBody"></tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Receipt No</th>
+                <th>Student</th>
+                <th>Class</th>
+                <th>Paid</th>
+                <th>Due</th>
+              </tr>
+            </thead>
+            <tbody id="detailsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const API = "http://127.0.0.1:5000";
+const params = new URLSearchParams(window.location.search);
+let allReceipts = [];
+let grouped = [];
+let selectedDateKey = "";
+
+function safeText(v){ return String(v ?? "").trim(); }
+function money(v){ return `Rs. ${Number(v || 0).toLocaleString("en-IN")}`; }
+
+function toDateKey(value){
+  const raw = safeText(value);
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m){
+    let a = parseInt(m[1], 10), b = parseInt(m[2], 10), y = parseInt(m[3], 10);
+    if (y < 100) y += 2000;
+    let day = a, mon = b;
+    if (a <= 12 && b > 12){ mon = a; day = b; }
+    return `${y}-${String(mon).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  }
+  const dt = new Date(raw);
+  if (isNaN(dt.getTime())) return "";
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+}
+
+function displayDate(dateKey){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!m) return dateKey || "-";
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+function getSession(){
+  return document.getElementById("sessionSelect").value;
+}
+
+async function loadSessions(){
+  const sel = document.getElementById("sessionSelect");
+  try{
+    const res = await fetch(`${API}/session/list`);
+    const data = await res.json();
+    const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+    sel.innerHTML = sessions.map(s => `<option value="${s}">${s}</option>`).join("");
+    const saved = params.get("session") || localStorage.getItem("session");
+    if (saved && sessions.includes(saved)) sel.value = saved;
+    if (!sel.value && sessions.length) sel.value = sessions[0];
+  }catch(e){
+    const s = localStorage.getItem("session") || "2024_25";
+    sel.innerHTML = `<option value="${s}">${s}</option>`;
+  }
+}
+
+async function loadReceipts(){
+  const session = getSession();
+  localStorage.setItem("session", session);
+  try{
+    const res = await fetch(`${API}/receipt/history?session=${encodeURIComponent(session)}`, {
+      headers: { "X-Session": session }
+    });
+    const data = await res.json();
+    if (!res.ok || data?.success === false) throw new Error(data?.message || `HTTP ${res.status}`);
+    allReceipts = Array.isArray(data.history) ? data.history : [];
+  }catch(e){
+    allReceipts = [];
+  }
+  groupByDate();
+  renderSummary();
+}
+
+function groupByDate(){
+  const map = new Map();
+  allReceipts.forEach(r => {
+    const key = toDateKey(r.date);
+    if (!key) return;
+    if (!map.has(key)) map.set(key, { dateKey:key, count:0, paid:0, due:0, rows:[] });
+    const g = map.get(key);
+    g.count += 1;
+    g.paid += Number(r.total_paid ?? r.totalPaid ?? 0);
+    g.due += Number(r.total_due ?? r.totalDue ?? 0);
+    g.rows.push(r);
+  });
+  grouped = [...map.values()].sort((a,b) => b.dateKey.localeCompare(a.dateKey));
+}
+
+function renderSummary(){
+  const q = safeText(document.getElementById("searchDate").value).toLowerCase();
+  const filtered = grouped.filter(g => {
+    const d1 = g.dateKey.toLowerCase();
+    const d2 = displayDate(g.dateKey).toLowerCase();
+    return !q || d1.includes(q) || d2.includes(q);
+  });
+
+  const totalReceipts = allReceipts.length;
+  const totalPaid = allReceipts.reduce((s,r) => s + Number(r.total_paid ?? r.totalPaid ?? 0), 0);
+  const totalDue = allReceipts.reduce((s,r) => s + Number(r.total_due ?? r.totalDue ?? 0), 0);
+  const todayKey = toDateKey(new Date().toISOString().slice(0,10));
+  const todayRows = grouped.find(g => g.dateKey === todayKey);
+  document.getElementById("totalReceipts").textContent = String(totalReceipts);
+  document.getElementById("totalPaid").textContent = money(totalPaid);
+  document.getElementById("totalDue").textContent = money(totalDue);
+  document.getElementById("todayReceipts").textContent = String(todayRows?.count || 0);
+  document.getElementById("todayPaid").textContent = money(todayRows?.paid || 0);
+
+  const tbody = document.getElementById("dateSummaryBody");
+  if (!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No date-wise data found.</td></tr>`;
+    renderDetails([]);
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(g => `
+    <tr>
+      <td>${displayDate(g.dateKey)}</td>
+      <td>${g.count}</td>
+      <td class="money">${money(g.paid)}</td>
+      <td class="money">${money(g.due)}</td>
+      <td><button class="btn" onclick="selectDate('${g.dateKey}')">View</button></td>
+    </tr>
+  `).join("");
+
+  const chosen = filtered.find(x => x.dateKey === selectedDateKey) || filtered[0];
+  selectedDateKey = chosen.dateKey;
+  renderDetails(chosen.rows);
+}
+
+function renderDetails(rows){
+  const tbody = document.getElementById("detailsBody");
+  if (!rows.length){
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No receipts for selected date.</td></tr>`;
+    return;
+  }
+  rows.sort((a,b) => Number(b.id || 0) - Number(a.id || 0));
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${safeText(r.receipt_number || "-")}</td>
+      <td>${safeText(r.name)}</td>
+      <td>${safeText(r.class_name || r.class || "-")}</td>
+      <td class="money">${money(r.total_paid ?? r.totalPaid ?? 0)}</td>
+      <td class="money">${money(r.total_due ?? r.totalDue ?? 0)}</td>
+    </tr>
+  `).join("");
+}
+
+function selectDate(dateKey){
+  selectedDateKey = dateKey;
+  const g = grouped.find(x => x.dateKey === dateKey);
+  renderDetails(g ? g.rows : []);
+}
+
+document.getElementById("sessionSelect").addEventListener("change", loadReceipts);
+document.getElementById("searchDate").addEventListener("input", renderSummary);
+
+(async function init(){
+  await loadSessions();
+  await loadReceipts();
+})();
+</script>
+<script src="shared_menu.js"></script>
+</body>
+</html>
+

@@ -1,204 +1,463 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Receipt History</title>
-
 <style>
-body {
-    font-family: Arial, sans-serif;
-    padding: 20px;
-    background: #f5f5f5;
+:root{
+  --brand:#0f4aa3;
+  --brand-2:#1f6feb;
+  --bg:#eef3fb;
+  --card:#ffffff;
+  --text:#1f2937;
+  --muted:#6b7280;
+  --danger:#d9363e;
+  --ok:#16803c;
+  --line:#d8e2f0;
 }
-.container {
-    max-width: 1000px;
-    margin: auto;
-    background: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 0 10px #ccc;
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 400px at -10% -20%, #dce9ff 0%, transparent 50%),
+    radial-gradient(900px 300px at 100% 0%, #d7f0ff 0%, transparent 45%),
+    var(--bg);
 }
-h2 { text-align: center; margin-bottom: 20px; }
-table { width: 100%; border-collapse: collapse; }
-th, td {
-    border: 1px solid #444;
-    padding: 8px;
-    text-align: center;
-    font-size: 14px;
+.topbar{
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  color:#fff;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  position:sticky;
+  top:0;
+  z-index:10;
 }
-th { background: #dff0ff; }
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;line-height:1}
+.topbar .title{font-size:20px;font-weight:700}
+.topbar .spacer{flex:1}
+.btn{
+  border:none;
+  border-radius:10px;
+  padding:9px 14px;
+  cursor:pointer;
+  font-weight:600;
+}
+.btn-light{background:#fff;color:var(--brand)}
+.btn-danger{background:var(--danger);color:#fff}
 
-.btn {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
+.overlay {
+  position: fixed;top:0;left:0;width:100%;height:100%;
+  background: rgba(0,0,0,0.35);display:none;z-index:1500;
 }
-.viewBtn { background: #007bff; color: #fff; }
-.delBtn { background: #dc3545; color: #fff; }
+.overlay.show { display:block; }
 
-.clearAll {
-    background: red;
-    color: white;
-    padding: 12px;
-    width: 100%;
-    margin-top: 20px;
-    font-size: 18px;
+.side-menu{
+  position:fixed;top:0;left:-280px;width:260px;height:100%;
+  background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+  padding:20px;overflow-y:auto;z-index:2000;
+  transition: left 0.35s;
+  border-radius:0 18px 18px 0;
 }
+.side-menu.open{ left:0; }
 
-.backBtn {
-    background: #6c757d;
-    color: white;
-    padding: 10px 18px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    margin-bottom: 15px;
+.menu-item{
+  padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+  font-size:16px;font-weight:600;color:#333;
 }
-.sessionBox { margin-bottom:20px; font-size:17px; }
-select { padding:8px; font-size:16px; border-radius:6px; }
+.wrap{max-width:1280px;margin:18px auto;padding:0 14px}
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:0 10px 28px rgba(15,74,163,.10);
+  padding:16px;
+}
+.toolbar{
+  display:grid;
+  grid-template-columns:220px 1fr 180px;
+  gap:10px;
+  align-items:center;
+}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+select,input{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px 11px;
+  font-size:14px;
+  background:#fff;
+}
+.cards{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(160px,1fr));
+  gap:10px;
+}
+.card{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#f8fbff;
+  padding:12px;
+}
+.card .k{color:var(--muted);font-size:12px}
+.card .v{font-size:22px;font-weight:800;margin-top:4px}
+.table-wrap{margin-top:14px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:980px}
+th,td{border-bottom:1px solid var(--line);padding:10px 8px;font-size:14px;text-align:left}
+th{
+  position:sticky;
+  top:0;
+  background:#f2f7ff;
+  color:#0f3c84;
+  font-weight:700;
+}
+tbody tr:hover{background:#f8fbff}
+.money{font-weight:700}
+.muted{color:var(--muted)}
+.action-cell{display:flex;gap:6px}
+.small-btn{
+  border:none;
+  border-radius:8px;
+  padding:6px 9px;
+  font-size:12px;
+  cursor:pointer;
+}
+.view{background:#0f4aa3;color:#fff}
+.del{background:#fbe6e7;color:#9b1319}
+.empty{
+  text-align:center;
+  color:var(--muted);
+  padding:18px 8px;
+}
+.pager{
+  margin-top:12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  justify-content:flex-end;
+  flex-wrap:wrap;
+}
+.pager .small{
+  color:var(--muted);
+}
+@media (max-width:900px){
+  .toolbar{grid-template-columns:1fr}
+  .cards{grid-template-columns:1fr}
+}
 </style>
 </head>
-
 <body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div class="title">Receipt History</div>
+    <div class="spacer"></div>
+    <button class="btn btn-light" onclick="goBack()">Back</button>
+    <button class="btn btn-danger" onclick="deleteAllReceipts()">Delete All</button>
+  </div>
+  <div id="overlay" class="overlay" onclick="closeMenu()"></div>
+  <div class="side-menu" id="sideMenu">
+    <div class="menu-item" onclick="goToPage('edit.html')">Edit Student</div>
+    <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
+    <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
+    <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
+  </div>
 
-<div class="container">
+  <div class="wrap">
+    <div class="panel">
+      <div class="toolbar">
+        <div>
+          <label>Session</label>
+          <select id="sessionSelect"></select>
+        </div>
+        <div>
+          <label>Search (Receipt No, Name, Father, Class, Roll)</label>
+          <input id="searchInput" type="text" placeholder="Type to filter receipts">
+        </div>
+        <div>
+          <label>Class Filter</label>
+          <select id="classFilter">
+            <option value="">All Classes</option>
+          </select>
+        </div>
+      </div>
 
-    <button class="backBtn" onclick="window.location.href='index.html'">⬅ Back</button>
+      <div class="cards">
+        <div class="card">
+          <div class="k">Total Receipts</div>
+          <div class="v" id="totalReceipts">0</div>
+        </div>
+        <div class="card">
+          <div class="k">Total Paid</div>
+          <div class="v" id="totalPaid">Rs. 0</div>
+        </div>
+        <div class="card">
+          <div class="k">Total Due</div>
+          <div class="v" id="totalDue">Rs. 0</div>
+        </div>
+      </div>
 
-    <h2>Receipt History</h2>
-
-    <div class="sessionBox">
-        <strong>Select Session:</strong>
-        <select id="sessionSelect" onchange="loadHistory()"></select>
-    </div>
-
-    <table>
-        <thead>
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-                <th>#</th>
-                <th>Receipt No</th>
-                <th>Name</th>
-                <th>Father</th>
-                <th>Class</th>
-                <th>Roll</th>
-                <th>Date</th>
-                <th>Total Paid</th>
-                <th>Actions</th>
+              <th>#</th>
+              <th>Receipt No</th>
+              <th>Name</th>
+              <th>Father</th>
+              <th>Class</th>
+              <th>Roll</th>
+              <th>Date</th>
+              <th>Total Paid</th>
+              <th>Total Due</th>
+              <th>Action</th>
             </tr>
-        </thead>
-        <tbody id="historyTable"></tbody>
-    </table>
-
-    <button class="clearAll" onclick="clearAll()">Delete All</button>
-
-</div>
+          </thead>
+          <tbody id="historyTable"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="prevPageBtn" class="small-btn view" type="button">Prev</button>
+        <span id="pageInfo" class="small">Page 1 / 1</span>
+        <button id="nextPageBtn" class="small-btn view" type="button">Next</button>
+      </div>
+    </div>
+  </div>
 
 <script>
-const API = "/api/proxy?path=";
+const API = "http://127.0.0.1:5000";
+const params = new URLSearchParams(window.location.search);
+let allRows = [];
+let filteredRows = [];
+let currentPage = 1;
+let pageSize = 50;
+let totalPages = 1;
+let totalRows = 0;
 
-/* ---------------- LOAD SESSIONS ---------------- */
-async function loadSessions() {
+function toggleMenu(){
+  const sideMenu = document.getElementById("sideMenu");
+  const overlay = document.getElementById("overlay");
+  sideMenu.classList.toggle("open");
+  overlay.classList.toggle("show");
+}
+
+function closeMenu(){
+  const sideMenu = document.getElementById("sideMenu");
+  const overlay = document.getElementById("overlay");
+  sideMenu.classList.remove("open");
+  overlay.classList.remove("show");
+}
+
+function goToPage(page){
+  const session = getSession() || localStorage.getItem("session") || "2024_25";
+  window.location.href = `${page}?session=${encodeURIComponent(session)}`;
+}
+
+function goBack(){
+  window.location.href = "index.html";
+}
+
+function formatMoney(v){
+  return `Rs. ${Number(v || 0).toLocaleString("en-IN")}`;
+}
+
+function safeText(v){
+  return String(v ?? "").trim();
+}
+
+function getSession(){
+  return document.getElementById("sessionSelect").value;
+}
+
+async function loadSessions(){
+  const sel = document.getElementById("sessionSelect");
+  try{
     const res = await fetch(`${API}/session/list`);
     const data = await res.json();
-
-    let sel = document.getElementById("sessionSelect");
-    sel.innerHTML = "";
-
-    data.sessions.forEach(s => {
-        let opt = document.createElement("option");
-        opt.value = s;
-        opt.textContent = s;
-        sel.appendChild(opt);
-    });
-
-    sel.value = localStorage.getItem("session") || data.sessions[0];
-    loadHistory();
+    const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+    sel.innerHTML = sessions.map(s => `<option value="${s}">${s}</option>`).join("");
+    const saved = params.get("session") || localStorage.getItem("session");
+    if (saved && sessions.includes(saved)) sel.value = saved;
+    if (!sel.value && sessions.length) sel.value = sessions[0];
+  }catch(e){
+    sel.innerHTML = `<option value="${localStorage.getItem("session") || "2024_25"}">${localStorage.getItem("session") || "2024_25"}</option>`;
+  }
 }
-loadSessions();
 
-/* ---------------- LOAD HISTORY ---------------- */
-async function loadHistory() {
-    const s = document.getElementById("sessionSelect").value;
-    localStorage.setItem("session", s);
+async function loadHistory(){
+  const session = getSession();
+  localStorage.setItem("session", session);
+  const tbody = document.getElementById("historyTable");
+  tbody.innerHTML = `<tr><td colspan="10" class="empty">Loading receipts...</td></tr>`;
 
-    const res = await fetch(`${API}/receipt/history`, {
-        headers: { "X-Session": s }
+  try{
+    const res = await fetch(`${API}/receipt/history?session=${encodeURIComponent(session)}&page=${currentPage}&page_size=${pageSize}`, {
+      headers: { "X-Session": session }
     });
-
     const data = await res.json();
-    if (!data.success) {
-        alert("Error loading history");
-        return;
+    if (!res.ok || data.success === false) {
+      throw new Error(data.message || data.error || `HTTP ${res.status}`);
     }
-
-    const rows = data.history;
-    let tb = "";
-
-    rows.forEach((r, i) => {
-
-        const finalClass = r.class_name || r.class || "-";
-        const totalPaid = r.total_paid ?? r.totalPaid ?? 0;
-
-        const encoded = encodeURIComponent(JSON.stringify(r));
-
-        tb += `
-        <tr>
-            <td>${i + 1}</td>
-            <td>${r.receipt_number || "-"}</td>
-            <td>${r.name}</td>
-            <td>${r.father}</td>
-            <td>${finalClass}</td>
-            <td>${r.roll}</td>
-            <td>${r.date}</td>
-            <td>₹${totalPaid}</td>
-
-            <td>
-                <button class="btn viewBtn" onclick='viewReceipt("${encoded}")'>View</button>
-                <button class="btn delBtn" onclick="deleteReceipt('${r.id}')">Delete</button>
-            </td>
-        </tr>`;
-    });
-
-    document.getElementById("historyTable").innerHTML =
-        tb || `<tr><td colspan="9">No receipts found.</td></tr>`;
+    allRows = Array.isArray(data.history) ? data.history : [];
+    currentPage = Number(data.page || currentPage || 1);
+    totalPages = Number(data.total_pages || 1);
+    totalRows = Number(data.total || allRows.length || 0);
+    buildClassFilter(allRows);
+    applyFilters();
+    renderPager();
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">Failed to load receipts: ${safeText(e.message)}</td></tr>`;
+    totalPages = 1;
+    totalRows = 0;
+    renderPager();
+  }
 }
 
-/* ---------------- DELETE ONE ---------------- */
-async function deleteReceipt(id) {
-    if (!confirm("Delete this receipt?")) return;
-
-    const s = document.getElementById("sessionSelect").value;
-
-    await fetch(`${API}/receipt/delete/${id}`, {
-        method: "DELETE",
-        headers: { "X-Session": s }
-    });
-
-    loadHistory();
+function buildClassFilter(rows){
+  const classFilter = document.getElementById("classFilter");
+  const selected = classFilter.value || "";
+  const classes = [...new Set(rows.map(r => safeText(r.class_name || r.class)).filter(Boolean))];
+  classes.sort((a,b) => a.localeCompare(b, undefined, { numeric:true, sensitivity:"base" }));
+  classFilter.innerHTML = `<option value="">All Classes</option>` + classes.map(c => `<option value="${c}">${c}</option>`).join("");
+  if (selected && classes.includes(selected)) classFilter.value = selected;
 }
 
-/* ---------------- DELETE ALL ---------------- */
-async function clearAll() {
-    if (!confirm("Delete ALL receipts?")) return;
+function applyFilters(){
+  const q = safeText(document.getElementById("searchInput").value).toLowerCase();
+  const classVal = safeText(document.getElementById("classFilter").value).toLowerCase();
 
-    const s = document.getElementById("sessionSelect").value;
+  filteredRows = allRows.filter(r => {
+    const cls = safeText(r.class_name || r.class).toLowerCase();
+    const roll = safeText(r.roll).toLowerCase();
+    const name = safeText(r.name).toLowerCase();
+    const father = safeText(r.father).toLowerCase();
+    const receiptNo = safeText(r.receipt_number).toLowerCase();
+    const date = safeText(r.date).toLowerCase();
 
-    await fetch(`${API}/receipt/delete_all`, {
-        method: "DELETE",
-        headers: { "X-Session": s }
-    });
+    const classOk = !classVal || cls === classVal;
+    const searchOk = !q || [receiptNo, name, father, cls, roll, date].some(v => v.includes(q));
+    return classOk && searchOk;
+  });
 
-    loadHistory();
+  renderTable();
+  renderSummary();
 }
 
-/* ---------------- VIEW RECEIPT ---------------- */
-function viewReceipt(encoded) {
-    const obj = JSON.parse(decodeURIComponent(encoded));
-    window.open("receipt.html?data=" + encodeURIComponent(JSON.stringify(obj)), "_blank");
+function renderSummary(){
+  const totalReceipts = filteredRows.length;
+  const totalPaid = filteredRows.reduce((s, r) => s + Number(r.total_paid ?? r.totalPaid ?? 0), 0);
+  const totalDue = filteredRows.reduce((s, r) => s + Number(r.total_due ?? r.totalDue ?? 0), 0);
+  document.getElementById("totalReceipts").textContent = String(totalReceipts);
+  document.getElementById("totalPaid").textContent = formatMoney(totalPaid);
+  document.getElementById("totalDue").textContent = formatMoney(totalDue);
 }
+
+function renderPager(){
+  const info = document.getElementById("pageInfo");
+  const prev = document.getElementById("prevPageBtn");
+  const next = document.getElementById("nextPageBtn");
+  info.textContent = `Page ${currentPage} / ${totalPages} (Total: ${totalRows})`;
+  prev.disabled = currentPage <= 1;
+  next.disabled = currentPage >= totalPages;
+  prev.style.opacity = prev.disabled ? "0.6" : "1";
+  next.style.opacity = next.disabled ? "0.6" : "1";
+}
+
+function renderTable(){
+  const tbody = document.getElementById("historyTable");
+  if (!filteredRows.length){
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">No receipts found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filteredRows.map((r, i) => {
+    const cls = safeText(r.class_name || r.class || "-");
+    const totalPaid = Number(r.total_paid ?? r.totalPaid ?? 0);
+    const totalDue = Number(r.total_due ?? r.totalDue ?? 0);
+    const encoded = encodeURIComponent(JSON.stringify(r));
+    return `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${safeText(r.receipt_number || "-")}</td>
+        <td>${safeText(r.name)}</td>
+        <td>${safeText(r.father)}</td>
+        <td>${cls}</td>
+        <td>${safeText(r.roll)}</td>
+        <td class="muted">${safeText(r.date)}</td>
+        <td class="money">${formatMoney(totalPaid)}</td>
+        <td class="money">${formatMoney(totalDue)}</td>
+        <td class="action-cell">
+          <button class="small-btn view" onclick='viewReceipt("${encoded}")'>View</button>
+          <button class="small-btn del" onclick='deleteReceipt(${Number(r.id || 0)})'>Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function viewReceipt(encoded){
+  const obj = JSON.parse(decodeURIComponent(encoded));
+  window.open("receipt.html?mode=history&data=" + encodeURIComponent(JSON.stringify(obj)), "_blank");
+}
+
+async function deleteReceipt(id){
+  if (!id) return;
+  if (!confirm("Delete this receipt?")) return;
+  const session = getSession();
+  const res = await fetch(`${API}/receipt/delete/${id}?session=${encodeURIComponent(session)}`, {
+    method: "DELETE",
+    headers: { "X-Session": session }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false){
+    alert(data.message || data.error || `Delete failed (${res.status})`);
+    return;
+  }
+  await loadHistory();
+}
+
+async function deleteAllReceipts(){
+  if (!confirm("Delete all receipts in this session?")) return;
+  const session = getSession();
+  const res = await fetch(`${API}/receipt/delete_all?session=${encodeURIComponent(session)}`, {
+    method: "DELETE",
+    headers: { "X-Session": session }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false){
+    alert(data.message || data.error || `Delete all failed (${res.status})`);
+    return;
+  }
+  await loadHistory();
+}
+
+document.getElementById("sessionSelect").addEventListener("change", async () => {
+  currentPage = 1;
+  await loadHistory();
+});
+document.getElementById("searchInput").addEventListener("input", applyFilters);
+document.getElementById("classFilter").addEventListener("change", applyFilters);
+document.getElementById("prevPageBtn").addEventListener("click", async () => {
+  if (currentPage <= 1) return;
+  currentPage -= 1;
+  await loadHistory();
+});
+document.getElementById("nextPageBtn").addEventListener("click", async () => {
+  if (currentPage >= totalPages) return;
+  currentPage += 1;
+  await loadHistory();
+});
+
+(async function init(){
+  await loadSessions();
+  await loadHistory();
+})();
 </script>
-
+<script src="shared_menu.js"></script>
 </body>
 </html>

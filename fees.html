@@ -1,8 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Edit Fee Structure</title>
-
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
 body{
     font-family:Poppins, sans-serif;
@@ -10,15 +13,12 @@ body{
     margin:0;
     padding:0;
 }
-
-/* TOP BAR */
 .topbar{
     width:100%;
     padding:15px 20px;
     background:#007bff;
     color:#fff;
     display:flex;
-    justify-content:flex-start;
     align-items:center;
     gap:15px;
     box-sizing:border-box;
@@ -28,7 +28,6 @@ body{
     font-size:20px;
     font-weight:600;
 }
-
 #sessionSelect{
     margin-left:auto;
     padding:6px 10px;
@@ -36,24 +35,23 @@ body{
     border:none;
     font-size:15px;
 }
-
 .menu-btn{
     font-size:28px;
     cursor:pointer;
     font-weight:900;
     user-select:none;
 }
-
 .overlay{
     position:fixed;
-    top:0;left:0;
-    width:100%;height:100%;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
     background:rgba(0,0,0,.35);
     display:none;
     z-index:1400;
 }
 .overlay.show{ display:block; }
-
 .side-menu{
     position:fixed;
     top:0;
@@ -68,7 +66,6 @@ body{
     border-radius:0 18px 18px 0;
 }
 .side-menu.open{ left:0; }
-
 .menu-item{
     padding:12px 0;
     border-bottom:1px solid #eee;
@@ -77,25 +74,50 @@ body{
     font-weight:600;
 }
 .menu-item:hover{ color:#007bff; }
-
 .container{
-    max-width:800px;
-    margin:auto;
+    max-width:980px;
+    margin:20px auto;
     background:#fff;
     padding:20px;
     border-radius:10px;
     box-shadow:0 4px 12px rgba(0,0,0,.1);
+}
+.actions{
+    display:flex;
+    gap:8px;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+}
+table{
+    width:100%;
+    border-collapse:collapse;
     margin-top:20px;
 }
-
-table{width:100%;border-collapse:collapse;margin-top:20px}
-th,td{border:1px solid #ddd;padding:10px;text-align:center}
-th{background:#007bff;color:white}
-input{padding:6px;width:120px}
-button{padding:6px 12px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer}
+th,td{
+    border:1px solid #ddd;
+    padding:10px;
+    text-align:center;
+}
+th{
+    background:#007bff;
+    color:white;
+}
+input{
+    padding:6px;
+    width:130px;
+}
+button{
+    padding:8px 12px;
+    background:#28a745;
+    color:white;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}
+.btn-blue{ background:#007bff; }
+.btn-purple{ background:#6f42c1; }
 </style>
 </head>
-
 <body>
 
 <div class="topbar">
@@ -107,18 +129,43 @@ button{padding:6px 12px;background:#28a745;color:white;border:none;border-radius
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 
 <div id="sideMenu" class="side-menu">
-    <div class="menu-item" onclick="goTo('fees.html')">💰 Fees Modify</div>
-    <div class="menu-item" onclick="goTo('index.html')">📋 Students</div>
-    <div class="menu-item" onclick="goTo('dashboard.html')">🏠 Dashboard</div>
-    <div class="menu-item" onclick="goTo('add_student.html')">➕ Add Student</div>
-    <div class="menu-item" onclick="goTo('receipt_history.html')">📜 Receipt History</div>
-    <div class="menu-item" onclick="goTo('delete_student.html')">🗑 Delete Students</div>
-    <div class="menu-item" onclick="goToPage('export.html')">📤 Export Data</div>
+    <div class="menu-item" onclick="goToPage('edit.html')">Edit Student</div>
+    <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
+    <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
+    <div class="menu-item" onclick="goToPage('exam_schedule.html')">Exam Schedule</div>
+    <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
+</div>
+
+<div class="container">
+    <div class="actions">
+        <button class="btn-blue" onclick="location.href='index.html?session='+currentSession">Back to Home</button>
+        <button onclick="saveAllFees()">Save All Classes</button>
+        <button class="btn-purple" onclick="downloadFeesPdf()">Download PDF</button>
+    </div>
+
+    <h2>Class-wise Fee Structure</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th>Monthly Fee (Rs.)</th>
+                <th>Annual Charge (Rs.)</th>
+                <th>Admission Charge (Rs.)</th>
+            </tr>
+        </thead>
+        <tbody id="feeBody"></tbody>
+    </table>
 </div>
 
 <script>
-const API = "/api/proxy?path=";
-let currentSession = localStorage.getItem("session") || "2024_25";
+const FEE_API = "http://127.0.0.1:5000";
+const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+const params = new URLSearchParams(window.location.search);
+let currentSession = params.get("session") || localStorage.getItem("session") || "2024_25";
+localStorage.setItem("apiBaseUrl", FEE_API);
+localStorage.setItem("session", currentSession);
 
 function toggleMenu(){
     document.getElementById("sideMenu").classList.add("open");
@@ -128,30 +175,32 @@ function closeMenu(){
     document.getElementById("sideMenu").classList.remove("open");
     document.getElementById("overlay").classList.remove("show");
 }
-function goTo(x){ location.href=x; }
+function goToPage(page){
+    closeMenu();
+    location.href = `${page}?session=${encodeURIComponent(currentSession)}`;
+}
 
-/* LOAD SESSIONS */
 async function loadSessions(){
-    try {
-        const res = await fetch(API + "/session/list");
+    try{
+        const res = await fetch(`${SESSION_API}/session/list`);
         const data = await res.json();
+        const list = Array.isArray(data?.sessions) ? data.sessions : [];
 
-        let sel = document.getElementById("sessionSelect");
+        const sel = document.getElementById("sessionSelect");
         sel.innerHTML = "";
-
-        data.sessions.forEach(s => {
+        list.forEach(s => {
             sel.innerHTML += `<option value="${s}">${s}</option>`;
         });
 
-        if(!data.sessions.includes(currentSession)){
-            currentSession = data.sessions[0];
+        if (!list.includes(currentSession) && list.length) {
+            currentSession = list[0];
         }
-
-        sel.value = currentSession;
-        localStorage.setItem("session", currentSession);
-    }
-    catch(err){
-        alert("Error loading sessions!");
+        if (currentSession) {
+            sel.value = currentSession;
+            localStorage.setItem("session", currentSession);
+        }
+    }catch(err){
+        alert("Error loading sessions");
     }
 }
 
@@ -161,90 +210,187 @@ function changeSession(){
     loadFees();
 }
 
-/* LOAD FEES */
+async function fetchStudentClasses(){
+    const normalizeClass = (raw) => {
+        const text = String(raw || "").trim().replace(/\s+/g, " ");
+        if (!text) return "";
+        // Convert "5th A" -> "5th", "9th B" -> "9th"
+        return text.replace(/\s+[AB]$/i, "").trim();
+    };
+
+    const uniq = (arr) => [...new Set(arr.filter(Boolean))];
+
+    try{
+        const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
+        const data = await res.json();
+        const rows = Array.isArray(data) ? data : (Array.isArray(data?.students) ? data.students : []);
+        let classes = uniq(rows.map(s => normalizeClass(s.class_name || s.class || "")));
+
+        // Fallback: if session has only one/very few classes, load all students
+        if (classes.length <= 1) {
+            const allRes = await fetch(`${STUDENT_API}/students`);
+            const allData = await allRes.json();
+            const allRows = Array.isArray(allData) ? allData : (Array.isArray(allData?.students) ? allData.students : []);
+            classes = uniq(allRows.map(s => normalizeClass(s.class_name || s.class || "")));
+        }
+
+        return classes;
+    }catch(e){
+        console.warn("students class fetch failed", e);
+        return [];
+    }
+}
+
 async function loadFees(){
-    const res = await fetch(`${API}/fees/get`, {
-        headers: { "X-Session": currentSession }
-    });
-
-    const data = await res.json();
-    if (!data.success) return alert("Error loading fees");
-
     const body = document.getElementById("feeBody");
+    body.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
+
+    let feeRows = [];
+    try{
+        const res = await fetch(`${FEE_API}/fees/get?session=${encodeURIComponent(currentSession)}`, {
+            headers: { "X-Session": currentSession }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            feeRows = Array.isArray(data.fees) ? data.fees : [];
+        }
+    }catch(e){
+        console.warn("fees/get failed", e);
+    }
+
+    const classFromStudents = await fetchStudentClasses();
+    const classFromFees = feeRows.map(f => String(f.class_name || "").trim()).filter(Boolean);
+    const classes = [...new Set([...classFromStudents, ...classFromFees])];
+    classes.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+
+    const feeMap = new Map(
+        feeRows.map(f => [
+            String(f.class_name || "").trim(),
+            {
+                monthly_fee: Number(f.monthly_fee || 0),
+                annual_charge: Number(f.annual_charge || 0),
+                admission_charge: Number(f.admission_charge ?? f.admission_fee ?? 0)
+            }
+        ])
+    );
+
     body.innerHTML = "";
+    if (!classes.length) {
+        body.innerHTML = `<tr><td colspan="4">No classes found for selected session</td></tr>`;
+        return;
+    }
 
-    data.fees.forEach(f => {
-        let monthly = f.monthly_fee ?? 0;
-        let annual = f.annual_charge ?? 0;
-
+    classes.forEach(cls => {
+        const row = feeMap.get(cls) || { monthly_fee: 0, annual_charge: 0, admission_charge: 0 };
         body.innerHTML += `
-          <tr>
-            <td>${f.class_name}</td>
-
-            <td><input id="fee_${f.class_name}" 
-                       value="${monthly}" 
-                       type="number"></td>
-
-            <td><input id="annual_${f.class_name}" 
-                       value="${annual}" 
-                       type="number"></td>
-
-            <td><button onclick="saveFee('${f.class_name}')">Save</button></td>
-          </tr>
+            <tr data-class="${cls}">
+                <td>${cls}</td>
+                <td><input class="monthly-fee" value="${row.monthly_fee}" type="number" min="0"></td>
+                <td><input class="annual-fee" value="${row.annual_charge}" type="number" min="0"></td>
+                <td><input class="admission-fee" value="${row.admission_charge}" type="number" min="0"></td>
+            </tr>
         `;
     });
 }
 
-/* SAVE FEES */
-async function saveFee(className){
-    const monthly_fee = Number(document.getElementById("fee_" + className).value);
-    const annual_charge = Number(document.getElementById("annual_" + className).value);
-
-    const res = await fetch(`${API}/fees/update`, {
-        method: "POST",
-        headers: { 
-            "Content-Type": "application/json",
-            "X-Session": currentSession
-        },
-        body: JSON.stringify({
-            class_name: className,   // FIXED 🔥
-            monthly_fee,
-            annual_charge
-        })
-    });
-
-    const data = await res.json();
-    alert(data.message ?? "Saved!");
+function collectFeeRows(){
+    const rows = [...document.querySelectorAll("#feeBody tr[data-class]")];
+    return rows.map(row => ({
+        class_name: String(row.getAttribute("data-class") || "").trim(),
+        monthly_fee: Number(row.querySelector(".monthly-fee")?.value || 0),
+        annual_charge: Number(row.querySelector(".annual-fee")?.value || 0),
+        admission_charge: Number(row.querySelector(".admission-fee")?.value || 0),
+        admission_fee: Number(row.querySelector(".admission-fee")?.value || 0)
+    })).filter(x => x.class_name);
 }
 
+async function saveAllFees(){
+    const fees = collectFeeRows();
+    if (!fees.length) {
+        alert("No classes to save");
+        return;
+    }
 
-/* INIT */
+    let res;
+    try {
+        res = await fetch(`${FEE_API}/fees/update_many?session=${encodeURIComponent(currentSession)}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Session": currentSession
+            },
+            body: JSON.stringify({ fees })
+        });
+    } catch (e) {
+        alert(`Save failed: ${e?.message || e}`);
+        return;
+    }
+
+    if (res.status === 404) {
+        const tasks = fees.map(async (fee) => {
+            const r = await fetch(`${FEE_API}/fees/update?session=${encodeURIComponent(currentSession)}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Session": currentSession
+                },
+                body: JSON.stringify(fee)
+            });
+            const d = await r.json().catch(() => ({}));
+            return { ok: r.ok && d.success !== false, class_name: fee.class_name, status: r.status, data: d };
+        });
+        const results = await Promise.all(tasks);
+        const failedRows = results.filter(x => !x.ok);
+        if (failedRows.length) {
+            const first = failedRows[0];
+            alert(`Failed for ${failedRows.length} classes. Example: ${first.class_name} (${first.status}) ${first.data?.message || first.data?.error || "Unknown error"}`);
+            return;
+        }
+        alert(`Saved all classes on ${FEE_API} (${currentSession})`);
+        await loadFees();
+        return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+        alert(data.message || data.error || `Save failed (${res.status})`);
+        return;
+    }
+    alert((data.message || "Saved all classes") + ` on ${FEE_API} (${currentSession})`);
+    await loadFees();
+}
+
+function downloadFeesPdf(){
+    const rows = [...document.querySelectorAll("#feeBody tr[data-class]")];
+    if (!rows.length) {
+        alert("No fee data to download");
+        return;
+    }
+
+    const body = rows.map(row => [
+        row.getAttribute("data-class") || "",
+        Number(row.querySelector(".monthly-fee")?.value || 0),
+        Number(row.querySelector(".annual-fee")?.value || 0),
+        Number(row.querySelector(".admission-fee")?.value || 0)
+    ]);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF("p", "pt", "a4");
+    doc.setFontSize(14);
+    doc.text(`Fee Structure - Session ${currentSession}`, 40, 40);
+    doc.autoTable({
+        startY: 60,
+        head: [["Class", "Monthly Fee (Rs.)", "Annual Charge (Rs.)", "Admission Charge (Rs.)"]],
+        body,
+        theme: "grid",
+        headStyles: { fillColor: [0, 123, 255] }
+    });
+    doc.save(`fee-structure-${currentSession}.pdf`);
+}
+
 loadSessions().then(loadFees);
 </script>
 
-<div class="container">
-
-  <button onclick="location.href='index.html?session='+currentSession" 
-        style="padding:8px 14px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;margin-bottom:12px">
-        ⬅ Back to Home
-  </button>
-
-  <h2>Class-wise Fee Structure</h2>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Class</th>
-        <th>Monthly Fee (₹)</th>
-        <th>Annual Charge (₹)</th>
-        <th>Save</th>
-      </tr>
-    </thead>
-
-    <tbody id="feeBody"></tbody>
-
-  </table>
-</div>
-
+<script src="shared_menu.js"></script>
 </body>
 </html>

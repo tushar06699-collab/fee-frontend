@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Accountant - Class Students</title>
+<style>
+body{font-family:Poppins,sans-serif;background:#f2f4f7;margin:0;padding:0}
+.topbar{width:100%;padding:15px 20px;background:#007bff;color:#fff;display:flex;align-items:center;gap:12px;box-sizing:border-box;position:sticky;top:0;z-index:4000}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900}
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);display:none;z-index:1500}
+.overlay.show{display:block}
+.side-menu{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,.18);padding:20px;overflow-y:auto;z-index:2000;transition:left .35s;border-radius:0 18px 18px 0}
+.side-menu.open{left:0}
+.menu-item{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600;color:#333}
+.container{max-width:1450px;margin:16px auto;background:#fff;padding:18px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.filters label{font-size:12px;color:#555;display:block;margin-bottom:4px}
+.filters input,.filters select{padding:8px;border-radius:8px;border:1px solid #ccc;min-width:220px}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{border:1px solid #e6e6e6;padding:8px;text-align:center;font-size:14px}
+th{background:#007bff;color:#fff}
+.link{color:#0d6efd;cursor:pointer;text-decoration:underline;font-weight:600}
+.btn{padding:6px 10px;border:0;border-radius:6px;cursor:pointer;background:#0d6efd;color:#fff}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px}
+.muted{color:#666;font-size:12px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="menu-btn" onclick="toggleMenu()">☰</div>
+  <div style="font-size:20px;font-weight:600;">Accountant - Class <span id="classLabel"></span></div>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+    <select id="classSelectTop" onchange="changeClass()"></select>
+    <select id="sessionSelect" onchange="changeSession()"></select>
+    <button class="btn" onclick="goBack()">Back</button>
+  </div>
+</div>
+<div id="overlay" class="overlay" onclick="closeMenu()"></div>
+<div id="sideMenu" class="side-menu"></div>
+
+<div class="container">
+  <div class="filters">
+    <div>
+      <label>Search</label>
+      <input id="searchInput" placeholder="Name / Roll / Admission No" oninput="applyFilters(true)"/>
+    </div>
+    <div>
+      <label>Page Size</label>
+      <select id="pageSize" onchange="applyFilters(true)">
+        <option value="20">20</option>
+        <option value="30" selected>30</option>
+        <option value="50">50</option>
+      </select>
+    </div>
+  </div>
+  <div class="muted" id="metaInfo"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Name</th><th>Roll</th><th>Admission No</th><th>Total Paid</th><th>Total Due</th><th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="bodyRows"></tbody>
+  </table>
+
+  <div class="pager">
+    <button class="btn" onclick="prevPage()">Prev</button>
+    <span id="pageInfo">Page 1 / 1</span>
+    <button class="btn" onclick="nextPage()">Next</button>
+  </div>
+</div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
+const params = new URLSearchParams(window.location.search);
+const classParam = params.get("class") || "";
+let currentClass = classParam;
+let currentSession = params.get("session") || localStorage.getItem("session") || "2024_25";
+let allRows = [];
+let filteredRows = [];
+let currentPage = 1;
+
+function esc(s){ return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+function toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function getPageSize(){ return Number(document.getElementById("pageSize").value || 30); }
+
+async function loadSessions(){
+  let list = [];
+  try{
+    const res = await fetch(`${SESSION_API}/session/list`);
+    const data = await res.json();
+    list = Array.isArray(data?.sessions) ? data.sessions.map(x => x.name || x).filter(Boolean) : [];
+  }catch(_){}
+  if (!list.length) list = [currentSession];
+  if (!list.includes(currentSession)) list.push(currentSession);
+  list = [...new Set(list)];
+  const sel = document.getElementById("sessionSelect");
+  sel.innerHTML = list.map(x => `<option value="${x}">${x}</option>`).join("");
+  sel.value = currentSession;
+}
+
+async function loadClassOptions(){
+  const sel = document.getElementById("classSelectTop");
+  let classes = [];
+  try{
+    const res = await fetch(`${FEE_API}/fees/get?session=${encodeURIComponent(currentSession)}`, {
+      headers: { "X-Session": currentSession }
+    });
+    const data = await res.json().catch(() => ({}));
+    classes = [...new Set((Array.isArray(data?.fees) ? data.fees : []).map(x => String(x.class_name || "").trim()).filter(Boolean))]
+      .sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:"base"}));
+  }catch(_){}
+  if (!classes.length && currentClass) classes = [currentClass];
+  if (currentClass && !classes.includes(currentClass)) classes.push(currentClass);
+  sel.innerHTML = classes.map(c => `<option value="${c}">${c}</option>`).join("");
+  if (currentClass) sel.value = currentClass;
+}
+
+function normalizeMaster(s){
+  return {
+    name: String(s.student_name || s.name || "").trim(),
+    class_name: String(s.class_name || s.class || "").trim(),
+    roll: String(s.rollno ?? s.roll ?? "").trim(),
+    admission_no: String(s.admission_no ?? s.admissionNo ?? "").trim(),
+    father: String(s.father_name || s.father || "").trim()
+  };
+}
+
+function calcTotals(r){
+  const months = (r.months && typeof r.months === "object") ? r.months : {};
+  let paid = 0, due = 0;
+  Object.keys(months).forEach(k => {
+    const m = months[k] || {};
+    paid += toNum(m.paid);
+    due += toNum(m.due);
+  });
+  return { paid, due };
+}
+
+async function loadClassStudents(){
+  const body = document.getElementById("bodyRows");
+  body.innerHTML = `<tr><td colspan="7">Loading...</td></tr>`;
+  try{
+    const [mRes, fRes] = await Promise.allSettled([
+      fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}&class_name=${encodeURIComponent(currentClass)}`),
+      fetch(`${FEE_API}/students?session=${encodeURIComponent(currentSession)}&class_name=${encodeURIComponent(currentClass)}`, { headers: { "X-Session": currentSession } })
+    ]);
+
+    const masterRows = [];
+    const feeRows = [];
+    if (mRes.status === "fulfilled" && mRes.value.ok){
+      const d = await mRes.value.json();
+      (Array.isArray(d) ? d : (Array.isArray(d?.students) ? d.students : [])).forEach(x => masterRows.push(normalizeMaster(x)));
+    }
+    if (fRes.status === "fulfilled" && fRes.value.ok){
+      const d = await fRes.value.json();
+      (Array.isArray(d) ? d : (Array.isArray(d?.students) ? d.students : [])).forEach(x => feeRows.push(x));
+    }
+
+    const map = new Map();
+    masterRows.forEach(r => map.set(`${r.class_name}|${r.roll}`, { ...r, months: {}, advance: 0 }));
+    feeRows.forEach(r => {
+      const key = `${r.class_name}|${r.roll}`;
+      const cur = map.get(key) || {};
+      map.set(key, { ...cur, ...r, name: r.name || cur.name || "", admission_no: r.admission_no || cur.admission_no || "" });
+    });
+    allRows = [...map.values()].filter(x => String(x.class_name).trim() === String(currentClass).trim() && x.roll);
+    applyFilters(true);
+  }catch(e){
+    body.innerHTML = `<tr><td colspan="7">Failed: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function applyFilters(resetPage){
+  if (resetPage) currentPage = 1;
+  const q = String(document.getElementById("searchInput").value || "").trim().toLowerCase();
+  filteredRows = allRows.filter(r => {
+    if (!q) return true;
+    return `${r.name} ${r.roll} ${r.admission_no}`.toLowerCase().includes(q);
+  }).sort((a,b)=>String(a.roll).localeCompare(String(b.roll),undefined,{numeric:true,sensitivity:"base"}));
+  renderPage();
+}
+
+function renderPage(){
+  const body = document.getElementById("bodyRows");
+  const pageSize = getPageSize();
+  const total = filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * pageSize;
+  const rows = filteredRows.slice(start, start + pageSize);
+
+  if (!rows.length){
+    body.innerHTML = `<tr><td colspan="7">No students found.</td></tr>`;
+  } else {
+    body.innerHTML = rows.map((r, i) => {
+      const t = calcTotals(r);
+      return `<tr>
+        <td>${start + i + 1}</td>
+        <td><span class="link" onclick="openStudent('${encodeURIComponent(r.class_name)}','${encodeURIComponent(r.roll)}')">${esc(r.name || "-")}</span></td>
+        <td>${esc(r.roll)}</td>
+        <td>${esc(r.admission_no || "-")}</td>
+        <td>${t.paid}</td>
+        <td>${t.due}</td>
+        <td><button class="btn" onclick="openStudent('${encodeURIComponent(r.class_name)}','${encodeURIComponent(r.roll)}')">Collect Fee</button></td>
+      </tr>`;
+    }).join("");
+  }
+  document.getElementById("pageInfo").textContent = `Page ${currentPage} / ${totalPages}`;
+  document.getElementById("metaInfo").textContent = `Showing class ${currentClass} | Students: ${total}`;
+}
+
+function openStudent(clsEnc, rollEnc){
+  const cls = decodeURIComponent(clsEnc);
+  const roll = decodeURIComponent(rollEnc);
+  window.location.href = `accountant_student_details.html?class=${encodeURIComponent(cls)}&roll=${encodeURIComponent(roll)}&session=${encodeURIComponent(currentSession)}`;
+}
+
+function prevPage(){ if (currentPage > 1){ currentPage--; renderPage(); } }
+function nextPage(){
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / getPageSize()));
+  if (currentPage < totalPages){ currentPage++; renderPage(); }
+}
+
+function goBack(){
+  window.location.href = `accountant.html?session=${encodeURIComponent(currentSession)}`;
+}
+
+function changeSession(){
+  currentSession = document.getElementById("sessionSelect").value;
+  localStorage.setItem("session", currentSession);
+  history.replaceState({}, "", `accountant_class.html?class=${encodeURIComponent(currentClass)}&session=${encodeURIComponent(currentSession)}`);
+  loadClassOptions().then(loadClassStudents);
+}
+
+function changeClass(){
+  currentClass = document.getElementById("classSelectTop").value;
+  history.replaceState({}, "", `accountant_class.html?class=${encodeURIComponent(currentClass)}&session=${encodeURIComponent(currentSession)}`);
+  document.getElementById("classLabel").textContent = currentClass || "-";
+  loadClassStudents();
+}
+
+(async function init(){
+  document.getElementById("classLabel").textContent = currentClass || "-";
+  await loadSessions();
+  await loadClassOptions();
+  await loadClassStudents();
+})();
+</script>
+<script src="shared_menu.js"></script>
+</body>
+</html>

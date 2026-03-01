@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Accountant Student Details</title>
+<style>
+body{font-family:Poppins,sans-serif;background:#f2f4f7;margin:0;padding:0 20px 20px}
+.topbar{width:100%;padding:15px 20px;background:#007bff;color:#fff;display:flex;align-items:center;gap:15px;box-sizing:border-box;position:sticky;top:0;z-index:3000;margin:0 -20px 15px}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900}
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);display:none;z-index:1500}
+.overlay.show{display:block}
+.side-menu{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,.18);padding:20px;overflow-y:auto;z-index:2000;transition:left .35s;border-radius:0 18px 18px 0}
+.side-menu.open{left:0}
+.menu-item{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600;color:#333}
+.container{max-width:1500px;margin:auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.info{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.card{background:#f7f7f7;padding:10px;border-radius:8px;min-width:140px}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #ddd;padding:8px;text-align:center}
+th{background:#007bff;color:#fff}
+.paid{background:#c8ffc8;color:#0b7a0b;font-weight:700}
+.partial{background:#fff3bf;color:#7a5a00;font-weight:700}
+.due{background:#ffd2d2;color:#b30000;font-weight:700}
+.btn{padding:8px 10px;border-radius:8px;border:none;cursor:pointer;margin:2px}
+.paid-btn{background:#28a745;color:#fff}
+.action-bar{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:15px 0}
+.action-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;width:100%}
+.amount-box{display:flex;flex-direction:column;gap:6px}
+.amount-box input[type="number"]{padding:8px 10px;border-radius:6px;border:1px solid #bbb;width:230px}
+.method-options{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.method-options label{display:flex;align-items:center;gap:6px;margin:0}
+.method-options input[type="checkbox"]{width:auto;padding:0;margin:0}
+.action-buttons{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn.primary{background:#0d6efd;color:#fff}
+.btn.advance{background:#198754;color:#fff}
+.btn.back{background:#6c757d;color:#fff}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="menu-btn" onclick="toggleMenu()">☰</div>
+  <div style="font-size:20px;font-weight:600;">Accountant - Student Fee Collection</div>
+</div>
+<div id="overlay" class="overlay" onclick="closeMenu()"></div>
+<div id="sideMenu" class="side-menu"></div>
+<div class="container">
+  <h2>Student Fee Details</h2>
+
+  <div class="info">
+    <div class="card">Name<br><strong id="nm"></strong></div>
+    <div class="card">Father<br><strong id="fa"></strong></div>
+    <div class="card">Class<br><strong id="cl"></strong></div>
+    <div class="card">Roll<br><strong id="rl"></strong></div>
+    <div class="card">Advance (Rs.)<br><strong id="adv">0</strong></div>
+    <div class="card">Scholarship<br><strong id="sch">-</strong></div>
+    <div class="card">Concession<br><strong id="con">-</strong></div>
+  </div>
+
+  <div class="action-bar">
+    <div class="action-row">
+      <div class="amount-box">
+        <label>Enter amount submitted:</label>
+        <input id="payAmount" type="number" placeholder="Enter amount"/>
+      </div>
+      <div class="amount-box">
+        <label>Payment Method:</label>
+        <div class="method-options">
+          <label><input type="checkbox" class="pm-method" value="cash" onchange="selectPaymentMethod(this)">Cash</label>
+          <label><input type="checkbox" class="pm-method" value="upi" onchange="selectPaymentMethod(this)">UPI</label>
+          <label><input type="checkbox" class="pm-method" value="bank" onchange="selectPaymentMethod(this)">Bank</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn primary" onclick="submitPayment()">Submit Payment</button>
+      <button class="btn advance" onclick="applyAdvance()">Apply Advance</button>
+      <button class="btn back" onclick="goBack()">Back</button>
+      <button class="btn paid-btn" onclick="generateReceipt()">Generate Receipt</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Month</th>
+        <th>Other Fee</th>
+        <th>Extra (Rs.)</th>
+        <th>Status</th>
+        <th>Paid (Rs.)</th>
+        <th>Due (Rs.)</th>
+        <th>Payment Date</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2">Totals</td>
+        <td id="totalPaid">Rs. 0</td>
+        <td id="totalDue">Rs. 0</td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+const params = new URLSearchParams(window.location.search);
+const rollParam = params.get("roll");
+const classParam = params.get("class");
+const sessionParam = params.get("session") || "2024_25";
+
+let student = null;
+const monthsList = ["previousDue","Annual","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+let monthlyFees = {}, annualFees = {}, admissionFees = {}, examConfigs = [];
+
+function cleanNumber(x){ return isNaN(Number(x)) ? 0 : Number(x); }
+function parseBool(v){
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  const s = String(v == null ? "" : v).trim().toLowerCase();
+  return s === "true" || s === "1" || s === "yes" || s === "y";
+}
+function normalizeDiscount(raw){
+  const d = (raw && typeof raw === "object") ? raw : {};
+  return { enabled: Boolean(d.enabled), type: String(d.type || "fixed"), value: Math.max(0, cleanNumber(d.value)), scope: String(d.scope || "monthly"), note: String(d.note || "").trim() };
+}
+function discountText(d){
+  const x = normalizeDiscount(d);
+  if (!x.enabled || x.value <= 0) return "Not Set";
+  const unit = String(x.type || "").toLowerCase() === "percentage" ? "%" : "Rs";
+  const note = x.note ? ` | ${x.note}` : "";
+  return `${x.value}${unit} (${x.scope})${note}`;
+}
+function selectPaymentMethod(el){ if (el.checked) document.querySelectorAll(".pm-method").forEach(cb => { if (cb !== el) cb.checked = false; }); }
+function getSelectedPaymentMethod(){ const s = [...document.querySelectorAll(".pm-method")].find(cb => cb.checked); return s ? s.value : ""; }
+function resolvePaidTypeForReceipt(){
+  const selected = getSelectedPaymentMethod();
+  if (selected) return selected;
+  const last = String(student?.last_payment_method || "").toLowerCase();
+  if (["cash","upi","bank"].includes(last)) return last;
+  return "";
+}
+function getMonthlyFeeForClass(c){ return monthlyFees[c] || 0; }
+function getAnnualFeeForClass(c){ return annualFees[c] || 0; }
+function getAdmissionFeeForClass(c){ return admissionFees[c] || 0; }
+function normalizeExamConfig(raw){
+  const ex = (raw && typeof raw === "object") ? raw : {};
+  const months = Array.isArray(ex.months) ? ex.months.map(x => String(x || "").trim()) : [];
+  const class_fees = (ex.class_fees && typeof ex.class_fees === "object") ? ex.class_fees : {};
+  return { name: String(ex.name || "").trim(), months, class_fees };
+}
+function getExamFeeForClassMonth(cls, month){
+  const m = String(month || "").trim();
+  const c = String(cls || "").trim();
+  return examConfigs.reduce((sum, exRaw) => {
+    const ex = normalizeExamConfig(exRaw);
+    if (!ex.months.includes(m)) return sum;
+    return sum + cleanNumber(ex.class_fees[c] || 0);
+  }, 0);
+}
+
+async function loadFees(){
+  const res = await fetch(`${FEE_API}/fees/get`, { headers: { "X-Session": sessionParam } });
+  const data = await res.json();
+  monthlyFees = {}; annualFees = {}; admissionFees = {};
+  (data.fees || []).forEach(f => {
+    const cls = f.class_name;
+    monthlyFees[cls] = cleanNumber(f.monthly_fee || 0);
+    annualFees[cls] = cleanNumber(f.annual_fee || f.annual_charge || 0);
+    admissionFees[cls] = cleanNumber(f.admission_charge ?? f.admission_fee ?? 0);
+  });
+}
+
+async function loadExamConfig(){
+  try{
+    const res = await fetch(`${FEE_API}/exam/config?session=${encodeURIComponent(sessionParam)}`, { headers: { "X-Session": sessionParam } });
+    const data = await res.json().catch(() => ({}));
+    examConfigs = Array.isArray(data?.exams) ? data.exams : [];
+  }catch(_){ examConfigs = []; }
+}
+
+async function loadStudent(){
+  const [masterRes, feeRes] = await Promise.allSettled([
+    fetch(`${STUDENT_API}/students?session=${encodeURIComponent(sessionParam)}`),
+    fetch(`${FEE_API}/student/${encodeURIComponent(classParam)}/${encodeURIComponent(rollParam)}?session=${encodeURIComponent(sessionParam)}`, { headers: { "X-Session": sessionParam } })
+  ]);
+  let masterStudent = null, feeStudent = null;
+  if (masterRes.status === "fulfilled" && masterRes.value.ok){
+    const d = await masterRes.value.json();
+    const arr = Array.isArray(d) ? d : (Array.isArray(d?.students) ? d.students : []);
+    masterStudent = arr.find(s => String(s.class_name || s.class || "").trim() === String(classParam || "").trim() && String(s.rollno ?? s.roll ?? "").trim() === String(rollParam || "").trim()) || null;
+  }
+  if (feeRes.status === "fulfilled"){
+    const d = await feeRes.value.json().catch(() => ({}));
+    if (feeRes.value.ok && d?.success) feeStudent = d.student || null;
+  }
+  if (!masterStudent && !feeStudent){ alert("Student not found"); return; }
+
+  student = {
+    name: masterStudent?.student_name || masterStudent?.name || feeStudent?.name || "",
+    father: masterStudent?.father_name || masterStudent?.father || feeStudent?.father || "",
+    class_name: masterStudent?.class_name || masterStudent?.class || feeStudent?.class_name || classParam || "",
+    roll: String(masterStudent?.rollno ?? masterStudent?.roll ?? feeStudent?.roll ?? rollParam ?? "").trim(),
+    admission_no: String(masterStudent?.admission_no ?? feeStudent?.admission_no ?? "").trim(),
+    new_admission: parseBool(masterStudent?.new_admission ?? feeStudent?.new_admission),
+    previous_due: cleanNumber(feeStudent?.previous_due || 0),
+    advance: cleanNumber(feeStudent?.advance || 0),
+    months: (feeStudent?.months && typeof feeStudent.months === "object") ? feeStudent.months : {},
+    payment_methods: (feeStudent?.payment_methods && typeof feeStudent.payment_methods === "object") ? feeStudent.payment_methods : { cash: 0, upi: 0, bank: 0 },
+    last_payment_method: String(feeStudent?.last_payment_method || ""),
+    scholarship: normalizeDiscount(feeStudent?.scholarship),
+    concession: normalizeDiscount(feeStudent?.concession)
+  };
+  initializeStudentData();
+  render();
+}
+
+function initializeStudentData(){
+  const fee = getMonthlyFeeForClass(student.class_name);
+  const annual = getAnnualFeeForClass(student.class_name);
+  const admission = student?.new_admission ? getAdmissionFeeForClass(student.class_name) : 0;
+  const annualWithAdmission = cleanNumber(annual + admission);
+  const previousDue = cleanNumber(student.previous_due);
+  monthsList.forEach(m => {
+    if (!student.months[m] || typeof student.months[m] !== "object"){
+      let dueDefault = 0;
+      if (m === "previousDue") dueDefault = previousDue;
+      else if (m === "Annual") dueDefault = annualWithAdmission;
+      else dueDefault = fee + getExamFeeForClassMonth(student.class_name, m);
+      student.months[m] = { paid:0, due:dueDefault, status:dueDefault===0?"Paid":"Due", date:"", purpose:"", extra:0, exam_fee_applied:(m!=="previousDue"&&m!=="Annual")?getExamFeeForClassMonth(student.class_name,m):0 };
+    } else {
+      student.months[m].paid = cleanNumber(student.months[m].paid);
+      student.months[m].due = cleanNumber(student.months[m].due);
+      student.months[m].status = student.months[m].status || (student.months[m].due===0 ? "Paid" : "Due");
+      student.months[m].date = student.months[m].date || "";
+      student.months[m].exam_fee_applied = cleanNumber(student.months[m].exam_fee_applied || 0);
+    }
+  });
+  document.getElementById("nm").textContent = student.name || "";
+  document.getElementById("fa").textContent = student.father || "";
+  document.getElementById("cl").textContent = student.class_name || "";
+  document.getElementById("rl").textContent = student.roll || "";
+  document.getElementById("adv").textContent = student.advance || 0;
+  document.getElementById("sch").textContent = discountText(student.scholarship);
+  document.getElementById("con").textContent = discountText(student.concession);
+}
+
+async function saveToBackend(){
+  const payload = { class: student.class_name, roll: student.roll, student };
+  let res = await fetch(`${FEE_API}/update_student?session=${encodeURIComponent(sessionParam)}`, {
+    method:"POST", headers:{ "Content-Type":"application/json", "X-Session":sessionParam }, body: JSON.stringify(payload)
+  });
+  let data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false){
+    if (res.status === 404){
+      const createPayload = {
+        name: student.name || "", father: student.father || "", class_name: student.class_name || classParam || "", roll: student.roll || rollParam || "",
+        previous_due: cleanNumber(student.previous_due || 0), advance: cleanNumber(student.advance || 0), months: student.months || {},
+        last_payment_method: String(student.last_payment_method || ""), payment_methods: student.payment_methods || { cash:0, upi:0, bank:0 },
+        scholarship: normalizeDiscount(student.scholarship), concession: normalizeDiscount(student.concession)
+      };
+      const cRes = await fetch(`${FEE_API}/student/add?session=${encodeURIComponent(sessionParam)}`, {
+        method:"POST", headers:{ "Content-Type":"application/json","X-Session":sessionParam }, body: JSON.stringify(createPayload)
+      });
+      const cData = await cRes.json().catch(() => ({}));
+      if (!cRes.ok || cData.success === false){ alert(cData?.message || "Failed to create student fee record"); return; }
+      res = await fetch(`${FEE_API}/update_student?session=${encodeURIComponent(sessionParam)}`, {
+        method:"POST", headers:{ "Content-Type":"application/json","X-Session":sessionParam }, body: JSON.stringify(payload)
+      });
+      data = await res.json().catch(() => ({}));
+    }
+  }
+  if (!res.ok || data.success === false){ alert(data?.message || "Failed to save"); return; }
+}
+
+function render(){
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  let totalPaid = 0, totalDue = 0;
+  monthsList.forEach(m => {
+    const rec = student.months[m] || { paid:0, due:0, status:"Due", date:"" };
+    const statusClass = rec.status === "Paid" ? "paid" : (rec.status === "Partial" ? "partial" : "due");
+    let label = m === "previousDue" ? "Previous Due" : (m === "Annual" ? (student?.new_admission ? "Annual Fee + Admission" : "Annual Fee") : `${m} Fee`);
+    if (m !== "previousDue" && m !== "Annual" && cleanNumber(rec.exam_fee_applied || 0) > 0) label += " + Exam Fee";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${label}</td>
+      <td><input style="width:120px;padding:6px;border-radius:6px;border:1px solid #ccc" value="${rec.purpose || ""}" onchange="updatePurpose('${m}', this.value)"></td>
+      <td><input style="width:90px;padding:6px;border-radius:6px;border:1px solid #ccc" type="number" value="${cleanNumber(rec.extra || 0)}" onchange="updateExtra('${m}', this.value)"></td>
+      <td class="${statusClass}">${rec.status}</td>
+      <td>Rs. ${cleanNumber(rec.paid)}</td>
+      <td>Rs. ${cleanNumber(rec.due)}</td>
+      <td>${rec.date || ""}</td>
+      <td><button class="btn paid-btn" onclick="markPaid('${m}')">Mark Paid</button></td>
+    `;
+    tbody.appendChild(tr);
+    totalPaid += cleanNumber(rec.paid);
+    totalDue += cleanNumber(rec.due);
+  });
+  document.getElementById("totalPaid").textContent = "Rs. " + totalPaid;
+  document.getElementById("totalDue").textContent = "Rs. " + totalDue;
+}
+
+function updatePurpose(m, val){
+  if (!student?.months?.[m]) return;
+  student.months[m].purpose = String(val || "");
+  saveToBackend();
+}
+
+function updateExtra(m, val){
+  const rec = student?.months?.[m];
+  if (!rec) return;
+  const oldExtra = cleanNumber(rec.extra || 0);
+  const newExtra = cleanNumber(val);
+  const delta = newExtra - oldExtra;
+  rec.extra = newExtra;
+  rec.due = Math.max(0, cleanNumber(rec.due || 0) + delta);
+  rec.status = rec.due === 0 ? "Paid" : (cleanNumber(rec.paid || 0) > 0 ? "Partial" : "Due");
+  saveToBackend();
+  render();
+}
+
+async function applyAdvance(){
+  let adv = cleanNumber(student.advance);
+  if (adv <= 0){ alert("No advance available."); return; }
+  for (const m of monthsList){
+    if (adv <= 0) break;
+    const rec = student.months[m]; if (!rec) continue;
+    const due = cleanNumber(rec.due || 0); if (due <= 0) continue;
+    const pay = Math.min(due, adv);
+    rec.paid = cleanNumber(rec.paid || 0) + pay;
+    rec.due = due - pay;
+    rec.status = rec.due === 0 ? "Paid" : (rec.paid > 0 ? "Partial" : "Due");
+    rec.date = new Date().toISOString().split("T")[0];
+    adv -= pay;
+  }
+  student.advance = adv;
+  await saveToBackend();
+  render();
+}
+
+async function submitPayment(){
+  const enteredAmount = cleanNumber(document.getElementById("payAmount").value);
+  if (!enteredAmount){ alert("Enter amount"); return; }
+  const method = getSelectedPaymentMethod();
+  if (!method){ alert("Select payment method (Cash/UPI/Bank)"); return; }
+  let amt = enteredAmount;
+  if (student.advance && student.advance > 0){ amt += cleanNumber(student.advance); student.advance = 0; }
+  for (const m of monthsList){
+    if (amt <= 0) break;
+    const rec = student.months[m]; if (!rec) continue;
+    if (cleanNumber(rec.due) > 0){
+      const pay = Math.min(cleanNumber(rec.due), amt);
+      rec.paid = cleanNumber(rec.paid || 0) + pay;
+      rec.due = cleanNumber(rec.due || 0) - pay;
+      rec.status = rec.due === 0 ? "Paid" : "Partial";
+      rec.date = new Date().toISOString().split("T")[0];
+      amt -= pay;
+    }
+  }
+  if (amt > 0) student.advance = cleanNumber(student.advance || 0) + amt;
+  if (!student.payment_methods || typeof student.payment_methods !== "object") student.payment_methods = { cash:0, upi:0, bank:0 };
+  student.payment_methods[method] = cleanNumber(student.payment_methods[method] || 0) + enteredAmount;
+  student.last_payment_method = method;
+  document.getElementById("payAmount").value = "";
+  await saveToBackend();
+  render();
+}
+
+async function markPaid(m){
+  const rec = student.months[m]; if (!rec) return;
+  const method = getSelectedPaymentMethod();
+  if (!method){ alert("Select payment method (Cash/UPI/Bank)"); return; }
+  const duePaid = cleanNumber(rec.due || 0);
+  rec.paid = cleanNumber(rec.paid || 0) + duePaid;
+  rec.due = 0;
+  rec.status = "Paid";
+  rec.date = new Date().toISOString().split("T")[0];
+  if (!student.payment_methods || typeof student.payment_methods !== "object") student.payment_methods = { cash:0, upi:0, bank:0 };
+  student.payment_methods[method] = cleanNumber(student.payment_methods[method] || 0) + duePaid;
+  student.last_payment_method = method;
+  await saveToBackend();
+  render();
+}
+
+function generateReceipt(){
+  const finalMonths = monthsList.map(m => {
+    const rec = student.months[m] || {};
+    return {
+      month: m === "previousDue" ? "Previous Due" : m,
+      paid: rec.paid || 0,
+      due: rec.due || 0,
+      status: rec.status || "Due",
+      purpose: rec.purpose || "",
+      extra: rec.extra || 0,
+      exam_fee_applied: cleanNumber(rec.exam_fee_applied || 0)
+    };
+  });
+  const data = {
+    name: student.name, father: student.father, admission_no: student.admission_no || "",
+    paid_type: resolvePaidTypeForReceipt(), payment_methods: student.payment_methods || { cash:0, upi:0, bank:0 },
+    scholarship: normalizeDiscount(student.scholarship), concession: normalizeDiscount(student.concession),
+    new_admission: parseBool(student.new_admission), admission_charge: parseBool(student.new_admission) ? cleanNumber(getAdmissionFeeForClass(student.class_name)) : 0,
+    exam_months: [],
+    class: student.class_name, roll: student.roll, date: new Date().toLocaleDateString(),
+    totalPaid: finalMonths.reduce((a, m) => a + cleanNumber(m.paid), 0),
+    totalDue: finalMonths.reduce((a, m) => a + cleanNumber(m.due), 0),
+    advance: student.advance || 0, months: finalMonths, session: sessionParam
+  };
+  const qs = new URLSearchParams();
+  qs.set("data", JSON.stringify(data));
+  qs.set("role", "accountant");
+  qs.set("class", student.class_name || classParam || "");
+  qs.set("roll", student.roll || rollParam || "");
+  qs.set("session", sessionParam);
+  window.location.href = "receipt.html?" + qs.toString();
+}
+
+function goBack(){ window.location.href = `accountant_class.html?class=${encodeURIComponent(classParam || student?.class_name || "")}&session=${encodeURIComponent(sessionParam)}`; }
+
+(async function init(){
+  await loadFees();
+  await loadExamConfig();
+  await loadStudent();
+})();
+</script>
+<script src="shared_menu.js"></script>
+</body>
+</html>

@@ -10,8 +10,40 @@ body{
     font-family:Arial,sans-serif;
     background:#f3f4f6;
     margin:0;
-    padding:20px;
+    padding:0 20px 20px;
     color:#111;
+}
+.topbar{
+    width:100%;
+    padding:15px 20px;
+    background:#007bff;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    gap:15px;
+    box-sizing:border-box;
+    position:sticky;
+    top:0;
+    z-index:3000;
+    margin:0 -20px 15px;
+}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
+.overlay {
+    position: fixed;top:0;left:0;width:100%;height:100%;
+    background: rgba(0,0,0,0.35);display:none;z-index:1500;
+}
+.overlay.show { display:block; }
+.side-menu{
+    position:fixed;top:0;left:-280px;width:260px;height:100%;
+    background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+    padding:20px;overflow-y:auto;z-index:2000;
+    transition: left 0.35s;
+    border-radius:0 18px 18px 0;
+}
+.side-menu.open{ left:0; }
+.menu-item{
+    padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+    font-size:16px;font-weight:600;color:#333;
 }
 
 .container{
@@ -94,63 +126,77 @@ th{background:#eef6ff;}
 
 
 /* ---------------------------------- */
-/*        PRINT: 4 RECEIPT BOXES      */
+/*      PRINT: THERMAL SLIP (80mm)    */
 /* ---------------------------------- */
 @media print {
+    @page {
+        size: 80mm auto;
+        margin: 2mm;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: #fff;
+    }
 
     body * { visibility: hidden; }
 
-    #printPage, #printPage * {
-        visibility: visible;
-    }
+    #printPage, #printPage * { visibility: visible; }
 
     #printPage {
+        display: block !important;
         position: absolute;
         left: 0;
         top: 0;
-        width: 100%;
+        width: 76mm;
         padding: 0;
         margin: 0;
     }
 
-    /* EXACT 4 boxes in A4 */
-    .print-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr 1fr;
-        height: 100vh;      /* FULL A4 PAGE */
-        padding: 6px;
-        gap: 6px;
+    .slip {
+        width: 76mm;
         box-sizing: border-box;
-        page-break-inside: avoid;
+        font-family: "Courier New", monospace;
+        color: #000;
+        font-size: 11px;
+        line-height: 1.3;
     }
 
-    /* FIXED HEIGHT FOR 1/4 PAGE */
-    .receipt-box {
-        border: 1px solid #000;
-        padding: 6px;
-        box-sizing: border-box;
-        width: 100%;
-        height: calc(100vh / 2 - 9px);   /* EXACT 1/4 OF A4 */
-        overflow: hidden;
-        transform-origin: top left;
-        transform: scale(0.92);          /* SHRINK TO FIT */
+    .slip h2 {
+        margin: 0;
+        text-align: center;
+        font-size: 13px;
     }
 
-    /* Reduce inside text to match the small size */
-    .receipt-box * {
-        font-size: 7px !important;
-        line-height: 10px !important;
+    .slip .center { text-align: center; }
+    .slip .line { border-top: 1px dashed #000; margin: 6px 0; }
+    .slip table { width: 100%; border-collapse: collapse; }
+    .slip th, .slip td {
+        border: 0;
+        padding: 2px 0;
+        font-size: 10px;
+        text-align: left;
     }
-
-    .receipt-logo {
-        height: 25px !important;
-    }
+    .slip td.num, .slip th.num { text-align: right; }
 }
 </style>
 </head>
 
 <body>
+<div class="topbar">
+  <div class="menu-btn" onclick="toggleMenu()">☰</div>
+  <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
+</div>
+<div id="overlay" class="overlay" onclick="closeMenu()"></div>
+<div class="side-menu" id="sideMenu">
+  <div class="menu-item" onclick="goToPage('edit.html')">Edit Student</div>
+  <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
+  <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
+  <div class="menu-item" onclick="goToPage('exam_schedule.html')">Exam Schedule</div>
+  <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
+  <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
+</div>
 
 <div class="container">
   <div class="header">
@@ -167,7 +213,7 @@ th{background:#eef6ff;}
   <div id="saveError" class="status err"></div>
 
   <div class="controls">
-    <button class="btn gray" onclick="window.location.href='index.html'">Home</button>
+    <button class="btn gray" onclick="goBackToStudent()">Back</button>
 
     <label>Session:</label>
     <select id="sessionSelect" style="padding:8px;border-radius:6px;border:1px solid #ccc"></select>
@@ -197,7 +243,7 @@ th{background:#eef6ff;}
     <h3 style="display:inline-block;margin:0 12px">Advance Left: ₹<span id="tAdv"></span></h3>
   </div>
 
-  <div style="margin-top:14px" class="small">
+  <div id="whatsWrap" style="margin-top:14px" class="small">
     <label>WhatsApp number:
       <input id="waNumber" placeholder="919XXXXXXXXX" style="padding:6px;border-radius:6px;border:1px solid #ccc">
     </label>
@@ -217,8 +263,11 @@ th{background:#eef6ff;}
 /*           JS LOGIC            */
 /* ----------------------------- */
 
-const API = "/api/proxy?path=";
+const API = "http://127.0.0.1:5000";
 const params = new URLSearchParams(window.location.search);
+const autoSaveFlagEl = document.getElementById("autoSaveFlag");
+const isHistoryView = ["history", "view", "readonly"].includes(String(params.get("mode") || "").toLowerCase());
+const isAccountantView = String(params.get("role") || "").toLowerCase() === "accountant";
 let dataRaw = params.get("data") || params.get("receipt");
 let data = {};
 
@@ -227,10 +276,44 @@ catch(e){ data={}; }
 
 data.name = data.name||"Unknown";
 data.father = data.father||"Unknown";
-data.class = data.class||"-";
+data.paid_type = String(data.paid_type || data.payment_type || "").trim().toLowerCase();
+data.payment_methods = (data.payment_methods && typeof data.payment_methods === "object")
+  ? data.payment_methods
+  : { cash: 0, upi: 0, bank: 0 };
+data.admission_no = String(data.admission_no || data.admissionNo || "").trim();
+function parseBool(v){
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  const s = String(v == null ? "" : v).trim().toLowerCase();
+  return s === "true" || s === "1" || s === "yes" || s === "y";
+}
+function normalizeDiscount(raw){
+  const d = (raw && typeof raw === "object") ? raw : {};
+  const type = ["fixed","percentage"].includes(String(d.type || "").toLowerCase()) ? String(d.type).toLowerCase() : "fixed";
+  const scope = ["monthly","annual","admission","all"].includes(String(d.scope || "").toLowerCase()) ? String(d.scope).toLowerCase() : "monthly";
+  return {
+    enabled: parseBool(d.enabled),
+    type,
+    value: Math.max(0, Number(d.value || 0)),
+    scope,
+    note: String(d.note || "").trim()
+  };
+}
+function discountLabel(d){
+  const x = normalizeDiscount(d);
+  if (!x.enabled || x.value <= 0) return "-";
+  const unit = x.type === "percentage" ? "%" : "Rs";
+  return `${x.value}${unit} (${x.scope})${x.note ? " - " + x.note : ""}`;
+}
+data.new_admission = parseBool(data.new_admission);
+data.admission_charge = Number(data.admission_charge || 0);
+data.scholarship = normalizeDiscount(data.scholarship);
+data.concession = normalizeDiscount(data.concession);
+data.exam_months = Array.isArray(data.exam_months) ? data.exam_months.map(x => String(x || "").trim()) : [];
+data.class = data.class || data.class_name || "-";
 data.roll = data.roll != null ? String(data.roll) : "-";
-data.totalPaid = Number(data.totalPaid||0);
-data.totalDue = Number(data.totalDue||0);
+data.totalPaid = Number(data.totalPaid ?? data.total_paid ?? 0);
+data.totalDue = Number(data.totalDue ?? data.total_due ?? 0);
 data.advance = Number(data.advance||0);
 data.date = data.date||new Date().toLocaleDateString('en-IN');
 
@@ -243,10 +326,15 @@ data.months = Array.isArray(data.months) ? data.months : (
       due:Number(v.due||0),
       status:v.status||"",
       purpose:v.purpose||"",
-      extra:Number(v.extra||0)
+      extra:Number(v.extra||0),
+      exam_fee_applied:Number(v.exam_fee_applied||0)
     };
   }) : []
 );
+
+if (!data.receiptKey && data.receipt_number) {
+  data.receiptKey = String(data.receipt_number);
+}
 
 let sessionsList = ["2024_25","2025_26"];
 const sel = document.getElementById("sessionSelect");
@@ -256,24 +344,138 @@ sessionsList.forEach(s=>{
   opt.textContent=s;
   sel.appendChild(opt);
 });
+const incomingSession = String(data.session || "").trim();
+if (incomingSession) {
+  const exists = sessionsList.includes(incomingSession);
+  if (!exists) {
+    const opt=document.createElement("option");
+    opt.value=incomingSession;
+    opt.textContent=incomingSession;
+    sel.appendChild(opt);
+  }
+  sel.value = incomingSession;
+}
 data.session = sel.value;
 
+function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
+function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
+function goToPage(p){ closeMenu(); window.location.href = p + "?session=" + encodeURIComponent(data.session || sel.value || "2024_25"); }
+
 function generateReceiptKey(){
-  const rand = String(Math.floor(Math.random()*100000)).padStart(5,"0");
-  data.receiptKey = `${data.class}-${data.roll}-${data.session}-${rand}`;
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+  data.receiptKey = `${data.class}-${data.roll}-${data.session}-${ts}-${rand}`;
 }
 generateReceiptKey();
+
+sel.addEventListener("change", () => {
+  data.session = sel.value;
+  generateReceiptKey();
+  renderInfo();
+  saveToSession(true);
+});
+
+function toNum(v){
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function monthLabel(m, rec){
+  if (m === "previousDue" || m === "Previous Due") return "Previous Due";
+  if (m === "Annual") return data.new_admission ? "Annual + Admission" : "Annual";
+  const examApplied = Number((rec && rec.exam_fee_applied) || 0) > 0;
+  const examByConfig = data.exam_months.includes(String(m || "").trim());
+  return (examApplied || examByConfig) ? `${m} + Exam Fee` : m;
+}
+
+function normalizeMonths(monthsRaw){
+  const out = [];
+
+  if (Array.isArray(monthsRaw)) {
+    monthsRaw.forEach(item => {
+      const month = String(item?.month || item?.name || "").trim();
+      if (!month) return;
+      out.push({
+        month,
+        paid: toNum(item?.paid),
+        due: toNum(item?.due)
+      });
+    });
+  } else if (monthsRaw && typeof monthsRaw === "object") {
+    Object.keys(monthsRaw).forEach(key => {
+      const rec = monthsRaw[key] || {};
+      out.push({
+        month: String(key).trim(),
+        paid: toNum(rec.paid),
+        due: toNum(rec.due)
+      });
+    });
+  }
+
+  out.sort((a, b) => a.month.localeCompare(b.month, undefined, { numeric: true, sensitivity: "base" }));
+  return out;
+}
+
+function buildReceiptSignature(source, isHistoryDoc = false){
+  const name = String(source?.name || "").trim().toLowerCase();
+  const father = String(source?.father || "").trim().toLowerCase();
+  const cls = String(isHistoryDoc ? source?.class_name : source?.class || "").trim().toLowerCase();
+  const roll = String(source?.roll || "").trim().toLowerCase();
+  const admission = String(source?.admission_no || source?.admissionNo || "").trim().toLowerCase();
+  const totalPaid = toNum(isHistoryDoc ? source?.total_paid : source?.totalPaid);
+  const totalDue = toNum(isHistoryDoc ? source?.total_due : source?.totalDue);
+  const advance = toNum(source?.advance);
+  const months = normalizeMonths(source?.months);
+
+  return JSON.stringify({ name, father, cls, roll, admission, totalPaid, totalDue, advance, months });
+}
+
+async function isDuplicateReceipt(){
+  const currentSignature = buildReceiptSignature(data, false);
+
+  const res = await fetch(`${API}/receipt/history`, {
+    headers: { "X-Session": data.session }
+  });
+  const payload = await res.json().catch(() => ({}));
+  const history = Array.isArray(payload?.history) ? payload.history : [];
+
+  const match = history.find(item => buildReceiptSignature(item, true) === currentSignature);
+  return match || null;
+}
+
+function setAutoSaveFlag(text, isError = false){
+  if (!autoSaveFlagEl) return;
+  autoSaveFlagEl.textContent = text;
+  autoSaveFlagEl.style.color = isError ? "#b30000" : "#0b6b33";
+}
 
 function escapeHtml(s){
   return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 }
 
 function renderInfo(){
+  const fallbackType = (() => {
+    if (data.paid_type) return data.paid_type;
+    const pm = data.payment_methods || {};
+    const entries = [
+      ["cash", Number(pm.cash || 0)],
+      ["upi", Number(pm.upi || 0)],
+      ["bank", Number(pm.bank || 0)]
+    ].sort((a,b) => b[1] - a[1]);
+    return entries[0][1] > 0 ? entries[0][0] : "";
+  })();
+  const paidTypeLabel = (fallbackType || "-").toUpperCase();
   document.getElementById("info").innerHTML = `
     <p><strong>Name:</strong> ${escapeHtml(data.name)}</p>
     <p class="muted"><strong>Father:</strong> ${escapeHtml(data.father)}</p>
     <p class="muted"><strong>Class:</strong> ${escapeHtml(data.class)} &nbsp; 
     <strong>Roll:</strong> ${escapeHtml(data.roll)}</p>
+    <p class="muted"><strong>Admission No:</strong> ${escapeHtml(data.admission_no || "-")}</p>
+    <p class="muted"><strong>Paid Type:</strong> ${escapeHtml(paidTypeLabel)}</p>
+    <p class="muted"><strong>New Admission:</strong> ${data.new_admission ? "Yes" : "No"}</p>
+    <p class="muted"><strong>Admission Charge:</strong> ${data.new_admission ? "₹" + escapeHtml(data.admission_charge) : "-"}</p>
+    <p class="muted"><strong>Scholarship:</strong> ${escapeHtml(discountLabel(data.scholarship))}</p>
+    <p class="muted"><strong>Concession:</strong> ${escapeHtml(discountLabel(data.concession))}</p>
     <p class="muted"><strong>Session:</strong> ${escapeHtml(data.session)}</p>
     <p class="muted"><strong>Date:</strong> ${escapeHtml(data.date)}</p>
     <p class="small muted"><strong>Receipt Key:</strong> ${escapeHtml(data.receiptKey)}</p>
@@ -284,7 +486,7 @@ function renderMonths(){
   const tbody = document.getElementById("monthsTable");
   tbody.innerHTML = (data.months||[]).map(m=>`
     <tr>
-      <td>${escapeHtml(m.month)}</td>
+      <td>${escapeHtml(monthLabel(m.month, m))}</td>
       <td style="text-align:right">${escapeHtml(m.paid||0)}</td>
       <td style="text-align:right">${escapeHtml(m.due||0)}</td>
       <td>${escapeHtml(m.status||"")}</td>
@@ -298,16 +500,55 @@ function renderMonths(){
   document.getElementById("tAdv").textContent = data.advance;
 }
 
-function buildReceiptHTML(label){
+function buildSlipHTML(){
   const rows = (data.months||[]).map(m=>`
     <tr>
-      <td>${m.month||""}</td>
-      <td style="text-align:right">${m.paid||0}</td>
-      <td style="text-align:right">${m.due||0}</td>
+      <td>${monthLabel(m.month||"", m)}</td>
+      <td class="num">${m.paid||0}</td>
+      <td class="num">${m.due||0}</td>
       <td>${m.status||""}</td>
+      <td>${m.purpose||""}</td>
+      <td class="num">${m.extra||0}</td>
     </tr>
   `).join("");
+  const admissionRow = data.new_admission ? `<div>Admission Charge: ${data.admission_charge}</div>` : "";
+  const scholarshipRow = `<div>Scholarship: ${discountLabel(data.scholarship)}</div>`;
+  const concessionRow = `<div>Concession: ${discountLabel(data.concession)}</div>`;
+  const paidTypeRow = `<div>Paid Type: ${(data.paid_type || "-").toUpperCase()}</div>`;
 
+  return `
+  <div class="slip">
+    <h2>P.S. Public School</h2>
+    <div class="center">Fee Receipt</div>
+    <div class="line"></div>
+    <div>Receipt Key: ${data.receiptKey}</div>
+    <div>Name: ${data.name}</div>
+    <div>Father: ${data.father}</div>
+    <div>Class: ${data.class}   Roll: ${data.roll}</div>
+    <div>Admission No: ${data.admission_no || "-"}</div>
+    ${paidTypeRow}
+    <div>Session: ${data.session}</div>
+    <div>Date: ${data.date}</div>
+    ${admissionRow}
+    ${scholarshipRow}
+    ${concessionRow}
+    <div class="line"></div>
+    <table>
+      <thead>
+        <tr><th>Month</th><th class="num">Paid</th><th class="num">Due</th><th>Status</th><th>Purpose</th><th class="num">Extra</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="line"></div>
+    <div><strong>Total Paid:</strong> ${data.totalPaid}</div>
+    <div><strong>Total Due:</strong> ${data.totalDue}</div>
+    <div><strong>Advance:</strong> ${data.advance}</div>
+    <div style="margin-top:8px" class="center">Thank You</div>
+    <div style="margin-top:10px">Sign: _______________</div>
+  </div>`;
+}
+
+function buildReceiptHTML(label){
   return `
   <div class="receipt-box">
     <div style="display:flex;align-items:center;gap:8px;">
@@ -315,44 +556,55 @@ function buildReceiptHTML(label){
       <div><strong>P.S. Public School</strong><br><small>${label}</small></div>
       <div style="margin-left:auto;font-size:12px;"><strong>Receipt Key:</strong> ${data.receiptKey}</div>
     </div>
-
     <hr>
-
     <div style="font-size:12px;line-height:16px;">
       Name: ${data.name}<br>
       Father: ${data.father}<br>
       Class: ${data.class} | Roll: ${data.roll}<br>
+      Admission: ${data.admission_no || "-"}<br>
+      Paid Type: ${(data.paid_type || "-").toUpperCase()}<br>
+      ${data.new_admission ? `Admission Charge: ₹${data.admission_charge}<br>` : ""}
+      Scholarship: ${discountLabel(data.scholarship)}<br>
+      Concession: ${discountLabel(data.concession)}<br>
       Session: ${data.session}<br>
       Date: ${data.date}
     </div>
-
-    <table style="width:100%;border-collapse:collapse;margin-top:5px;font-size:12px;">
-      <thead>
-        <tr><th>Month</th><th>Paid</th><th>Due</th><th>Status</th></tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-
     <div style="margin-top:6px;font-size:12px;">
       <strong>Total Paid:</strong> ₹${data.totalPaid} &nbsp;&nbsp;
       <strong>Total Due:</strong> ₹${data.totalDue} &nbsp;&nbsp;
       <strong>Advance:</strong> ₹${data.advance}
     </div>
-
-    <div class="signature-box">
-      Signature:
-      <div class="signature-line"></div>
-    </div>
   </div>`;
 }
 
-async function saveToSession(){
+async function saveToSession(isAuto = false){
   try{
-    await fetch(`${API}/receipt/add`,{
+    if (isAuto) setAutoSaveFlag("saving...");
+    data.session = sel.value;
+
+    const duplicate = await isDuplicateReceipt();
+    if (duplicate) {
+      document.getElementById("saveStatus").innerHTML = "Duplicate receipt not saved (same student and same paid/due details).";
+      document.getElementById("saveStatus").style.display = "block";
+      document.getElementById("saveError").style.display = "none";
+      document.getElementById("showTopReceipt").textContent =
+        duplicate?.receipt_number ? `Receipt No: ${duplicate.receipt_number}` : "";
+      if (isAuto) setAutoSaveFlag("duplicate skipped");
+      return;
+    }
+
+    // fresh key for each new saved receipt
+    generateReceiptKey();
+
+    const saveRes = await fetch(`${API}/receipt/add`,{
       method:"POST",
       headers:{"Content-Type":"application/json","X-Session":data.session},
       body: JSON.stringify({...data})
     });
+    const saveData = await saveRes.json().catch(() => ({}));
+    if (!saveRes.ok || saveData?.success === false) {
+      throw new Error(saveData?.message || `Save failed (${saveRes.status})`);
+    }
 
     document.getElementById("saveStatus").innerHTML = 
       `Saved ✔ — Receipt Key: ${data.receiptKey}`;
@@ -360,45 +612,98 @@ async function saveToSession(){
     document.getElementById("saveError").style.display="none";
     document.getElementById("showTopReceipt").textContent =
       "Receipt Key: " + data.receiptKey;
+    if (isAuto) setAutoSaveFlag("saved");
 
   }catch(e){
     document.getElementById("saveError").innerText = "Save failed: "+e.message;
     document.getElementById("saveError").style.display="block";
+    if (isAuto) setAutoSaveFlag("failed", true);
   }
 }
 
 function printReceipt(){
   const grid = document.getElementById("printGrid");
 
-  grid.innerHTML = `
-    ${buildReceiptHTML("School Copy")}
-    ${buildReceiptHTML("Student Copy")}
-
-    <!-- blank boxes -->
-    <div class="receipt-box"></div>
-    <div class="receipt-box"></div>
-  `;
+  grid.innerHTML = buildSlipHTML();
 
   document.getElementById("printPage").style.display="block";
   window.print();
 }
 
+function goBackToStudent(){
+  const cls = String(data.class || "").trim();
+  const roll = String(data.roll || "").trim();
+  const session = String(data.session || "").trim();
+
+  if (!cls || !roll) {
+    history.back();
+    return;
+  }
+
+  const qs = new URLSearchParams();
+  qs.set("class", cls);
+  qs.set("roll", roll);
+  if (session) qs.set("session", session);
+  if (isAccountantView) {
+    window.location.href = `accountant_student_details.html?${qs.toString()}`;
+    return;
+  }
+  window.location.href = `student_details.html?${qs.toString()}`;
+}
+
 
 /* BUTTON EVENTS */
-document.getElementById("btnSave").addEventListener("click", saveToSession);
+document.getElementById("btnSave").addEventListener("click", () => saveToSession(false));
 document.getElementById("btnPrint").addEventListener("click", printReceipt);
 
 document.getElementById("btnWhats").addEventListener("click", ()=>{
   const num = document.getElementById("waNumber").value.trim();
   if(!num){ alert("Enter WhatsApp number with country code (e.g. 919XXXXXXXXX)"); return; }
 
-  let msg = `P.S. Public School - Fee Receipt\nReceipt Key: ${data.receiptKey}\nName: ${data.name}\nFather: ${data.father}\nClass: ${data.class}\nRoll: ${data.roll}\nSession: ${data.session}\nDate: ${data.date}\n\nDetails:\n`;
+  let msg = `P.S. Public School - Fee Receipt\n`;
+  msg += `Receipt: ${data.receiptKey}\n`;
+  msg += `Name: ${data.name}\n`;
+  msg += `Class: ${data.class} | Roll: ${data.roll}\n`;
+  msg += `Paid Type: ${(data.paid_type || "-").toUpperCase()}\n`;
+  msg += `Scholarship: ${discountLabel(data.scholarship)}\n`;
+  msg += `Concession: ${discountLabel(data.concession)}\n`;
+  msg += `Session: ${data.session} | Date: ${data.date}\n`;
+  const prevRec = (data.months || []).find(x => (x.month === "previousDue" || x.month === "Previous Due")) || {};
+  const annualRec = (data.months || []).find(x => x.month === "Annual") || {};
+  msg += `Previous Due: Paid ${Number(prevRec.paid || 0)}, Due ${Number(prevRec.due || 0)}\n`;
+  msg += `Admission Fee: ${data.new_admission ? Number(data.admission_charge || 0) : 0}\n`;
+  if (annualRec && Object.keys(annualRec).length) {
+    msg += `${monthLabel("Annual")}: Paid ${Number(annualRec.paid || 0)}, Due ${Number(annualRec.due || 0)}\n`;
+  }
+  msg += `\nMonth Details:\n`;
 
-  (data.months||[]).forEach(m=>{
-    msg += `${m.month}: Paid ${m.paid||0}, Due ${m.due||0}\n`;
+  const rows = (data.months || []).filter(m => {
+    const paid = Number(m.paid || 0);
+    const due = Number(m.due || 0);
+    const extra = Number(m.extra || 0);
+    const purpose = String(m.purpose || "").trim();
+    return paid > 0 || due > 0 || extra > 0 || purpose.length > 0;
   });
 
-  msg += `\nTotal Paid: ${data.totalPaid}\nTotal Due: ${data.totalDue}\nAdvance: ${data.advance}`;
+  if (!rows.length) {
+    msg += `No pending/payment month rows.\n`;
+  } else {
+    rows.forEach(m => {
+      const mLabel = monthLabel(m.month, m);
+      const purpose = String(m.purpose || "").trim();
+      const extra = Number(m.extra || 0);
+      const parts = [
+        `${mLabel}`,
+        `Paid ${m.paid || 0}`,
+        `Due ${m.due || 0}`
+      ];
+      if (purpose) parts.push(`Purpose ${purpose}`);
+      if (extra > 0) parts.push(`Extra ${extra}`);
+      msg += `- ${parts.join(" | ")}\n`;
+    });
+  }
+
+  msg += `\nTotals:\nTotal Paid: ${data.totalPaid}\nTotal Due: ${data.totalDue}\nAdvance: ${data.advance}`;
 
   window.open(`https://wa.me/${num}?text=`+encodeURIComponent(msg), "_blank");
 });
@@ -406,7 +711,31 @@ document.getElementById("btnWhats").addEventListener("click", ()=>{
 
 renderInfo();
 renderMonths();
-</script>
+if (isHistoryView) {
+  const controls = document.querySelector(".controls");
+  const whatsWrap = document.getElementById("whatsWrap");
+  if (controls) controls.style.display = "none";
+  if (whatsWrap) whatsWrap.style.display = "none";
+  const statusOk = document.getElementById("saveStatus");
+  const statusErr = document.getElementById("saveError");
+  if (statusOk) statusOk.style.display = "none";
+  if (statusErr) statusErr.style.display = "none";
+} else {
+  saveToSession(true);
+}
 
+if (isAccountantView) {
+  const side = document.getElementById("sideMenu");
+  if (side) {
+    const cls = String(data.class || "").trim();
+    const session = String(data.session || "").trim();
+    side.innerHTML = `
+      <div class="menu-item" onclick="window.location.href='accountant.html?session=${encodeURIComponent(session)}'">Accountant Home</div>
+      <div class="menu-item" onclick="window.location.href='accountant_class.html?class=${encodeURIComponent(cls)}&session=${encodeURIComponent(session)}'">Class Students</div>
+      <div class="menu-item" onclick="window.location.href='accountant_student_details.html?class=${encodeURIComponent(cls)}&roll=${encodeURIComponent(String(data.roll||''))}&session=${encodeURIComponent(session)}'">Student Details</div>
+    `;
+  }
+}
+</script>
 </body>
 </html>

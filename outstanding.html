@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outstanding List</title>
+<style>
+:root{
+  --brand:#0f4aa3;
+  --brand-2:#1f6feb;
+  --bg:#eef3fb;
+  --card:#ffffff;
+  --text:#1f2937;
+  --muted:#6b7280;
+  --line:#d8e2f0;
+  --danger:#b42318;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 400px at -10% -20%, #dce9ff 0%, transparent 50%),
+    radial-gradient(900px 300px at 100% 0%, #d7f0ff 0%, transparent 45%),
+    var(--bg);
+}
+.topbar{
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  color:#fff;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;line-height:1}
+.title{font-size:20px;font-weight:700}
+.spacer{flex:1}
+.overlay {
+  position: fixed;top:0;left:0;width:100%;height:100%;
+  background: rgba(0,0,0,0.35);display:none;z-index:1500;
+}
+.overlay.show { display:block; }
+.side-menu{
+  position:fixed;top:0;left:-280px;width:260px;height:100%;
+  background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+  padding:20px;overflow-y:auto;z-index:2000;
+  transition: left 0.35s;
+  border-radius:0 18px 18px 0;
+}
+.side-menu.open{ left:0; }
+.menu-item{
+  padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+  font-size:16px;font-weight:600;color:#333;
+}
+.wrap{max-width:1400px;margin:18px auto;padding:0 14px}
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:0 10px 28px rgba(15,74,163,.10);
+  padding:16px;
+}
+.toolbar{
+  display:grid;
+  grid-template-columns:220px 220px 220px 1fr;
+  gap:10px;
+  align-items:end;
+}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+select,input{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px 11px;
+  font-size:14px;
+  background:#fff;
+}
+.cards{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(160px,1fr));
+  gap:10px;
+}
+.card{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#f8fbff;
+  padding:12px;
+}
+.k{color:var(--muted);font-size:12px}
+.v{font-size:22px;font-weight:800;margin-top:4px}
+.table-wrap{margin-top:14px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:1120px}
+th,td{border-bottom:1px solid var(--line);padding:10px 8px;font-size:14px;text-align:left}
+th{background:#f2f7ff;color:#0f3c84;font-weight:700}
+.money{font-weight:700}
+.due{color:var(--danger);font-weight:700}
+.ok{color:#067647;font-weight:700}
+.btn{
+  border:none;border-radius:8px;padding:6px 10px;cursor:pointer;
+  background:#0f4aa3;color:#fff;font-size:12px;
+}
+.empty{text-align:center;color:var(--muted);padding:18px 8px}
+.hint{font-size:12px;color:var(--muted)}
+.template-wrap{
+  margin-top:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fafcff;
+  padding:10px;
+}
+.template-wrap textarea{
+  width:100%;
+  min-height:80px;
+  resize:vertical;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:8px;
+  font-size:13px;
+}
+.template-actions{
+  margin-top:8px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.ok-dot,.bad-dot{
+  display:inline-block;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  vertical-align:middle;
+  margin-right:6px;
+}
+.ok-dot{background:#16a34a}
+.bad-dot{background:#dc2626}
+@media (max-width:1000px){
+  .toolbar{grid-template-columns:1fr}
+  .cards{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div class="title">Outstanding List</div>
+    <div class="spacer"></div>
+  </div>
+  <div id="overlay" class="overlay"></div>
+  <div id="sideMenu" class="side-menu"></div>
+
+  <div class="wrap">
+    <div class="panel">
+      <div class="toolbar">
+        <div>
+          <label>Session</label>
+          <select id="sessionSelect"></select>
+        </div>
+        <div>
+          <label>Class</label>
+          <select id="classFilter"><option value="">All Classes</option></select>
+        </div>
+        <div>
+          <label>Date (month check)</label>
+          <input id="asOnDate" type="date" />
+        </div>
+        <div>
+          <label>Search (name, roll)</label>
+          <input id="searchInput" placeholder="Type name or roll..." />
+        </div>
+      </div>
+      <div class="hint">Students are shown when selected month fee is pending (not fully paid).</div>
+      <div class="template-wrap">
+        <label>Message Template ({name}, {class}, {roll}, {month}, {due})</label>
+        <textarea id="msgTemplate">Dear Parent, fee due reminder for {name} (Class {class}, Roll {roll}). Pending for {month}: Rs. {due}. Kindly pay at the earliest. - P.S. Public School</textarea>
+        <div class="template-actions">
+          <button class="btn" style="background:#16a34a" onclick="sendAllWhatsApp()">Send All WhatsApp</button>
+        </div>
+      </div>
+
+      <div class="cards">
+        <div class="card"><div class="k">Pending Students</div><div class="v" id="pendingCount">0</div></div>
+        <div class="card"><div class="k">Selected Month</div><div class="v" id="selectedMonthLabel">-</div></div>
+        <div class="card"><div class="k">Selected Month Due</div><div class="v" id="monthDueTotal">Rs. 0</div></div>
+        <div class="card"><div class="k">Total Pending Due</div><div class="v" id="allDueTotal">Rs. 0</div></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Class</th>
+              <th>Roll</th>
+              <th>Month Status</th>
+              <th>Month Due</th>
+              <th>Total Pending Due</th>
+              <th>Mobile</th>
+              <th>Phone Valid</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="outstandingBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+const params = new URLSearchParams(window.location.search);
+let currentSession = params.get("session") || localStorage.getItem("session") || "2024_25";
+let allRows = [];
+let monthlyFeesByClass = {};
+let annualFeesByClass = {};
+let admissionFeesByClass = {};
+let filteredDueRows = [];
+
+function money(v){ return `Rs. ${Number(v || 0).toLocaleString("en-IN")}`; }
+function toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function safeText(v){ return String(v ?? "").trim(); }
+function normalizeClassName(value){
+  const text = safeText(value).replace(/\s+/g, " ");
+  if (!text) return "";
+  return text.replace(/\s+[AB]$/i, "").trim();
+}
+function normalizeRoll(roll){
+  let r = safeText(roll);
+  if (r.endsWith(".0")) r = r.slice(0, -2);
+  if (/^\d+$/.test(r)) r = String(parseInt(r, 10));
+  return r;
+}
+function normalizePhone(raw){
+  let n = safeText(raw).replace(/[^\d]/g, "");
+  if (!n) return "";
+
+  // Normalize common India formats:
+  // 9755777442 -> 919755777442
+  // 09755777442 -> 919755777442
+  // 00919755777442 -> 919755777442
+  while (n.startsWith("00")) n = n.slice(2);
+  if (n.startsWith("0")) n = n.slice(1);
+  if (n.length === 10) n = "91" + n;
+
+  return n;
+}
+function isValidPhone(raw){
+  const n = normalizePhone(raw);
+  // Strict India validation for this portal.
+  return /^91\d{10}$/.test(n);
+}
+function monthKeyFromDate(dateVal){
+  const d = dateVal ? new Date(dateVal + "T00:00:00") : new Date();
+  const m = d.getMonth(); // 0-11
+  const map = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return map[m];
+}
+function monthDueRecord(rec, defaultDue){
+  if (!rec || typeof rec !== "object") {
+    return { paid: 0, due: toNum(defaultDue), status: toNum(defaultDue) > 0 ? "Due" : "Paid" };
+  }
+  const paid = toNum(rec.paid);
+  let due = rec.due === undefined || rec.due === null ? toNum(defaultDue) : toNum(rec.due);
+  if (paid === 0 && due === 0 && toNum(defaultDue) > 0) due = toNum(defaultDue);
+  let status = safeText(rec.status);
+  if (!["Paid","Partial","Due"].includes(status)) {
+    if (due <= 0 && paid > 0) status = "Paid";
+    else if (paid > 0 && due > 0) status = "Partial";
+    else status = "Due";
+  }
+  return { paid, due, status };
+}
+function totalPendingDue(student){
+  const cls = normalizeClassName(student.class_name);
+  const monthDefault = toNum(monthlyFeesByClass[cls] || 0);
+  const annualDefault = toNum(annualFeesByClass[cls] || 0) + (student.new_admission ? toNum(admissionFeesByClass[cls] || 0) : 0);
+  const months = student.months || {};
+  let total = 0;
+  const order = ["previousDue","Annual","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+  order.forEach(m => {
+    let def = monthDefault;
+    if (m === "previousDue") def = toNum(student.previous_due);
+    if (m === "Annual") def = annualDefault;
+    total += monthDueRecord(months[m], def).due;
+  });
+  return total;
+}
+function buildReminderMessage(student, monthKey, monthDue){
+  const tpl = document.getElementById("msgTemplate").value || "";
+  return tpl
+    .replaceAll("{name}", student.name || "")
+    .replaceAll("{class}", student.class_name || "")
+    .replaceAll("{roll}", student.roll || "")
+    .replaceAll("{month}", monthKey || "")
+    .replaceAll("{due}", String(monthDue || 0));
+}
+function sendWhatsApp(phone, message){
+  const num = normalizePhone(phone);
+  if (!num) {
+    alert("No valid mobile number for this student.");
+    return;
+  }
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(message)}`, "_blank");
+}
+function sendWhatsAppEncoded(phone, encodedMessage){
+  sendWhatsApp(phone, decodeURIComponent(encodedMessage || ""));
+}
+async function copyMessageEncoded(encodedMessage){
+  const text = decodeURIComponent(encodedMessage || "");
+  try{
+    await navigator.clipboard.writeText(text);
+    alert("Message copied.");
+  }catch(e){
+    alert("Copy failed.");
+  }
+}
+function sendAllWhatsApp(){
+  const list = filteredDueRows.filter(r => r.mobile && r.isPhoneValid);
+  if (!list.length){
+    alert("No valid phone numbers in current filtered list.");
+    return;
+  }
+  if (!confirm(`Send WhatsApp to ${list.length} students?`)) return;
+
+  // Open one-by-one with delay. Browser may block if popups are restricted.
+  list.forEach((r, i) => {
+    setTimeout(() => {
+      sendWhatsApp(r.mobile, r.message);
+    }, i * 350);
+  });
+}
+
+async function loadSessions(){
+  const sel = document.getElementById("sessionSelect");
+  try{
+    const res = await fetch(`${SESSION_API}/session/list`);
+    const data = await res.json();
+    const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+    sel.innerHTML = sessions.map(s => `<option value="${s}">${s}</option>`).join("");
+    if (!sessions.includes(currentSession) && sessions.length) currentSession = sessions[0];
+    if (currentSession) sel.value = currentSession;
+  }catch(e){
+    sel.innerHTML = `<option value="${currentSession}">${currentSession}</option>`;
+  }
+  localStorage.setItem("session", currentSession);
+}
+
+async function loadFeeStructure(){
+  try{
+    const res = await fetch(`${FEE_API}/fees/get?session=${encodeURIComponent(currentSession)}`, {
+      headers: { "X-Session": currentSession }
+    });
+    const data = await res.json();
+    if (!res.ok || data?.success === false) return;
+    monthlyFeesByClass = {};
+    annualFeesByClass = {};
+    admissionFeesByClass = {};
+    (data.fees || []).forEach(f => {
+      const cls = normalizeClassName(f.class_name);
+      if (!cls) return;
+      monthlyFeesByClass[cls] = toNum(f.monthly_fee);
+      annualFeesByClass[cls] = toNum(f.annual_fee || f.annual_charge);
+      admissionFeesByClass[cls] = toNum(f.admission_charge ?? f.admission_fee);
+    });
+  }catch(e){}
+}
+
+async function loadOutstandingRows(){
+  const [masterRes, feeRes] = await Promise.allSettled([
+    fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`),
+    fetch(`${FEE_API}/students?session=${encodeURIComponent(currentSession)}`, { headers: { "X-Session": currentSession } })
+  ]);
+
+  const parseRows = (data) => Array.isArray(data) ? data : (Array.isArray(data?.students) ? data.students : []);
+  let master = [];
+  if (masterRes.status === "fulfilled" && masterRes.value.ok) {
+    const data = await masterRes.value.json().catch(() => ({}));
+    master = parseRows(data);
+  }
+
+  let feeRows = [];
+  if (feeRes.status === "fulfilled" && feeRes.value.ok) {
+    const data = await feeRes.value.json().catch(() => ({}));
+    feeRows = parseRows(data);
+  }
+
+  const feeMap = new Map();
+  feeRows.forEach(s => {
+    const key = `${normalizeClassName(s.class_name || s.class)}|${normalizeRoll(s.roll)}`;
+    feeMap.set(key, s);
+  });
+
+  allRows = master.map(m => {
+    const cls = normalizeClassName(m.class_name || m.class);
+    const roll = normalizeRoll(m.rollno ?? m.roll);
+    const key = `${cls}|${roll}`;
+    const fs = feeMap.get(key) || {};
+    return {
+      name: safeText(m.student_name || m.name || fs.name),
+      class_name: cls,
+      roll,
+      mobile: safeText(
+        m.parent_mobile ||
+        m.mobile ||
+        m.phone ||
+        m.phone_no ||
+        m.whatsapp ||
+        m.guardian_mobile ||
+        fs.parent_mobile ||
+        fs.mobile ||
+        fs.phone ||
+        ""
+      ),
+      new_admission: Boolean(m.new_admission),
+      previous_due: toNum(fs.previous_due),
+      months: (fs.months && typeof fs.months === "object") ? fs.months : {}
+    };
+  }).filter(x => x.class_name && x.roll);
+
+  buildClassFilter();
+  renderTable();
+}
+
+function buildClassFilter(){
+  const classFilter = document.getElementById("classFilter");
+  const selected = classFilter.value || "";
+  const classes = [...new Set(allRows.map(r => r.class_name).filter(Boolean))]
+    .sort((a,b) => a.localeCompare(b, undefined, { numeric:true, sensitivity:"base" }));
+  classFilter.innerHTML = `<option value="">All Classes</option>` + classes.map(c => `<option value="${c}">${c}</option>`).join("");
+  if (selected && classes.includes(selected)) classFilter.value = selected;
+}
+
+function renderTable(){
+  const tbody = document.getElementById("outstandingBody");
+  const classVal = normalizeClassName(document.getElementById("classFilter").value || "");
+  const q = safeText(document.getElementById("searchInput").value).toLowerCase();
+  const dateVal = document.getElementById("asOnDate").value;
+  const monthKey = monthKeyFromDate(dateVal);
+  document.getElementById("selectedMonthLabel").textContent = monthKey;
+
+  let filtered = allRows.filter(r => {
+    if (classVal && normalizeClassName(r.class_name) !== classVal) return false;
+    const hay = `${r.name} ${r.roll}`.toLowerCase();
+    if (q && !hay.includes(q)) return false;
+
+    const cls = normalizeClassName(r.class_name);
+    const monthDefault = toNum(monthlyFeesByClass[cls] || 0);
+    const rec = monthDueRecord((r.months || {})[monthKey], monthDefault);
+    return rec.due > 0; // pending for selected/current month
+  });
+
+  filtered.sort((a,b) => {
+    const c = a.class_name.localeCompare(b.class_name, undefined, { numeric:true, sensitivity:"base" });
+    if (c !== 0) return c;
+    return toNum(a.roll) - toNum(b.roll);
+  });
+
+  if (!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">No pending students for selected month.</td></tr>`;
+    filteredDueRows = [];
+    document.getElementById("pendingCount").textContent = "0";
+    document.getElementById("monthDueTotal").textContent = "Rs. 0";
+    document.getElementById("allDueTotal").textContent = "Rs. 0";
+    return;
+  }
+
+  let monthDueTotal = 0;
+  let allDueTotal = 0;
+  filteredDueRows = [];
+  tbody.innerHTML = filtered.map((r, i) => {
+    const cls = normalizeClassName(r.class_name);
+    const monthDefault = toNum(monthlyFeesByClass[cls] || 0);
+    const rec = monthDueRecord((r.months || {})[monthKey], monthDefault);
+    const allDue = totalPendingDue(r);
+    monthDueTotal += rec.due;
+    allDueTotal += allDue;
+    const message = buildReminderMessage(r, monthKey, rec.due);
+    const mobile = normalizePhone(r.mobile);
+    const valid = isValidPhone(r.mobile);
+    filteredDueRows.push({
+      ...r,
+      message,
+      mobile,
+      isPhoneValid: valid,
+      monthDue: rec.due
+    });
+    const detailsLink = `student_details.html?roll=${encodeURIComponent(r.roll)}&class=${encodeURIComponent(r.class_name)}&session=${encodeURIComponent(currentSession)}`;
+    return `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${r.name}</td>
+        <td>${r.class_name}</td>
+        <td>${r.roll}</td>
+        <td class="${rec.due > 0 ? "due" : "ok"}">${rec.status}</td>
+        <td class="money due">${money(rec.due)}</td>
+        <td class="money due">${money(allDue)}</td>
+        <td>${mobile || "-"}</td>
+        <td>${valid ? '<span class="ok-dot"></span>Valid' : '<span class="bad-dot"></span>Invalid'}</td>
+        <td>
+          <button class="btn" onclick="window.location.href='${detailsLink}'">Open</button>
+          <button class="btn" style="background:#16a34a;${valid ? "" : "opacity:.6;"}" ${valid ? "" : "disabled"} onclick="sendWhatsAppEncoded('${mobile}', '${encodeURIComponent(message)}')">WhatsApp</button>
+          <button class="btn" style="background:#475569" onclick="copyMessageEncoded('${encodeURIComponent(message)}')">Copy</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  document.getElementById("pendingCount").textContent = String(filtered.length);
+  document.getElementById("monthDueTotal").textContent = money(monthDueTotal);
+  document.getElementById("allDueTotal").textContent = money(allDueTotal);
+}
+
+document.getElementById("sessionSelect").addEventListener("change", async () => {
+  currentSession = document.getElementById("sessionSelect").value;
+  localStorage.setItem("session", currentSession);
+  await loadFeeStructure();
+  await loadOutstandingRows();
+});
+document.getElementById("classFilter").addEventListener("change", renderTable);
+document.getElementById("searchInput").addEventListener("input", renderTable);
+document.getElementById("asOnDate").addEventListener("change", renderTable);
+
+(async function init(){
+  const today = new Date();
+  document.getElementById("asOnDate").value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  await loadSessions();
+  await loadFeeStructure();
+  await loadOutstandingRows();
+})();
+</script>
+<script src="shared_menu.js"></script>
+</body>
+</html>

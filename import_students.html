@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -8,7 +8,39 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
-body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:20px}
+body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0 20px 20px}
+.topbar{
+    width:100%;
+    padding:15px 20px;
+    background:#007bff;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    gap:15px;
+    box-sizing:border-box;
+    position:sticky;
+    top:0;
+    z-index:3000;
+    margin:0 -20px 20px;
+}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
+.overlay {
+    position: fixed;top:0;left:0;width:100%;height:100%;
+    background: rgba(0,0,0,0.35);display:none;z-index:1500;
+}
+.overlay.show { display:block; }
+.side-menu{
+    position:fixed;top:0;left:-280px;width:260px;height:100%;
+    background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+    padding:20px;overflow-y:auto;z-index:2000;
+    transition: left 0.35s;
+    border-radius:0 18px 18px 0;
+}
+.side-menu.open{ left:0; }
+.menu-item{
+    padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+    font-size:16px;font-weight:600;color:#333;
+}
 .container{max-width:700px;margin:auto;background:#fff;padding:22px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
 button,input,select{display:block;width:100%;padding:10px;margin-top:10px;border-radius:8px}
 .import{background:#6f42c1;color:#fff;border:none}
@@ -17,6 +49,18 @@ button,input,select{display:block;width:100%;padding:10px;margin-top:10px;border
 </head>
 
 <body>
+<div class="topbar">
+  <div class="menu-btn" onclick="toggleMenu()">☰</div>
+  <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
+</div>
+<div id="overlay" class="overlay" onclick="closeMenu()"></div>
+<div class="side-menu" id="sideMenu">
+  <div class="menu-item" onclick="goToPage('edit.html')">Edit Student</div>
+  <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
+  <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
+  <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
+  <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
+</div>
 <div class="container">
   <h2>Import Students From Excel</h2>
 
@@ -29,14 +73,20 @@ button,input,select{display:block;width:100%;padding:10px;margin-top:10px;border
 
   <button class="import" onclick="importExcel()">Import to Backend</button>
   <button class="download" onclick="downloadSample()">Download Sample</button>
-  <button onclick="location.href='index.html'">⬅ Back</button>
+  <button onclick="location.href='index.html'">â¬… Back</button>
 
   <p id="status"></p>
 </div>
 
 <script>
-const API = "/api/proxy?path=";
-let currentSession = localStorage.getItem("session") || "2024_25";
+const API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const params = new URLSearchParams(window.location.search);
+let currentSession = params.get("session") || localStorage.getItem("session") || "2024_25";
+localStorage.setItem("session", currentSession);
+
+function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
+function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
+function goToPage(p){ closeMenu(); window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
 
 /* ------------------------------------
    LOAD SESSION LIST
@@ -60,7 +110,7 @@ async function loadSessions(){
         };
     }
     catch(err){
-        alert("❌ Failed to load sessions");
+        alert("âŒ Failed to load sessions");
     }
 }
 loadSessions();
@@ -216,5 +266,7 @@ async function importExcel(){
   reader.readAsArrayBuffer(file);
 }
 </script>
+<script src="shared_menu.js"></script>
 </body>
 </html>
+

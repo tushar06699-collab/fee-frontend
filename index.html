@@ -8,27 +8,6 @@
 <style>
   body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
 
-  /* LOGIN SCREEN */
-  #loginBox{
-      position:fixed;top:0;left:0;width:100%;height:100%;
-      background:#0d6efd;display:flex;justify-content:center;
-      align-items:center;z-index:5000;
-  }
-  #loginCard{
-      background:white;padding:30px;border-radius:12px;width:320px;
-      box-shadow:0 4px 12px rgba(0,0,0,.25);text-align:center;
-  }
-  #loginCard h2{margin-bottom:15px;color:#0d6efd;}
-  #loginCard input{
-      width:100%;padding:10px;margin:8px 0;border-radius:8px;
-      border:1px solid #ccc;font-size:16px;
-  }
-  #loginCard button{
-      width:100%;padding:10px;background:#0d6efd;color:white;
-      border:0;border-radius:8px;font-size:18px;cursor:pointer;
-  }
-  #loginCard button:hover{background:#0b5ed7;}
-
   /* TOP NAV BAR */
   .topbar{
       width:100%;padding:15px 20px;background:#007bff;color:#fff;
@@ -99,6 +78,37 @@
       padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;
       margin-top:15px
   }
+  .filters-bar{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      margin-bottom:10px;
+      flex-wrap:wrap;
+  }
+  .class-picker{
+      min-width:260px;
+      background:linear-gradient(120deg,#0ea5e9,#2563eb);
+      color:#fff;
+      border-radius:12px;
+      padding:10px 12px;
+      box-shadow:0 6px 20px rgba(37,99,235,.25);
+  }
+  .class-picker label{
+      display:block;
+      font-size:12px;
+      opacity:.9;
+      margin-bottom:4px;
+  }
+  #classSelect{
+      width:100%;
+      border:0;
+      border-radius:10px;
+      padding:8px 10px;
+      font-weight:700;
+      background:#fff;
+      color:#0f172a;
+      outline:none;
+  }
 
   .edit-btn{
       margin-top:4px;padding:4px 8px;font-size:12px;background:#ffc107;
@@ -117,35 +127,6 @@
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="loginBox">
-    <div id="loginCard">
-        <h2>Admin Login</h2>
-        <input id="username" placeholder="Username">
-        <input id="password" type="password" placeholder="Password">
-        <button onclick="doLogin()">Login</button>
-    </div>
-</div>
-
-<script>
-function doLogin(){
-    let u = document.getElementById("username").value.trim();
-    let p = document.getElementById("password").value.trim();
-
-    
-    if (u === "admin" && p === "1234") {
-    localStorage.setItem("loggedIn", "yes");
-    document.getElementById("loginBox").style.display = "none";
-} else {
-    alert("Invalid credentials");
-}
-}
-
-if (localStorage.getItem("loggedIn") === "yes") {
-    document.getElementById("loginBox").style.display = "none";
-}
-</script>
-
 <!-- TOP BAR -->
 <div class="topbar">
     <div class="menu-btn" onclick="toggleMenu()">☰</div>
@@ -159,14 +140,11 @@ if (localStorage.getItem("loggedIn") === "yes") {
 <!-- SIDEBAR -->
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 <div class="side-menu" id="sideMenu">
-    <div class="menu-item" onclick="goToPage('edit.html')">✏️ Edit Student</div>
-    <div class="menu-item" onclick="goToPage('dashboard.html')">📊 Dashboard</div>
-    <div class="menu-item" onclick="goToPage('add_student.html')">➕ Add Student</div>
-    <div class="menu-item" onclick="goToPage('fees.html')">💰 Fees Modify</div>
-    <div class="menu-item" onclick="goToPage('import_students.html')">📥 Import Students</div>
-    <div class="menu-item" onclick="goToPage('receipt_history.html')">📜 Receipt History</div>
-    <div class="menu-item" onclick="goToPage('delete_student.html')">🗑 Delete Students</div>
-    <div class="menu-item" onclick="goToPage('export.html')">📤 Export Data</div>
+    <div class="menu-item" onclick="goToPage('edit.html')">Edit Student</div>
+    <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
+    <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
+    <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
 
 </div>
 
@@ -177,13 +155,20 @@ function goToPage(p){ window.location.href = p + "?session=" + currentSession; }
 </script>
 
 <div class="container">
-  <input id="search" placeholder="Search by name, roll, class..." />
+  <div class="filters-bar">
+    <div class="class-picker">
+      <label>Select Class</label>
+      <select id="classSelect" onchange="changeClass()"></select>
+    </div>
+    <input id="search" placeholder="Search by name, Admission No..." />
+  </div>
   <table id="feeTable">
     <thead>
   <tr>
     <th>Student</th>
     <th>Class</th>
     <th>Roll</th>
+    <th>Admission No</th>
     <th>Prev Due</th>
     <th>Apr</th>
     <th>May</th>
@@ -206,18 +191,50 @@ function goToPage(p){ window.location.href = p + "?session=" + currentSession; }
 </div>
 
 <script>
-const API = "/api/proxy?path=";
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
 let currentSession = localStorage.getItem("session") || "2024_25";
+const STUDENT_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const STUDENT_CACHE_VERSION = "v3";
+let mergedStudentsMemory = [];
+let mergedStudentsSession = null;
+let selectedClass = "";
+let monthlyFeesByClass = {};
+let annualFeesByClass = {};
+let admissionFeesByClass = {};
 const allMonths = [
     "Apr","May","Jun","Jul","Aug","Sep",
     "Oct","Nov","Dec","Jan","Feb","Mar"
 ];
 
+function getSelectedClassStorageKey(sessionName){
+    return `selectedClass:${sessionName || currentSession || ""}`;
+}
+
+function saveSelectedClass(className){
+    try{
+        localStorage.setItem(getSelectedClassStorageKey(currentSession), className || "");
+    }catch(e){}
+}
+
+function readSelectedClass(sessionName){
+    try{
+        return localStorage.getItem(getSelectedClassStorageKey(sessionName || currentSession)) || "";
+    }catch(e){
+        return "";
+    }
+}
+
 /* -------------- SESSIONS ---------------- */
 async function loadSessions(){
     try{
-        const res = await fetch(API + "/session/list");
+        const res = await fetch(SESSION_API + "/session/list");
         const data = await res.json();
+
+        if (!res.ok || !data.success || !Array.isArray(data.sessions) || data.sessions.length === 0) {
+            throw new Error(data?.message || data?.error || "Session list failed");
+        }
 
         let sel = sessionSelect;
         sel.innerHTML = "";
@@ -231,7 +248,7 @@ async function loadSessions(){
         localStorage.setItem("session", currentSession);
 
     } catch(e){
-        alert("Error loading sessions");
+        alert("Error loading sessions: " + (e?.message || e));
         console.error(e);
     }
 }
@@ -246,7 +263,7 @@ async function createNewSession() {
     extra = parseInt(extra) || 0;
 
     try {
-        const res = await fetch(API + "/session/create_auto", {
+        const res = await fetch(SESSION_API + "/session/create_auto", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -282,32 +299,380 @@ async function createNewSession() {
 function changeSession(){
     currentSession = sessionSelect.value;
     localStorage.setItem("session", currentSession);
-    renderTable();
+    mergedStudentsMemory = [];
+    mergedStudentsSession = null;
+    selectedClass = readSelectedClass(currentSession) || "";
+    monthlyFeesByClass = {};
+    Promise.all([loadClassOptions(), loadFeeStructure()]).then(() => renderTable());
 }
 
-/* ----------- FIXED FETCH STUDENTS ----------- */
-async function fetchStudents(){
-    const headers = { "X-Session": currentSession };
-
+async function loadFeeStructure(){
     try{
-        const res = await fetch(API + "/students", { headers });
-        const text = await res.text();
+        const res = await fetch(`${FEE_API}/fees/get?session=${encodeURIComponent(currentSession)}`, {
+            headers: { "X-Session": currentSession }
+        });
+        const data = await res.json();
+        if (!res.ok || data?.success === false) return;
 
-        let json = null;
-        try{ json = JSON.parse(text); } catch(e){}
+        monthlyFeesByClass = {};
+        annualFeesByClass = {};
+        admissionFeesByClass = {};
+        (data.fees || []).forEach(f => {
+            const cls = String(f.class_name || "").trim();
+            if (!cls) return;
+            monthlyFeesByClass[cls] = Number(f.monthly_fee || 0);
+            annualFeesByClass[cls] = Number(f.annual_fee || f.annual_charge || 0);
+            admissionFeesByClass[cls] = Number((f.admission_charge ?? f.admission_fee) || 0);
+        });
+    }catch(e){
+        console.warn("Fee structure load failed:", e);
+    }
+}
 
-        if(!res.ok || (json && json.success === false)){
-            alert("Students load failed: " + (json?.message || json?.error || res.status));
-            return [];
+function normalizeMonthRecord(rec, defaultDue){
+    // If month record is missing in fee ledger, treat as Due by default.
+    if (!rec || typeof rec !== "object") {
+        return { paid: 0, due: Number(defaultDue || 0), status: "Due" };
+    }
+
+    const paid = Number(rec.paid || 0);
+    const due = Number(rec.due ?? defaultDue ?? 0);
+    let status = String(rec.status || "").trim();
+
+    // Recompute status when backend status is missing/invalid.
+    if (!status || !["Paid", "Partial", "Due"].includes(status)) {
+        if (due <= 0 && paid > 0) status = "Paid";
+        else if (paid > 0 && due > 0) status = "Partial";
+        else status = "Due";
+    }
+
+    return { paid, due, status };
+}
+
+async function loadClassOptions(){
+    const classSel = document.getElementById("classSelect");
+    classSel.innerHTML = "";
+    let classes = [];
+
+    // Try 1: student backend by session (primary source)
+    try {
+        const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
+        if (res.ok) {
+            const data = await res.json();
+            const rows = Array.isArray(data)
+                ? data
+                : (Array.isArray(data?.students) ? data.students : []);
+            classes = [...new Set(rows.map(s => normalizeClassName(s.class_name || s.class || "")).filter(Boolean))];
         }
+    } catch (e) {
+        console.warn("Class source 1 failed (student API session):", e);
+    }
 
-        return json?.students || [];
+    // Try 2: student backend all (fallback if session has too few classes)
+    if (classes.length <= 1) {
+        try {
+            const ares = await fetch(`${STUDENT_API}/students`);
+            if (ares.ok) {
+                const adata = await ares.json();
+                const allRows = Array.isArray(adata)
+                    ? adata
+                    : (Array.isArray(adata?.students) ? adata.students : []);
+                classes = [...new Set([...classes, ...allRows.map(s => normalizeClassName(s.class_name || s.class || "")).filter(Boolean)])];
+            }
+        } catch (e) {
+            console.warn("Class source 2 failed (student API all):", e);
+        }
     }
-    catch(e){
-        alert("Cannot load students from backend");
-        console.error(e);
-        return [];
+
+    // Try 3: fee backend class list (final fallback)
+    if (!classes.length) {
+        try {
+            const res = await fetch(`${FEE_API}/getClassList/${encodeURIComponent(currentSession)}`);
+            if (res.ok) {
+                const data = await res.json();
+                classes = Array.isArray(data) ? data.map(x => x.class_name).filter(Boolean) : [];
+            }
+        } catch (e) {
+            console.warn("Class source 3 failed (fee API):", e);
+        }
     }
+
+    classes.sort((a,b)=>a.localeCompare(b, undefined, { numeric: true }));
+    classes.forEach(c => classSel.innerHTML += `<option value="${c}">${c}</option>`);
+    classSel.innerHTML += `<option value="">All Classes</option>`;
+    const urlClass = normalizeClassName(new URLSearchParams(window.location.search).get("class") || "");
+    const savedClass = normalizeClassName(readSelectedClass(currentSession));
+    const preferredClass = normalizeClassName(selectedClass || urlClass || savedClass);
+
+    if (preferredClass && classes.includes(preferredClass)) {
+        selectedClass = preferredClass;
+    } else if ((!selectedClass || !classes.includes(selectedClass)) && classes.length) {
+        selectedClass = classes[0];
+    }
+    classSel.value = selectedClass || "";
+    saveSelectedClass(selectedClass || "");
+
+    if (!classes.length) {
+        classSel.innerHTML = `<option value="">No classes found</option>`;
+    }
+}
+
+function changeClass(){
+    const classSel = document.getElementById("classSelect");
+    selectedClass = classSel.value || "";
+    saveSelectedClass(selectedClass);
+    mergedStudentsMemory = [];
+    mergedStudentsSession = null;
+    renderTable(search.value || "");
+}
+
+/* ----------- FETCH + MERGE STUDENTS ----------- */
+function normalizeRollKey(roll) {
+    let r = String(roll ?? "").trim();
+    if (r.endsWith(".0")) r = r.slice(0, -2);
+    if (/^\d+$/.test(r)) r = String(parseInt(r, 10));
+    return r;
+}
+
+function normalizeClassName(value){
+    const text = String(value || "").trim().replace(/\s+/g, " ");
+    if (!text) return "";
+    return text.replace(/\s+[AB]$/i, "").trim();
+}
+
+function toBool(value){
+    if (typeof value === "boolean") return value;
+    const t = String(value ?? "").trim().toLowerCase();
+    return t === "true" || t === "1" || t === "yes" || t === "y" || t === "on";
+}
+
+function studentKey(className, roll) {
+    return `${normalizeClassName(className)}|${normalizeRollKey(roll)}`;
+}
+
+function admissionKey(adm){
+    return String(adm ?? "").trim();
+}
+
+function normalizeMasterStudent(s) {
+    return {
+        id: s._id || s.id || null,
+        name: s.student_name || s.name || "",
+        father: s.father_name || s.father || "",
+        class_name: normalizeClassName(s.class_name || s.class || ""),
+        roll: normalizeRollKey(s.rollno ?? s.roll ?? ""),
+        admission_no: String(s.admission_no ?? s.admissionNo ?? "").trim(),
+        new_admission: toBool(s.new_admission),
+    };
+}
+
+function normalizeFeeStudent(s) {
+    return {
+        id: s.id || null,
+        name: s.name || "",
+        father: s.father || "",
+        class_name: normalizeClassName(s.class_name || ""),
+        roll: normalizeRollKey(s.roll ?? ""),
+        admission_no: String(s.admission_no ?? s.admissionNo ?? "").trim(),
+        previous_due: Number(s.previous_due || 0),
+        advance: Number(s.advance || 0),
+        months: s.months || {},
+        annual_charge: Number(s.annual_charge || 0),
+    };
+}
+
+function getMasterStudentsCacheKey(sessionName, className) {
+    return `students_master_cache:${STUDENT_CACHE_VERSION}:${sessionName}:${className || "ALL"}`;
+}
+
+function readMasterStudentsCache(sessionName, className) {
+    try {
+        const raw = localStorage.getItem(getMasterStudentsCacheKey(sessionName, className));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.data) || !parsed.cached_at) return null;
+        if (!parsed.data.length) return null; // ignore empty cache entries
+        if ((Date.now() - Number(parsed.cached_at)) > STUDENT_CACHE_TTL_MS) return null;
+        return parsed.data;
+    } catch (e) {
+        return null;
+    }
+}
+
+function writeMasterStudentsCache(sessionName, className, rows) {
+    try {
+        if (!Array.isArray(rows) || rows.length === 0) return; // do not persist empty results
+        localStorage.setItem(
+            getMasterStudentsCacheKey(sessionName, className),
+            JSON.stringify({ cached_at: Date.now(), data: rows })
+        );
+    } catch (e) {
+        // ignore quota/caching errors
+    }
+}
+
+async function fetchMasterStudents(forceRefresh = false, className = "") {
+    const sessionName = currentSession;
+    if (!forceRefresh) {
+        const cached = readMasterStudentsCache(sessionName, className);
+        if (cached) return cached;
+    }
+
+    const parseRows = (data) => Array.isArray(data) ? data : (Array.isArray(data?.students) ? data.students : []);
+
+    // Primary: current session
+    const targetClass = normalizeClassName(className || "");
+
+    const fetchJsonRows = async (url) => {
+        const res = await fetch(url);
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch (e) {}
+        if (!res.ok) throw new Error(`Master students fetch failed (${res.status})`);
+        return parseRows(data);
+    };
+
+    let rows = [];
+    try {
+        // Use session-only fetch and filter by class in frontend.
+        rows = await fetchJsonRows(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
+    } catch (e) {
+        rows = [];
+    }
+
+    if (!rows.length) {
+        try {
+            rows = await fetchJsonRows(`${STUDENT_API}/students`);
+        } catch (e) {
+            rows = [];
+        }
+    }
+
+    let normalized = rows.map(normalizeMasterStudent).filter(s => s.class_name && (s.roll || s.admission_no));
+    if (targetClass) {
+        normalized = normalized.filter(s => normalizeClassName(s.class_name) === targetClass);
+    }
+
+    // Fallback to all-students whenever session mapping is sparse.
+    if (normalized.length <= 2) {
+        try {
+            const allRes = await fetch(`${STUDENT_API}/students`);
+            if (allRes.ok) {
+                const allData = await allRes.json();
+                const allRows = parseRows(allData);
+                // Keep only rows for current session where session exists.
+                const filteredBySession = allRows.filter(r => {
+                    const s = String(r.session || "").trim();
+                    return !s || s === currentSession;
+                });
+                let allNormalized = filteredBySession
+                    .map(normalizeMasterStudent)
+                    .filter(s => s.class_name && (s.roll || s.admission_no));
+                if (targetClass) {
+                    allNormalized = allNormalized.filter(s => normalizeClassName(s.class_name) === targetClass);
+                }
+                if (allNormalized.length > normalized.length) {
+                    normalized = allNormalized;
+                }
+            }
+        } catch (e) {
+            console.warn("Master fallback (all students) failed:", e);
+        }
+    }
+
+    writeMasterStudentsCache(sessionName, className, normalized);
+    return normalized;
+}
+
+async function fetchFeeStudentsOnly(className = "") {
+    const headers = { "X-Session": currentSession };
+    const res = await fetch(`${FEE_API}/students?class_name=${encodeURIComponent(className || "")}`, { headers });
+    const text = await res.text();
+
+    let data = null;
+    try { data = JSON.parse(text); } catch (e) {}
+
+    if (!res.ok || (data && data.success === false)) {
+        throw new Error(data?.message || data?.error || `Fee students fetch failed (${res.status})`);
+    }
+
+    const rows = data?.students || [];
+    return rows.map(normalizeFeeStudent).filter(s => s.class_name && s.roll);
+}
+
+async function fetchStudents(forceRefresh = false, className = ""){
+    const memoryKey = `${currentSession}|${className || "ALL"}`;
+    if (!forceRefresh && mergedStudentsSession === memoryKey && mergedStudentsMemory.length) {
+        return mergedStudentsMemory;
+    }
+
+    const [masterRes, feeRes] = await Promise.allSettled([
+        fetchMasterStudents(forceRefresh, className),
+        fetchFeeStudentsOnly(className),
+    ]);
+
+    const masterStudents = masterRes.status === "fulfilled" ? masterRes.value : [];
+    const feeStudents = feeRes.status === "fulfilled" ? feeRes.value : [];
+
+    if (masterRes.status === "rejected") {
+        console.error("Master student backend error:", masterRes.reason);
+    }
+    if (feeRes.status === "rejected") {
+        console.error("Fee backend error:", feeRes.reason);
+    }
+
+    if (!masterStudents.length && !feeStudents.length) return [];
+
+    const feeMap = new Map();
+    feeStudents.forEach(s => feeMap.set(studentKey(s.class_name, s.roll), s));
+    const feeMapByAdmission = new Map();
+    feeStudents.forEach(s => {
+        const key = admissionKey(s.admission_no);
+        if (key) feeMapByAdmission.set(key, s);
+    });
+    const masterMapByAdmission = new Map();
+    masterStudents.forEach(s => {
+        const key = admissionKey(s.admission_no);
+        if (key) masterMapByAdmission.set(key, s);
+    });
+
+    const merged = [];
+    const seen = new Set();
+
+    masterStudents.forEach(ms => {
+        const key = studentKey(ms.class_name, ms.roll);
+        const admKey = admissionKey(ms.admission_no);
+        const fs = feeMap.get(key) || (admKey ? feeMapByAdmission.get(admKey) : null) || {};
+
+        merged.push({
+            id: fs.id || ms.id || null,
+            name: ms.name || fs.name || "",
+            father: ms.father || fs.father || "",
+            class_name: ms.class_name || fs.class_name || "",
+            roll: ms.roll || fs.roll || "",
+            admission_no: ms.admission_no || fs.admission_no || "",
+            new_admission: Boolean(ms.new_admission),
+            previous_due: Number(fs.previous_due || 0),
+            advance: Number(fs.advance || 0),
+            months: fs.months || {},
+            annual_charge: Number(fs.annual_charge || 0),
+        });
+
+        seen.add(key);
+    });
+
+    // Do not append fee-only orphan rows.
+    // Index list should be driven by Students backend master records only,
+    // otherwise deleted/renamed students appear and open "Student not found".
+
+    const selected = normalizeClassName(className || "");
+    const filteredMerged = selected
+        ? merged.filter(s => normalizeClassName(s.class_name) === selected)
+        : merged;
+
+    mergedStudentsSession = memoryKey;
+    mergedStudentsMemory = filteredMerged;
+    return filteredMerged;
 }
 
 /* ----------------- TABLE ----------------- */
@@ -315,26 +680,46 @@ async function renderTable(filter = "") {
     const tbody = feeRows;
     tbody.innerHTML = "";
 
-    let students = await fetchStudents();
-    students.sort((a, b) => (a.class_name || "").localeCompare(b.class_name || ""));
+    const q = String(filter || "").trim();
+    const isGlobalSearch = q.length > 0;
+
+    const fetchClass = isGlobalSearch ? "" : selectedClass;
+    let students = await fetchStudents(false, fetchClass);
+    students.sort((a, b) => {
+        const classCmp = String(a.class_name || "").localeCompare(
+            String(b.class_name || ""),
+            undefined,
+            { numeric: true, sensitivity: "base" }
+        );
+        if (classCmp !== 0) return classCmp;
+
+        const rollA = parseInt(a.roll, 10);
+        const rollB = parseInt(b.roll, 10);
+        const aNum = Number.isFinite(rollA) ? rollA : Number.MAX_SAFE_INTEGER;
+        const bNum = Number.isFinite(rollB) ? rollB : Number.MAX_SAFE_INTEGER;
+        if (aNum !== bNum) return aNum - bNum;
+
+        return String(a.roll || "").localeCompare(String(b.roll || ""), undefined, { numeric: true, sensitivity: "base" });
+    });
 
     let curClass = null;
 
     students.forEach(s => {
         s.months = s.months || {};
+        const classFee = Number(monthlyFeesByClass[String(s.class_name || "").trim()] || 0);
+        const classAnnual = Number(annualFeesByClass[String(s.class_name || "").trim()] || 0);
+        const classAdmission = Number(admissionFeesByClass[String(s.class_name || "").trim()] || 0);
 
         let match = (
             (s.name || "") + " " +
-            (s.father || "") + " " +
-            (s.roll || "") + " " +
-            (s.class_name || "")
+            (s.admission_no || "")
         ).toLowerCase();
 
-        if (filter && !match.includes(filter.toLowerCase())) return;
+        if (q && !match.includes(q.toLowerCase())) return;
 
         if (s.class_name !== curClass) {
             curClass = s.class_name;
-            tbody.innerHTML += `<tr class="class-row"><td colspan="17">Class: ${curClass}</td></tr>`;
+            tbody.innerHTML += `<tr class="class-row"><td colspan="18">Class: ${curClass}</td></tr>`;
         }
 
         let prevClass = s.previous_due === 0 ? "prev-green" : "prev-red";
@@ -350,14 +735,25 @@ async function renderTable(filter = "") {
         let totalDue = 0;
 
         monthOrder.forEach(m => {
-            let val = s.months[m] || {status: "Due", due: 0};
+            const val = normalizeMonthRecord(s.months[m], classFee);
             let cls = val.status === "Paid" ? "paid" :
                       val.status === "Partial" ? "partial" : "due";
 
-            monthsHtml += `<td class="${cls}">${val.status}</td>`;
+            monthsHtml += `<td class="${cls}" title="Paid: ${val.paid} | Due: ${val.due}">${val.status}</td>`;
             totalDue += val.due || 0;
         });
-        totalDue += s.previous_due || 0;
+        const prevDue = Number(s.months?.previousDue?.due ?? s.previous_due ?? 0);
+        const annualExpected = Number(classAnnual + (s.new_admission ? classAdmission : 0));
+        const annualRec = (s.months && typeof s.months.Annual === "object") ? s.months.Annual : null;
+        const annualPaid = Number(annualRec?.paid || 0);
+        let annualDue = Number(annualRec?.due);
+        if (!Number.isFinite(annualDue)) annualDue = annualExpected;
+        // Match student_details initialize behavior:
+        // if Annual record exists but untouched (paid=0,due=0), apply class annual+admission.
+        if (annualDue === 0 && annualPaid === 0 && annualExpected > 0) {
+            annualDue = annualExpected;
+        }
+        totalDue += prevDue + annualDue;
 
 
         tbody.innerHTML += `
@@ -366,14 +762,14 @@ async function renderTable(filter = "") {
               <span class="student-name" data-roll="${s.roll}" data-class="${s.class_name}">
                   ${s.name}
               </span><br>
-              <button class="edit-btn" data-roll="${s.roll}" data-class="${s.class_name}">✏ Edit</button>
           </td>
           <td>${s.class_name}</td>
           <td>${s.roll}</td>
+          <td>${s.admission_no || ""}</td>
 
           <!-- previous due cell -->
           <td class="${prevClass}">
-              ${s.months.previousDue ? s.months.previousDue.due : s.previous_due}
+              ${prevDue}
           </td>
 
           <!-- insert all months including annual -->
@@ -385,8 +781,11 @@ async function renderTable(filter = "") {
 
     document.querySelectorAll(".student-name").forEach(el => {
         el.onclick = () => {
+            const clickedClass = el.dataset.class || "";
+            selectedClass = clickedClass || selectedClass;
+            saveSelectedClass(selectedClass);
             window.location.href =
-                `student_details.html?roll=${el.dataset.roll}&class=${el.dataset.class}&session=${currentSession}`;
+                `student_details.html?roll=${el.dataset.roll}&class=${clickedClass}&session=${currentSession}`;
         };
     });
 
@@ -402,6 +801,8 @@ window.addEventListener("focus", () => {
     const flag = localStorage.getItem("paymentMade");
     if (flag) {
         localStorage.removeItem("paymentMade");
+        mergedStudentsMemory = [];
+        mergedStudentsSession = null;
 
         // Reload full student list automatically
         setTimeout(() => {
@@ -414,11 +815,31 @@ window.addEventListener("focus", () => {
 search.oninput = e => renderTable(e.target.value);
 
 /* INIT */
-loadSessions().then(renderTable);
+const initParams = new URLSearchParams(window.location.search);
+const sessionFromUrl = initParams.get("session");
+const classFromUrl = normalizeClassName(initParams.get("class") || "");
+if (sessionFromUrl) {
+    currentSession = sessionFromUrl;
+    localStorage.setItem("session", currentSession);
+}
+if (classFromUrl) {
+    selectedClass = classFromUrl;
+}
+
+loadSessions().then(async () => {
+    await Promise.all([loadClassOptions(), loadFeeStructure()]);
+    await renderTable();
+});
 
 /* 🔥 AUTO REFRESH WHEN PAYMENT IS MADE IN student_detail.html */
 
 </script>
 
+<script src="shared_menu.js"></script>
 </body>
 </html>
+
+
+
+
+

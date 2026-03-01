@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exam Schedule</title>
+<style>
+:root{
+  --brand:#0f4aa3;
+  --brand-2:#1f6feb;
+  --bg:#eef3fb;
+  --card:#fff;
+  --line:#d8e2f0;
+  --text:#1f2937;
+  --muted:#6b7280;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 420px at -10% -20%, #dce9ff 0%, transparent 50%),
+    radial-gradient(900px 320px at 100% 0%, #d7f0ff 0%, transparent 45%),
+    var(--bg);
+}
+.topbar{
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;
+  position:sticky;top:0;z-index:10;
+}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;line-height:1}
+.title{font-size:20px;font-weight:700}
+.spacer{flex:1}
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);display:none;z-index:1500}
+.overlay.show{display:block}
+.side-menu{
+  position:fixed;top:0;left:-280px;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,.18);
+  padding:20px;overflow-y:auto;z-index:2000;transition:left .35s;border-radius:0 18px 18px 0;
+}
+.side-menu.open{left:0}
+.menu-item{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600;color:#333}
+.wrap{max-width:1260px;margin:18px auto;padding:0 14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 28px rgba(15,74,163,.10);padding:16px}
+.toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+select,input{border:1px solid var(--line);border-radius:10px;padding:10px 11px;font-size:14px;background:#fff}
+.btn{border:none;border-radius:8px;padding:9px 12px;cursor:pointer;background:#0f4aa3;color:#fff;font-size:13px}
+.btn.red{background:#dc3545}
+.btn.green{background:#198754}
+.status{margin-top:8px;font-size:13px;font-weight:700}
+.exam-card{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:#f8fbff;padding:12px}
+.exam-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.months{margin-top:8px;display:grid;grid-template-columns:repeat(6,minmax(90px,1fr));gap:8px}
+.m{border:1px solid var(--line);border-radius:8px;padding:6px;background:#fff}
+.m label{margin:0;display:flex;gap:6px;align-items:center;font-size:13px;color:#111}
+.fee-wrap{margin-top:10px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:680px}
+th,td{border-bottom:1px solid var(--line);padding:8px;font-size:13px;text-align:left}
+th{background:#edf4ff;color:#0f3c84;font-weight:700}
+.muted{font-size:12px;color:var(--muted);margin-top:6px}
+@media (max-width:960px){ .months{grid-template-columns:repeat(3,minmax(90px,1fr));} }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div class="title">Exam Schedule</div>
+    <div class="spacer"></div>
+  </div>
+  <div id="overlay" class="overlay"></div>
+  <div id="sideMenu" class="side-menu"></div>
+
+  <div class="wrap">
+    <div class="panel">
+      <div class="toolbar">
+        <div>
+          <label>Session</label>
+          <select id="sessionSelect"></select>
+        </div>
+        <button class="btn" onclick="addExam()">Add Exam</button>
+        <button class="btn green" onclick="saveConfig()">Save All</button>
+      </div>
+      <div class="muted">Create exam entries (Exam 1, Preboard, U.T.) and set months + class-wise fee for each exam.</div>
+      <div id="status" class="status"></div>
+      <div id="examList"></div>
+    </div>
+  </div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
+const params = new URLSearchParams(window.location.search);
+let currentSession = params.get("session") || localStorage.getItem("session") || "2024_25";
+const MONTHS = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+let classList = [];
+let exams = [];
+
+function esc(s){
+  return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+}
+function toNum(v){ const n = Number(v); return Number.isFinite(n) ? Math.max(0, n) : 0; }
+
+async function loadSessions(){
+  const sel = document.getElementById("sessionSelect");
+  sel.innerHTML = "";
+  let list = [];
+  try{
+    const res = await fetch(`${SESSION_API}/session/list`);
+    const data = await res.json();
+    list = Array.isArray(data?.sessions) ? data.sessions.map(x => x.name || x).filter(Boolean) : [];
+  }catch(_){}
+  if (!list.length) list = [currentSession];
+  if (!list.includes(currentSession)) list.push(currentSession);
+  list = [...new Set(list)];
+  list.forEach(s => {
+    const o = document.createElement("option");
+    o.value = s;
+    o.textContent = s;
+    sel.appendChild(o);
+  });
+  sel.value = currentSession;
+  sel.addEventListener("change", async () => {
+    currentSession = sel.value;
+    localStorage.setItem("session", currentSession);
+    history.replaceState({}, "", `exam_schedule.html?session=${encodeURIComponent(currentSession)}`);
+    await bootstrapData();
+  });
+}
+
+async function loadClasses(){
+  try{
+    const res = await fetch(`${FEE_API}/fees/get?session=${encodeURIComponent(currentSession)}`, {
+      headers: { "X-Session": currentSession }
+    });
+    const data = await res.json().catch(() => ({}));
+    const rows = Array.isArray(data?.fees) ? data.fees : [];
+    classList = rows.map(r => String(r.class_name || "").trim()).filter(Boolean);
+  }catch(_){
+    classList = [];
+  }
+}
+
+async function loadExamConfig(){
+  try{
+    const res = await fetch(`${FEE_API}/exam/config?session=${encodeURIComponent(currentSession)}`, {
+      headers: { "X-Session": currentSession }
+    });
+    const data = await res.json().catch(() => ({}));
+    exams = Array.isArray(data?.exams) ? data.exams : [];
+  }catch(_){
+    exams = [];
+  }
+  if (!exams.length) addExam();
+  renderExams();
+}
+
+function normalizeExam(ex){
+  const name = String(ex?.name || "").trim();
+  const months = Array.isArray(ex?.months) ? ex.months.filter(m => MONTHS.includes(m)) : [];
+  const class_fees = (ex?.class_fees && typeof ex.class_fees === "object") ? ex.class_fees : {};
+  const mapped = {};
+  classList.forEach(cls => { mapped[cls] = toNum(class_fees[cls] || 0); });
+  return { name, months, class_fees: mapped };
+}
+
+function renderExams(){
+  const host = document.getElementById("examList");
+  host.innerHTML = exams.map((ex, i) => {
+    const x = normalizeExam(ex);
+    const monthHtml = MONTHS.map(m => `
+      <div class="m">
+        <label>
+          <input type="checkbox" data-idx="${i}" data-month="${m}" ${x.months.includes(m) ? "checked" : ""} onchange="toggleMonth(this)">
+          ${m}
+        </label>
+      </div>
+    `).join("");
+
+    const feeRows = classList.map(cls => `
+      <tr>
+        <td>${esc(cls)}</td>
+        <td><input type="number" min="0" value="${toNum(x.class_fees[cls])}" data-idx="${i}" data-class="${esc(cls)}" onchange="setClassFee(this)"></td>
+      </tr>
+    `).join("");
+
+    return `
+      <div class="exam-card">
+        <div class="exam-head">
+          <label style="margin:0;min-width:220px;">Exam Name</label>
+          <input style="min-width:240px;" value="${esc(x.name || `Exam ${i + 1}`)}" data-idx="${i}" onchange="setExamName(this)">
+          <button class="btn red" onclick="removeExam(${i})">Remove</button>
+        </div>
+        <div class="months">${monthHtml}</div>
+        <div class="fee-wrap">
+          <table>
+            <thead><tr><th>Class</th><th>Fee (Rs.)</th></tr></thead>
+            <tbody>${feeRows || `<tr><td colspan="2">No class records found.</td></tr>`}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function addExam(){
+  exams.push({ name: `Exam ${exams.length + 1}`, months: [], class_fees: {} });
+  renderExams();
+}
+
+function removeExam(idx){
+  exams.splice(idx, 1);
+  if (!exams.length) exams.push({ name: "Exam 1", months: [], class_fees: {} });
+  renderExams();
+}
+
+function setExamName(el){
+  const idx = Number(el.getAttribute("data-idx"));
+  if (!exams[idx]) return;
+  exams[idx].name = String(el.value || "").trim();
+}
+
+function toggleMonth(el){
+  const idx = Number(el.getAttribute("data-idx"));
+  const month = String(el.getAttribute("data-month") || "");
+  if (!exams[idx] || !MONTHS.includes(month)) return;
+  const set = new Set(Array.isArray(exams[idx].months) ? exams[idx].months : []);
+  if (el.checked) set.add(month); else set.delete(month);
+  exams[idx].months = [...set];
+}
+
+function setClassFee(el){
+  const idx = Number(el.getAttribute("data-idx"));
+  const cls = String(el.getAttribute("data-class") || "");
+  if (!exams[idx]) return;
+  if (!exams[idx].class_fees || typeof exams[idx].class_fees !== "object") exams[idx].class_fees = {};
+  exams[idx].class_fees[cls] = toNum(el.value);
+}
+
+async function saveConfig(){
+  const status = document.getElementById("status");
+  status.style.color = "#111";
+  status.textContent = "Saving...";
+  const payloadExams = exams.map(normalizeExam).filter(ex => ex.name);
+  try{
+    const res = await fetch(`${FEE_API}/exam/config?session=${encodeURIComponent(currentSession)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session": currentSession },
+      body: JSON.stringify({ exams: payloadExams })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) throw new Error(data.message || "Save failed");
+    status.style.color = "#0b6b33";
+    status.textContent = "Saved. Exam fees applied month-wise to students in this session.";
+    exams = Array.isArray(data?.exams) ? data.exams : payloadExams;
+    renderExams();
+  }catch(e){
+    status.style.color = "#b30000";
+    status.textContent = `Save failed: ${e.message}`;
+  }
+}
+
+async function bootstrapData(){
+  await loadClasses();
+  await loadExamConfig();
+}
+
+(async function init(){
+  await loadSessions();
+  await bootstrapData();
+})();
+</script>
+<script src="shared_menu.js"></script>
+</body>
+</html>
