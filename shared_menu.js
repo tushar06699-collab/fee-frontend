@@ -7,6 +7,7 @@
     { label: "Scholarship", page: "scholarship.html" },
     { label: "Exam Schedule", page: "exam_schedule.html" },
     { label: "Summary", page: "summary.html" },
+    { label: "Transport Fee", page: "transport_fee.html" },
     { label: "Fees Modify", page: "fees.html" },
     { label: "Receipt History", page: "receipt_history.html" },
     { label: "Export Data", page: "export.html" }

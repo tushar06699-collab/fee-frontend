@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transport Fee Setup</title>
+<style>
+:root{
+  --brand:#0f4aa3;
+  --brand2:#1f6feb;
+  --bg:#eef3fb;
+  --card:#fff;
+  --line:#d7e3f3;
+  --text:#1f2937;
+  --muted:#6b7280;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  background:
+    radial-gradient(1200px 380px at -10% -20%, #dce9ff 0%, transparent 50%),
+    radial-gradient(900px 300px at 100% 0%, #d7f0ff 0%, transparent 45%),
+    var(--bg);
+  color:var(--text);
+}
+.topbar{
+  background:linear-gradient(90deg,var(--brand),var(--brand2));
+  color:#fff;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.menu-btn{font-size:28px;cursor:pointer;font-weight:900;line-height:1}
+.title{font-size:20px;font-weight:700}
+.spacer{flex:1}
+.overlay{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,.35);display:none;z-index:1500;
+}
+.overlay.show{display:block}
+.side-menu{
+  position:fixed;top:0;left:-280px;width:260px;height:100%;
+  background:#fff;box-shadow:2px 0 8px rgba(0,0,0,.18);padding:20px;overflow-y:auto;z-index:2000;
+  transition:left .35s;border-radius:0 18px 18px 0;
+}
+.side-menu.open{left:0}
+.menu-item{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600}
+.wrap{max-width:1450px;margin:16px auto;padding:0 14px}
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:0 10px 28px rgba(15,74,163,.10);
+  padding:14px;
+  margin-bottom:14px;
+}
+.toolbar{
+  display:grid;
+  grid-template-columns:220px 220px 1fr;
+  gap:10px;
+  align-items:end;
+}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+input,select{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px 11px;
+  font-size:14px;
+  background:#fff;
+}
+.btn{
+  border:none;border-radius:10px;padding:10px 12px;cursor:pointer;font-weight:600;
+  background:#0f4aa3;color:#fff;
+}
+.btn.green{background:#16a34a}
+.btn.red{background:#b42318}
+.btn.gray{background:#475569}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.split{
+  display:grid;
+  grid-template-columns:420px 1fr;
+  gap:12px;
+}
+.table-wrap{overflow:auto;margin-top:10px}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th,td{border-bottom:1px solid var(--line);padding:9px 8px;font-size:14px;text-align:left}
+th{background:#f2f7ff;color:#0f3c84;font-weight:700}
+.empty{text-align:center;color:var(--muted);padding:16px 8px}
+.toggle{
+  transform:scale(1.2);
+  cursor:pointer;
+}
+.mini{
+  font-size:12px;color:#64748b;
+}
+@media(max-width:1000px){
+  .split{grid-template-columns:1fr}
+  .toolbar{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div class="title">Transport Fee Setup</div>
+    <div class="spacer"></div>
+  </div>
+  <div id="overlay" class="overlay"></div>
+  <div id="sideMenu" class="side-menu"></div>
+
+  <div class="wrap">
+    <div class="panel">
+      <div class="toolbar">
+        <div>
+          <label>Session</label>
+          <select id="sessionSelect"></select>
+        </div>
+        <div>
+          <label>Class</label>
+          <select id="classSelect"></select>
+        </div>
+        <div>
+          <button class="btn" onclick="loadStudents()">Load Students</button>
+          <button class="btn green" onclick="saveAssignments()">Save Assignments</button>
+        </div>
+      </div>
+      <div class="hint">Only students with checkbox enabled are treated as transport users.</div>
+    </div>
+
+    <div class="split">
+      <div class="panel">
+        <h3 style="margin:0 0 10px 0">Route Master</h3>
+        <label>Route Name</label>
+        <input id="routeName" placeholder="e.g. Route A">
+        <label style="margin-top:8px">Route Fee (Monthly)</label>
+        <input id="routeFee" type="number" min="0" placeholder="e.g. 800">
+        <label style="margin-top:8px">Bus No</label>
+        <input id="busNo" placeholder="e.g. UP32 AB 1234">
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn green" onclick="saveRoute()">Add / Update Route</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Route</th><th>Fee</th><th>Bus No</th><th>Action</th></tr>
+            </thead>
+            <tbody id="routeBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 style="margin:0 0 10px 0">Student Transport Assignment</h3>
+        <div class="mini">Select route to auto-fill fee and bus no.</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Class</th>
+                <th>Roll</th>
+                <th>Admission No</th>
+                <th>Route</th>
+                <th>Fee</th>
+                <th>Months</th>
+                <th>Bus No</th>
+              </tr>
+            </thead>
+            <tbody id="studentBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+const params = new URLSearchParams(window.location.search);
+let currentSession = params.get("session") || localStorage.getItem("session") || "2024_25";
+let routes = [];
+let students = [];
+const sessionSelectEl = document.getElementById("sessionSelect");
+const classSelectEl = document.getElementById("classSelect");
+const routeNameEl = document.getElementById("routeName");
+const routeFeeEl = document.getElementById("routeFee");
+const busNoEl = document.getElementById("busNo");
+
+function toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function safe(v){ return String(v ?? "").trim(); }
+function clsNorm(v){ return safe(v).replace(/\s+/g," "); }
+
+function routeOptions(selected){
+  return `<option value="">Select Route</option>` + routes.map(r => {
+    const sel = safe(selected) === safe(r.route_name) ? "selected" : "";
+    return `<option ${sel} value="${r.route_name}">${r.route_name}</option>`;
+  }).join("");
+}
+
+function findRoute(name){
+  return routes.find(r => safe(r.route_name) === safe(name));
+}
+
+async function loadSessions(){
+  const sel = document.getElementById("sessionSelect");
+  try{
+    const res = await fetch(`${SESSION_API}/session/list`);
+    const data = await res.json();
+    const list = Array.isArray(data?.sessions) ? data.sessions : [];
+    sel.innerHTML = list.map(s => `<option value="${s}">${s}</option>`).join("");
+    if (!list.includes(currentSession) && list.length) currentSession = list[0];
+    sel.value = currentSession;
+  }catch(_e){
+    sel.innerHTML = `<option value="${currentSession}">${currentSession}</option>`;
+  }
+  localStorage.setItem("session", currentSession);
+}
+
+async function loadClasses(){
+  const classSel = document.getElementById("classSelect");
+  try{
+    const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (Array.isArray(data?.students) ? data.students : []);
+    const classes = [...new Set(rows.map(r => clsNorm(r.class_name || r.class)).filter(Boolean))]
+      .sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:"base"}));
+    classSel.innerHTML += classes.map(c => `<option value="${c}">${c}</option>`).join("");
+  }catch(_e){}
+}
+
+async function loadRoutes(){
+  const res = await fetch(`${FEE_API}/transport/routes?session=${encodeURIComponent(currentSession)}`, {
+    headers: { "X-Session": currentSession }
+  });
+  const data = await res.json().catch(()=>({}));
+  routes = Array.isArray(data?.routes) ? data.routes : [];
+  const body = document.getElementById("routeBody");
+  if(!routes.length){
+    body.innerHTML = `<tr><td colspan="4" class="empty">No routes created</td></tr>`;
+    return;
+  }
+  body.innerHTML = routes.map(r => `
+    <tr>
+      <td>${r.route_name}</td>
+      <td>${toNum(r.route_fee)}</td>
+      <td>${safe(r.bus_no)}</td>
+      <td><button class="btn red" onclick="deleteRoute('${encodeURIComponent(r.route_name)}')">Delete</button></td>
+    </tr>
+  `).join("");
+}
+
+async function saveRoute(){
+  const route_name = safe(routeNameEl.value);
+  const route_fee = Math.max(0, toNum(routeFeeEl.value));
+  const bus_no = safe(busNoEl.value);
+  if(!route_name) return alert("Route name required");
+  const res = await fetch(`${FEE_API}/transport/routes?session=${encodeURIComponent(currentSession)}`, {
+    method:"POST",
+    headers: { "Content-Type":"application/json", "X-Session": currentSession },
+    body: JSON.stringify({ route_name, route_fee, bus_no })
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.success === false) return alert(data.message || "Failed");
+  routeNameEl.value = ""; routeFeeEl.value = ""; busNoEl.value = "";
+  await loadRoutes();
+  renderStudents();
+}
+
+async function deleteRoute(encoded){
+  const route_name = decodeURIComponent(encoded || "");
+  if(!route_name) return;
+  if(!confirm(`Delete route "${route_name}"?`)) return;
+  await fetch(`${FEE_API}/transport/routes?session=${encodeURIComponent(currentSession)}`, {
+    method:"DELETE",
+    headers: { "Content-Type":"application/json", "X-Session": currentSession },
+    body: JSON.stringify({ route_name })
+  });
+  await loadRoutes();
+  students = students.map(s => {
+    if (safe(s.transport_route) === route_name){
+      return { ...s, transport_route: "", transport_fee: 0, transport_bus_no: "", uses_transport: false };
+    }
+    return s;
+  });
+  renderStudents();
+}
+
+function renderStudents(){
+  const body = document.getElementById("studentBody");
+  if(!students.length){
+    body.innerHTML = `<tr><td colspan="9" class="empty">No students found for selected class/session.</td></tr>`;
+    return;
+  }
+  body.innerHTML = students.map((s, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${safe(s.name)}</td>
+      <td>${safe(s.class_name)}</td>
+      <td>${safe(s.roll)}</td>
+      <td>${safe(s.admission_no)}</td>
+      <td>
+        <select onchange="setRoute(${i}, this.value)">
+          ${routeOptions(s.transport_route)}
+        </select>
+      </td>
+      <td><input type="number" min="0" value="${toNum(s.transport_fee)}" onchange="setFee(${i}, this.value)"></td>
+      <td>
+        <select onchange="setMonths(${i}, this.value)">
+          ${Array.from({length:12}, (_,k)=>k+1).map(n => `<option value="${n}" ${(toNum(s.transport_months || 12)===n)?"selected":""}>${n}</option>`).join("")}
+        </select>
+      </td>
+      <td><input value="${safe(s.transport_bus_no)}" onchange="setBus(${i}, this.value)"></td>
+    </tr>
+  `).join("");
+}
+
+function setRoute(i, routeNameVal){
+  const s = students[i];
+  if(!s) return;
+  s.transport_route = safe(routeNameVal);
+  const r = findRoute(s.transport_route);
+  if(r){
+    s.transport_fee = toNum(r.route_fee);
+    s.transport_bus_no = safe(r.bus_no);
+  }
+  renderStudents();
+}
+function setFee(i, v){ if(students[i]) students[i].transport_fee = Math.max(0, toNum(v)); }
+function setMonths(i, v){ if(students[i]) students[i].transport_months = Math.max(1, Math.min(12, toNum(v) || 12)); }
+function setBus(i, v){ if(students[i]) students[i].transport_bus_no = safe(v); }
+
+async function loadStudents(){
+  const cls = clsNorm(classSelectEl.value);
+  const res = await fetch(`${FEE_API}/transport/students?session=${encodeURIComponent(currentSession)}&class_name=${encodeURIComponent(cls)}`, {
+    headers: { "X-Session": currentSession }
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.success === false){
+    students = [];
+    renderStudents();
+    alert(data.message || "Failed to load students");
+    return;
+  }
+  students = Array.isArray(data.students) ? data.students : [];
+  renderStudents();
+}
+
+async function saveAssignments(){
+  if(!students.length) return alert("Load students first");
+  const payload = students.map(s => {
+    const route = safe(s.transport_route);
+    const isTransportUser = Boolean(route);
+    return {
+      name: safe(s.name),
+      class_name: clsNorm(s.class_name),
+      roll: safe(s.roll),
+      uses_transport: isTransportUser,
+      transport_route: route,
+      transport_fee: isTransportUser ? Math.max(0, toNum(s.transport_fee)) : 0,
+      transport_months: isTransportUser ? Math.max(1, Math.min(12, toNum(s.transport_months || 12))) : 0,
+      transport_bus_no: isTransportUser ? safe(s.transport_bus_no) : "",
+    };
+  });
+  const res = await fetch(`${FEE_API}/transport/students/save?session=${encodeURIComponent(currentSession)}`, {
+    method:"POST",
+    headers: { "Content-Type":"application/json", "X-Session": currentSession },
+    body: JSON.stringify({ students: payload })
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.success === false) return alert(data.message || "Save failed");
+  alert(data.message || `Saved ${data.saved || payload.length} students`);
+  await loadStudents();
+}
+
+sessionSelectEl.addEventListener("change", async () => {
+  currentSession = sessionSelectEl.value;
+  localStorage.setItem("session", currentSession);
+  await loadClasses();
+  await loadRoutes();
+  await loadStudents();
+});
+classSelectEl.addEventListener("change", loadStudents);
+
+(async function init(){
+  await loadSessions();
+  await loadClasses();
+  await loadRoutes();
+  await loadStudents();
+})();
+</script>
+<script src="shared_menu.js"></script>
+</body>
+</html>

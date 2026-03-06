@@ -302,6 +302,26 @@ function isExamMonth(m, cls){
   return getExamFeeForClassMonth(cls, m) > 0;
 }
 
+function getTransportMonthsCount(){
+  const hasRoute = String(student?.transport_route || "").trim().length > 0;
+  if(!hasRoute) return 0;
+  const n = cleanNumber(student?.transport_months ?? 12);
+  return Math.max(0, Math.min(12, n || 12));
+}
+
+function getTransportFeeForMonth(month){
+  const m = String(month || "").trim();
+  if (!m || m === "previousDue" || m === "Annual") return 0;
+  const hasRoute = String(student?.transport_route || "").trim().length > 0;
+  if (!hasRoute) return 0;
+  const monthly = Math.max(0, cleanNumber(student?.transport_fee || 0));
+  if (!monthly) return 0;
+  const academicOrder = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+  const idx = academicOrder.indexOf(m);
+  if (idx < 0) return 0;
+  return idx < getTransportMonthsCount() ? monthly : 0;
+}
+
 async function loadExamConfig(){
   try{
     const res = await fetch(`${FEE_API}/exam/config?session=${encodeURIComponent(sessionParam)}`, {
@@ -367,6 +387,10 @@ async function loadStudent(){
         ? feeStudent.payment_methods
         : { cash: 0, upi: 0, bank: 0 },
       last_payment_method: String(feeStudent?.last_payment_method || ""),
+      transport_route: String(feeStudent?.transport_route || ""),
+      transport_fee: cleanNumber(feeStudent?.transport_fee || 0),
+      transport_bus_no: String(feeStudent?.transport_bus_no || ""),
+      transport_months: Math.max(0, Math.min(12, cleanNumber(feeStudent?.transport_months ?? 12))),
       scholarship: normalizeDiscount(feeStudent?.scholarship),
       concession: normalizeDiscount(feeStudent?.concession)
     };
@@ -414,7 +438,7 @@ else if (m === "Annual") {
 } 
 else {
     // Monthly fee should be the new session's fee
-    dueDefault = fee + getExamFeeForClassMonth(student.class_name, m);
+    dueDefault = fee + getExamFeeForClassMonth(student.class_name, m) + getTransportFeeForMonth(m);
 }
 
       student.months[m] = {
@@ -424,7 +448,8 @@ else {
         date: "",
         purpose: "",
         extra: 0,
-        exam_fee_applied: (m !== "previousDue" && m !== "Annual") ? getExamFeeForClassMonth(student.class_name, m) : 0
+        exam_fee_applied: (m !== "previousDue" && m !== "Annual") ? getExamFeeForClassMonth(student.class_name, m) : 0,
+        transport_fee_applied: (m !== "previousDue" && m !== "Annual") ? getTransportFeeForMonth(m) : 0
       };
     } else {
       // sanitize existing record
@@ -435,11 +460,23 @@ else {
       student.months[m].status = student.months[m].status || (student.months[m].due === 0 ? "Paid" : "Due");
       student.months[m].date = student.months[m].date || "";
       student.months[m].exam_fee_applied = cleanNumber(student.months[m].exam_fee_applied || 0);
+      student.months[m].transport_fee_applied = cleanNumber(student.months[m].transport_fee_applied || 0);
+      if (m !== "previousDue" && m !== "Annual") {
+        const targetTransport = getTransportFeeForMonth(m);
+        const currentTransport = cleanNumber(student.months[m].transport_fee_applied || 0);
+        if (targetTransport !== currentTransport) {
+          student.months[m].due = Math.max(0, cleanNumber(student.months[m].due) + (targetTransport - currentTransport));
+          student.months[m].transport_fee_applied = targetTransport;
+          student.months[m].status = student.months[m].due === 0 ? "Paid" : (cleanNumber(student.months[m].paid) > 0 ? "Partial" : "Due");
+        }
+      }
       // If due was 0 but fee exists, set default due only if user never set value
       if (m !== "previousDue" && m !== "Annual" && student.months[m].due === 0 && fee > 0 && student.months[m].paid === 0) {
         const monthExam = getExamFeeForClassMonth(student.class_name, m);
-        student.months[m].due = fee + monthExam;
+        const monthTransport = getTransportFeeForMonth(m);
+        student.months[m].due = fee + monthExam + monthTransport;
         student.months[m].exam_fee_applied = monthExam;
+        student.months[m].transport_fee_applied = monthTransport;
         student.months[m].status = "Due";
       }
       if (m === "Annual" && student.months[m].due === 0 && student.months[m].paid === 0 && annualWithAdmission > 0) {
@@ -564,6 +601,7 @@ function render(){
     const extras = [];
     if (m === "Annual" && student?.new_admission) extras.push("Admission");
     if (m !== "previousDue" && m !== "Annual" && cleanNumber(rec.exam_fee_applied || 0) > 0) extras.push("Exam Fee");
+    if (m !== "previousDue" && m !== "Annual" && cleanNumber(rec.transport_fee_applied || 0) > 0) extras.push("Transport");
     const monthCell = extras.length
       ? `${label}<br><small style="color:#0d6efd;font-weight:600;">+ ${extras.join(" + ")}</small>`
       : label;
@@ -711,10 +749,11 @@ async function markDue(m){
   let feeNow;
   if(m === "previousDue") feeNow = cleanNumber(student.previous_due || 0);
   else if(m === "Annual") feeNow = getAnnualFeeForClass(student.class_name) + (student?.new_admission ? getAdmissionFeeForClass(student.class_name) : 0);
-  else feeNow = getMonthlyFeeForClass(student.class_name) + getExamFeeForClassMonth(student.class_name, m);
+  else feeNow = getMonthlyFeeForClass(student.class_name) + getExamFeeForClassMonth(student.class_name, m) + getTransportFeeForMonth(m);
 
   rec.paid = 0;
   rec.exam_fee_applied = (m !== "previousDue" && m !== "Annual") ? getExamFeeForClassMonth(student.class_name, m) : 0;
+  rec.transport_fee_applied = (m !== "previousDue" && m !== "Annual") ? getTransportFeeForMonth(m) : 0;
   rec.due = feeNow + cleanNumber(rec.extra || 0);
   rec.status = rec.due === 0 ? "Paid" : "Due";
   rec.date = "";
@@ -738,7 +777,8 @@ function generateReceipt() {
             status: rec.status || "Due",
             purpose: rec.purpose || "",
             extra: rec.extra || 0,
-            exam_fee_applied: cleanNumber(rec.exam_fee_applied || 0)
+            exam_fee_applied: cleanNumber(rec.exam_fee_applied || 0),
+            transport_fee_applied: cleanNumber(rec.transport_fee_applied || 0)
         });
     });
 

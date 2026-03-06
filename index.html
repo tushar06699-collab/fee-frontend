@@ -203,6 +203,7 @@ let selectedClass = "";
 let monthlyFeesByClass = {};
 let annualFeesByClass = {};
 let admissionFeesByClass = {};
+let examConfigs = [];
 const allMonths = [
     "Apr","May","Jun","Jul","Aug","Sep",
     "Oct","Nov","Dec","Jan","Feb","Mar"
@@ -303,7 +304,7 @@ function changeSession(){
     mergedStudentsSession = null;
     selectedClass = readSelectedClass(currentSession) || "";
     monthlyFeesByClass = {};
-    Promise.all([loadClassOptions(), loadFeeStructure()]).then(() => renderTable());
+    Promise.all([loadClassOptions(), loadFeeStructure(), loadExamConfig()]).then(() => renderTable());
 }
 
 async function loadFeeStructure(){
@@ -318,7 +319,7 @@ async function loadFeeStructure(){
         annualFeesByClass = {};
         admissionFeesByClass = {};
         (data.fees || []).forEach(f => {
-            const cls = String(f.class_name || "").trim();
+            const cls = normalizeClassName(f.class_name || "");
             if (!cls) return;
             monthlyFeesByClass[cls] = Number(f.monthly_fee || 0);
             annualFeesByClass[cls] = Number(f.annual_fee || f.annual_charge || 0);
@@ -329,22 +330,71 @@ async function loadFeeStructure(){
     }
 }
 
-function normalizeMonthRecord(rec, defaultDue){
+async function loadExamConfig(){
+    try{
+        const res = await fetch(`${FEE_API}/exam/config?session=${encodeURIComponent(currentSession)}`, {
+            headers: { "X-Session": currentSession }
+        });
+        const data = await res.json().catch(() => ({}));
+        examConfigs = Array.isArray(data?.exams) ? data.exams : [];
+    }catch(e){
+        examConfigs = [];
+    }
+}
+
+function getExamFeeForClassMonth(cls, month){
+    const c = normalizeClassName(cls || "");
+    const m = String(month || "").trim();
+    if (!c || !m) return 0;
+    return examConfigs.reduce((sum, ex) => {
+        const months = Array.isArray(ex?.months) ? ex.months.map(x => String(x || "").trim()) : [];
+        if (!months.includes(m)) return sum;
+        const classFees = (ex && typeof ex.class_fees === "object") ? ex.class_fees : {};
+        return sum + Number(classFees[c] || 0);
+    }, 0);
+}
+
+function getTransportFeeForStudentMonth(student, month){
+    const m = String(month || "").trim();
+    const route = String(student?.transport_route || "").trim();
+    const monthly = Number(student?.transport_fee || 0);
+    const monthsCount = Math.max(0, Math.min(12, Number(student?.transport_months ?? 0) || 0));
+    if (!route || monthly <= 0 || monthsCount <= 0) return 0;
+    const idx = allMonths.indexOf(m);
+    if (idx < 0) return 0;
+    return idx < monthsCount ? monthly : 0;
+}
+
+function normalizeMonthRecord(rec, defaultDue, options = {}){
+    const targetExam = Number(options.targetExam || 0);
+    const targetTransport = Number(options.targetTransport || 0);
+
     // If month record is missing in fee ledger, treat as Due by default.
     if (!rec || typeof rec !== "object") {
         return { paid: 0, due: Number(defaultDue || 0), status: "Due" };
     }
 
     const paid = Number(rec.paid || 0);
-    const due = Number(rec.due ?? defaultDue ?? 0);
-    let status = String(rec.status || "").trim();
+    let due = Number(rec.due ?? defaultDue ?? 0);
 
-    // Recompute status when backend status is missing/invalid.
-    if (!status || !["Paid", "Partial", "Due"].includes(status)) {
-        if (due <= 0 && paid > 0) status = "Paid";
-        else if (paid > 0 && due > 0) status = "Partial";
-        else status = "Due";
+    // Keep index calculation aligned with student_details:
+    // if exam/transport target changed after old save, adjust due by delta.
+    const currentExam = Number(rec.exam_fee_applied || 0);
+    const currentTransport = Number(rec.transport_fee_applied || 0);
+    const feeDelta = (targetExam - currentExam) + (targetTransport - currentTransport);
+    if (feeDelta !== 0) {
+        due = Math.max(0, due + feeDelta);
     }
+
+    // If untouched month row exists with zeros, apply class default due.
+    if (due === 0 && paid === 0 && Number(defaultDue || 0) > 0) {
+        due = Number(defaultDue || 0);
+    }
+
+    // Always derive status from corrected due/paid.
+    let status = "Due";
+    if (due <= 0) status = "Paid";
+    else if (paid > 0) status = "Partial";
 
     return { paid, due, status };
 }
@@ -478,6 +528,9 @@ function normalizeFeeStudent(s) {
         advance: Number(s.advance || 0),
         months: s.months || {},
         annual_charge: Number(s.annual_charge || 0),
+        transport_route: String(s.transport_route || "").trim(),
+        transport_fee: Number(s.transport_fee || 0),
+        transport_months: Number(s.transport_months || 0),
     };
 }
 
@@ -656,6 +709,9 @@ async function fetchStudents(forceRefresh = false, className = ""){
             advance: Number(fs.advance || 0),
             months: fs.months || {},
             annual_charge: Number(fs.annual_charge || 0),
+            transport_route: String(fs.transport_route || "").trim(),
+            transport_fee: Number(fs.transport_fee || 0),
+            transport_months: Number(fs.transport_months || 0),
         });
 
         seen.add(key);
@@ -706,9 +762,10 @@ async function renderTable(filter = "") {
 
     students.forEach(s => {
         s.months = s.months || {};
-        const classFee = Number(monthlyFeesByClass[String(s.class_name || "").trim()] || 0);
-        const classAnnual = Number(annualFeesByClass[String(s.class_name || "").trim()] || 0);
-        const classAdmission = Number(admissionFeesByClass[String(s.class_name || "").trim()] || 0);
+        const classKey = normalizeClassName(s.class_name || "");
+        const classFee = Number(monthlyFeesByClass[classKey] || 0);
+        const classAnnual = Number(annualFeesByClass[classKey] || 0);
+        const classAdmission = Number(admissionFeesByClass[classKey] || 0);
 
         let match = (
             (s.name || "") + " " +
@@ -735,11 +792,21 @@ async function renderTable(filter = "") {
         let totalDue = 0;
 
         monthOrder.forEach(m => {
-            const val = normalizeMonthRecord(s.months[m], classFee);
+            const examPart = Number(getExamFeeForClassMonth(s.class_name, m) || 0);
+            const transportPart = Number(getTransportFeeForStudentMonth(s, m) || 0);
+            const defaultMonthlyDue = classFee + examPart + transportPart;
+            const val = normalizeMonthRecord(s.months[m], defaultMonthlyDue, {
+                targetExam: examPart,
+                targetTransport: transportPart
+            });
             let cls = val.status === "Paid" ? "paid" :
                       val.status === "Partial" ? "partial" : "due";
-
-            monthsHtml += `<td class="${cls}" title="Paid: ${val.paid} | Due: ${val.due}">${val.status}</td>`;
+            const parts = [];
+            if (classFee > 0) parts.push(`M:${classFee}`);
+            if (examPart > 0) parts.push(`Ex:${examPart}`);
+            if (transportPart > 0) parts.push(`Tr:${transportPart}`);
+            const comp = parts.length ? ` | ${parts.join(" + ")}` : "";
+            monthsHtml += `<td class="${cls}" title="Paid: ${val.paid} | Due: ${val.due}${comp}">${val.status}<br><small>P:${val.paid} D:${val.due}</small></td>`;
             totalDue += val.due || 0;
         });
         const prevDue = Number(s.months?.previousDue?.due ?? s.previous_due ?? 0);
@@ -775,7 +842,7 @@ async function renderTable(filter = "") {
           <!-- insert all months including annual -->
           ${monthsHtml}
 
-          <td style="font-weight:700;color:#0047b3;background:#e8f0ff;">${totalDue}</td>
+          <td style="font-weight:700;color:#0047b3;background:#e8f0ff;" title="Prev Due: ${prevDue} | Annual Due: ${annualDue} (Annual ${classAnnual}${s.new_admission ? ` + Admission ${classAdmission}` : ""})">${totalDue}</td>
         </tr>`;
     });
 
@@ -827,7 +894,7 @@ if (classFromUrl) {
 }
 
 loadSessions().then(async () => {
-    await Promise.all([loadClassOptions(), loadFeeStructure()]);
+    await Promise.all([loadClassOptions(), loadFeeStructure(), loadExamConfig()]);
     await renderTable();
 });
 

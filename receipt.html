@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Fee Receipt — P.S. Public School</title>
+<title>Fee Receipt â€” P.S. Public School</title>
 
 <style>
 body{
@@ -185,7 +185,7 @@ th{background:#eef6ff;}
 
 <body>
 <div class="topbar">
-  <div class="menu-btn" onclick="toggleMenu()">☰</div>
+  <div class="menu-btn" onclick="toggleMenu()">â˜°</div>
   <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
 </div>
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
@@ -202,7 +202,7 @@ th{background:#eef6ff;}
   <div class="header">
     <div class="header-left">
       <img src="images/logo1.png" alt="School logo" class="schoolLogo">
-      <h1>P.S. Public School – Fee Receipt</h1>
+      <h1>P.S. Public School â€“ Fee Receipt</h1>
     </div>
     <div style="text-align:right">
       <div id="showTopReceipt" class="muted"></div>
@@ -231,16 +231,17 @@ th{background:#eef6ff;}
   <table id="monthsTbl">
     <thead>
       <tr>
-        <th>Month</th><th>Paid (₹)</th><th>Due (₹)</th><th>Status</th><th>Purpose</th><th>Extra</th>
+        <th>Month</th><th>Paid (â‚¹)</th><th>Due (â‚¹)</th><th>Status</th><th>Purpose</th><th>Extra</th>
       </tr>
     </thead>
     <tbody id="monthsTable"></tbody>
   </table>
 
   <div style="margin-top:12px">
-    <h3 style="display:inline-block;margin:0 12px 0 0">Total Paid: ₹<span id="tPaid"></span></h3>
-    <h3 style="display:inline-block;margin:0 12px">Total Due: ₹<span id="tDue"></span></h3>
-    <h3 style="display:inline-block;margin:0 12px">Advance Left: ₹<span id="tAdv"></span></h3>
+    <h3 style="display:inline-block;margin:0 12px 0 0">Total Paid: â‚¹<span id="tPaid"></span></h3>
+    <h3 style="display:inline-block;margin:0 12px">Total Due: â‚¹<span id="tDue"></span></h3>
+    <h3 style="display:inline-block;margin:0 12px">Advance Left: â‚¹<span id="tAdv"></span></h3>
+    <div id="transportTotals" class="small muted" style="margin-top:8px">Transport Included: 0 (Paid: 0, Due: 0)</div>
   </div>
 
   <div id="whatsWrap" style="margin-top:14px" class="small">
@@ -327,7 +328,8 @@ data.months = Array.isArray(data.months) ? data.months : (
       status:v.status||"",
       purpose:v.purpose||"",
       extra:Number(v.extra||0),
-      exam_fee_applied:Number(v.exam_fee_applied||0)
+      exam_fee_applied:Number(v.exam_fee_applied||0),
+      transport_fee_applied:Number(v.transport_fee_applied||0)
     };
   }) : []
 );
@@ -385,7 +387,9 @@ function monthLabel(m, rec){
   if (m === "Annual") return data.new_admission ? "Annual + Admission" : "Annual";
   const examApplied = Number((rec && rec.exam_fee_applied) || 0) > 0;
   const examByConfig = data.exam_months.includes(String(m || "").trim());
-  return (examApplied || examByConfig) ? `${m} + Exam Fee` : m;
+  const transportApplied = Number((rec && rec.transport_fee_applied) || 0) > 0;
+  const withExam = (examApplied || examByConfig) ? `${m} + Exam Fee` : m;
+  return transportApplied ? `${withExam} + Transport` : withExam;
 }
 
 function normalizeMonths(monthsRaw){
@@ -398,7 +402,8 @@ function normalizeMonths(monthsRaw){
       out.push({
         month,
         paid: toNum(item?.paid),
-        due: toNum(item?.due)
+        due: toNum(item?.due),
+        transport_fee_applied: toNum(item?.transport_fee_applied)
       });
     });
   } else if (monthsRaw && typeof monthsRaw === "object") {
@@ -407,7 +412,8 @@ function normalizeMonths(monthsRaw){
       out.push({
         month: String(key).trim(),
         paid: toNum(rec.paid),
-        due: toNum(rec.due)
+        due: toNum(rec.due),
+        transport_fee_applied: toNum(rec.transport_fee_applied)
       });
     });
   }
@@ -428,6 +434,17 @@ function buildReceiptSignature(source, isHistoryDoc = false){
   const months = normalizeMonths(source?.months);
 
   return JSON.stringify({ name, father, cls, roll, admission, totalPaid, totalDue, advance, months });
+}
+
+function getTransportTotals(){
+  const months = Array.isArray(data.months) ? data.months : [];
+  return months.reduce((acc, m) => {
+    const t = Number(m?.transport_fee_applied || 0);
+    acc.total += t;
+    if (Number(m?.paid || 0) > 0) acc.paid += t;
+    if (Number(m?.due || 0) > 0) acc.due += t;
+    return acc;
+  }, { total: 0, paid: 0, due: 0 });
 }
 
 async function isDuplicateReceipt(){
@@ -473,7 +490,7 @@ function renderInfo(){
     <p class="muted"><strong>Admission No:</strong> ${escapeHtml(data.admission_no || "-")}</p>
     <p class="muted"><strong>Paid Type:</strong> ${escapeHtml(paidTypeLabel)}</p>
     <p class="muted"><strong>New Admission:</strong> ${data.new_admission ? "Yes" : "No"}</p>
-    <p class="muted"><strong>Admission Charge:</strong> ${data.new_admission ? "₹" + escapeHtml(data.admission_charge) : "-"}</p>
+    <p class="muted"><strong>Admission Charge:</strong> ${data.new_admission ? "â‚¹" + escapeHtml(data.admission_charge) : "-"}</p>
     <p class="muted"><strong>Scholarship:</strong> ${escapeHtml(discountLabel(data.scholarship))}</p>
     <p class="muted"><strong>Concession:</strong> ${escapeHtml(discountLabel(data.concession))}</p>
     <p class="muted"><strong>Session:</strong> ${escapeHtml(data.session)}</p>
@@ -490,7 +507,7 @@ function renderMonths(){
       <td style="text-align:right">${escapeHtml(m.paid||0)}</td>
       <td style="text-align:right">${escapeHtml(m.due||0)}</td>
       <td>${escapeHtml(m.status||"")}</td>
-      <td>${escapeHtml(m.purpose||"")}</td>
+      <td>${escapeHtml(m.purpose||"")}${Number(m.transport_fee_applied||0)>0 ? `<br><span class="small muted">Transport: ${escapeHtml(m.transport_fee_applied||0)}</span>` : ""}</td>
       <td style="text-align:right">${escapeHtml(m.extra||0)}</td>
     </tr>
   `).join("");
@@ -498,16 +515,20 @@ function renderMonths(){
   document.getElementById("tPaid").textContent = data.totalPaid;
   document.getElementById("tDue").textContent = data.totalDue;
   document.getElementById("tAdv").textContent = data.advance;
+  const tt = getTransportTotals();
+  const block = document.getElementById("transportTotals");
+  if (block) block.textContent = `Transport Included: ${tt.total} (Paid: ${tt.paid}, Due: ${tt.due})`;
 }
 
 function buildSlipHTML(){
+  const tt = getTransportTotals();
   const rows = (data.months||[]).map(m=>`
     <tr>
       <td>${monthLabel(m.month||"", m)}</td>
       <td class="num">${m.paid||0}</td>
       <td class="num">${m.due||0}</td>
       <td>${m.status||""}</td>
-      <td>${m.purpose||""}</td>
+      <td>${m.purpose||""}${Number(m.transport_fee_applied||0)>0 ? ` | Transport: ${Number(m.transport_fee_applied||0)}` : ""}</td>
       <td class="num">${m.extra||0}</td>
     </tr>
   `).join("");
@@ -543,12 +564,14 @@ function buildSlipHTML(){
     <div><strong>Total Paid:</strong> ${data.totalPaid}</div>
     <div><strong>Total Due:</strong> ${data.totalDue}</div>
     <div><strong>Advance:</strong> ${data.advance}</div>
+    <div><strong>Transport Included:</strong> Rs ${tt.total} (Paid: Rs ${tt.paid}, Due: Rs ${tt.due})</div>
     <div style="margin-top:8px" class="center">Thank You</div>
     <div style="margin-top:10px">Sign: _______________</div>
   </div>`;
 }
 
 function buildReceiptHTML(label){
+  const tt = getTransportTotals();
   return `
   <div class="receipt-box">
     <div style="display:flex;align-items:center;gap:8px;">
@@ -563,16 +586,19 @@ function buildReceiptHTML(label){
       Class: ${data.class} | Roll: ${data.roll}<br>
       Admission: ${data.admission_no || "-"}<br>
       Paid Type: ${(data.paid_type || "-").toUpperCase()}<br>
-      ${data.new_admission ? `Admission Charge: ₹${data.admission_charge}<br>` : ""}
+      ${data.new_admission ? `Admission Charge: â‚¹${data.admission_charge}<br>` : ""}
       Scholarship: ${discountLabel(data.scholarship)}<br>
       Concession: ${discountLabel(data.concession)}<br>
       Session: ${data.session}<br>
       Date: ${data.date}
     </div>
     <div style="margin-top:6px;font-size:12px;">
-      <strong>Total Paid:</strong> ₹${data.totalPaid} &nbsp;&nbsp;
-      <strong>Total Due:</strong> ₹${data.totalDue} &nbsp;&nbsp;
-      <strong>Advance:</strong> ₹${data.advance}
+      <strong>Total Paid:</strong> â‚¹${data.totalPaid} &nbsp;&nbsp;
+      <strong>Total Due:</strong> â‚¹${data.totalDue} &nbsp;&nbsp;
+      <strong>Advance:</strong> â‚¹${data.advance}
+    </div>
+    <div style="margin-top:4px;font-size:12px;">
+      <strong>Transport Included:</strong> Rs ${tt.total} (Paid: Rs ${tt.paid}, Due: Rs ${tt.due})
     </div>
   </div>`;
 }
@@ -607,7 +633,7 @@ async function saveToSession(isAuto = false){
     }
 
     document.getElementById("saveStatus").innerHTML = 
-      `Saved ✔ — Receipt Key: ${data.receiptKey}`;
+      `Saved âœ” â€” Receipt Key: ${data.receiptKey}`;
     document.getElementById("saveStatus").style.display="block";
     document.getElementById("saveError").style.display="none";
     document.getElementById("showTopReceipt").textContent =
@@ -692,18 +718,21 @@ document.getElementById("btnWhats").addEventListener("click", ()=>{
       const mLabel = monthLabel(m.month, m);
       const purpose = String(m.purpose || "").trim();
       const extra = Number(m.extra || 0);
+      const transport = Number(m.transport_fee_applied || 0);
       const parts = [
         `${mLabel}`,
         `Paid ${m.paid || 0}`,
         `Due ${m.due || 0}`
       ];
+      if (transport > 0) parts.push(`Transport ${transport}`);
       if (purpose) parts.push(`Purpose ${purpose}`);
       if (extra > 0) parts.push(`Extra ${extra}`);
       msg += `- ${parts.join(" | ")}\n`;
     });
   }
 
-  msg += `\nTotals:\nTotal Paid: ${data.totalPaid}\nTotal Due: ${data.totalDue}\nAdvance: ${data.advance}`;
+  const tt = getTransportTotals();
+  msg += `\nTotals:\nTotal Paid: ${data.totalPaid}\nTotal Due: ${data.totalDue}\nAdvance: ${data.advance}\nTransport Included: ${tt.total} (Paid ${tt.paid}, Due ${tt.due})`;
 
   window.open(`https://wa.me/${num}?text=`+encodeURIComponent(msg), "_blank");
 });
@@ -739,3 +768,4 @@ if (isAccountantView) {
 </script>
 </body>
 </html>
+

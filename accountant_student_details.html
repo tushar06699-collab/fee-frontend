@@ -164,6 +164,26 @@ function getExamFeeForClassMonth(cls, month){
   }, 0);
 }
 
+function getTransportMonthsCount(){
+  const hasRoute = String(student?.transport_route || "").trim().length > 0;
+  if(!hasRoute) return 0;
+  const n = cleanNumber(student?.transport_months ?? 12);
+  return Math.max(0, Math.min(12, n || 12));
+}
+
+function getTransportFeeForMonth(month){
+  const m = String(month || "").trim();
+  if (!m || m === "previousDue" || m === "Annual") return 0;
+  const hasRoute = String(student?.transport_route || "").trim().length > 0;
+  if (!hasRoute) return 0;
+  const monthly = Math.max(0, cleanNumber(student?.transport_fee || 0));
+  if (!monthly) return 0;
+  const academicOrder = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+  const idx = academicOrder.indexOf(m);
+  if (idx < 0) return 0;
+  return idx < getTransportMonthsCount() ? monthly : 0;
+}
+
 async function loadFees(){
   const res = await fetch(`${FEE_API}/fees/get`, { headers: { "X-Session": sessionParam } });
   const data = await res.json();
@@ -213,6 +233,10 @@ async function loadStudent(){
     months: (feeStudent?.months && typeof feeStudent.months === "object") ? feeStudent.months : {},
     payment_methods: (feeStudent?.payment_methods && typeof feeStudent.payment_methods === "object") ? feeStudent.payment_methods : { cash: 0, upi: 0, bank: 0 },
     last_payment_method: String(feeStudent?.last_payment_method || ""),
+    transport_route: String(feeStudent?.transport_route || ""),
+    transport_fee: cleanNumber(feeStudent?.transport_fee || 0),
+    transport_bus_no: String(feeStudent?.transport_bus_no || ""),
+    transport_months: Math.max(0, Math.min(12, cleanNumber(feeStudent?.transport_months ?? 12))),
     scholarship: normalizeDiscount(feeStudent?.scholarship),
     concession: normalizeDiscount(feeStudent?.concession)
   };
@@ -231,14 +255,33 @@ function initializeStudentData(){
       let dueDefault = 0;
       if (m === "previousDue") dueDefault = previousDue;
       else if (m === "Annual") dueDefault = annualWithAdmission;
-      else dueDefault = fee + getExamFeeForClassMonth(student.class_name, m);
-      student.months[m] = { paid:0, due:dueDefault, status:dueDefault===0?"Paid":"Due", date:"", purpose:"", extra:0, exam_fee_applied:(m!=="previousDue"&&m!=="Annual")?getExamFeeForClassMonth(student.class_name,m):0 };
+      else dueDefault = fee + getExamFeeForClassMonth(student.class_name, m) + getTransportFeeForMonth(m);
+      student.months[m] = {
+        paid:0,
+        due:dueDefault,
+        status:dueDefault===0?"Paid":"Due",
+        date:"",
+        purpose:"",
+        extra:0,
+        exam_fee_applied:(m!=="previousDue"&&m!=="Annual")?getExamFeeForClassMonth(student.class_name,m):0,
+        transport_fee_applied:(m!=="previousDue"&&m!=="Annual")?getTransportFeeForMonth(m):0
+      };
     } else {
       student.months[m].paid = cleanNumber(student.months[m].paid);
       student.months[m].due = cleanNumber(student.months[m].due);
       student.months[m].status = student.months[m].status || (student.months[m].due===0 ? "Paid" : "Due");
       student.months[m].date = student.months[m].date || "";
       student.months[m].exam_fee_applied = cleanNumber(student.months[m].exam_fee_applied || 0);
+      student.months[m].transport_fee_applied = cleanNumber(student.months[m].transport_fee_applied || 0);
+      if (m !== "previousDue" && m !== "Annual") {
+        const targetTransport = getTransportFeeForMonth(m);
+        const currentTransport = cleanNumber(student.months[m].transport_fee_applied || 0);
+        if (targetTransport !== currentTransport) {
+          student.months[m].due = Math.max(0, cleanNumber(student.months[m].due) + (targetTransport - currentTransport));
+          student.months[m].transport_fee_applied = targetTransport;
+          student.months[m].status = student.months[m].due === 0 ? "Paid" : (cleanNumber(student.months[m].paid) > 0 ? "Partial" : "Due");
+        }
+      }
     }
   });
   document.getElementById("nm").textContent = student.name || "";
@@ -287,6 +330,7 @@ function render(){
     const statusClass = rec.status === "Paid" ? "paid" : (rec.status === "Partial" ? "partial" : "due");
     let label = m === "previousDue" ? "Previous Due" : (m === "Annual" ? (student?.new_admission ? "Annual Fee + Admission" : "Annual Fee") : `${m} Fee`);
     if (m !== "previousDue" && m !== "Annual" && cleanNumber(rec.exam_fee_applied || 0) > 0) label += " + Exam Fee";
+    if (m !== "previousDue" && m !== "Annual" && cleanNumber(rec.transport_fee_applied || 0) > 0) label += " + Transport";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${label}</td>
@@ -398,7 +442,8 @@ function generateReceipt(){
       status: rec.status || "Due",
       purpose: rec.purpose || "",
       extra: rec.extra || 0,
-      exam_fee_applied: cleanNumber(rec.exam_fee_applied || 0)
+      exam_fee_applied: cleanNumber(rec.exam_fee_applied || 0),
+      transport_fee_applied: cleanNumber(rec.transport_fee_applied || 0)
     };
   });
   const data = {
