@@ -1,0 +1,435 @@
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Stationary - Students</title>
+<style>
+  body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
+  .topbar{width:100%;padding:15px 20px;background:#007bff;color:#fff;display:flex;align-items:center;gap:15px;box-sizing:border-box;position:sticky;top:0;z-index:4000}
+  .menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
+  #sessionSelect{padding:4px 8px;border-radius:6px;border:none;font-size:14px;}
+  .overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);display:none;z-index:1500;}
+  .overlay.show{display:block;}
+  .side-menu{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);padding:20px;overflow-y:auto;z-index:2000;transition:left 0.35s;border-radius:0 18px 18px 0;}
+  .side-menu.open{left:0;}
+  .menu-item{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600;color:#333;}
+
+  .container{max-width:1100px;margin:15px auto;background:#fff;padding:20px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+  .row > div{flex:1;min-width:240px;}
+  select,input{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{border:1px solid #e6e6e6;padding:8px;text-align:left;font-size:14px}
+  th{background:#007bff;color:#fff}
+  .btn{padding:8px 12px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
+  .muted{color:#6b7280;font-size:13px;}
+  .ok{color:#067647;font-weight:700;}
+  .partial{color:#7a5a00;font-weight:700;}
+  .due{color:#b30000;font-weight:700;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">&#9776;</div>
+    <div style="font-size:20px;font-weight:600;">Stationary Issue</div>
+    <div style="margin-left:auto; display:flex; align-items:center;">
+      <select id="sessionSelect" onchange="changeSession()"></select>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay" onclick="closeMenu()"></div>
+  <div class="side-menu" id="sideMenu">
+    <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
+        <div class="menu-item" onclick="goToPage('index.html')">Home</div>
+    <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
+    <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
+    <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('stationary_fee_ledger.html')">Stationary Fee Ledger</div>
+  </div>
+
+  <div class="container">
+    <div class="row">
+      <div>
+        <label class="muted">Select Class</label>
+        <select id="classSelect" onchange="loadStudents()"></select>
+      </div>
+      <div>
+        <label class="muted">Search</label>
+        <input id="search" placeholder="Search by name or roll" oninput="renderStudents()" />
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Class</th>
+          <th>Roll</th>
+          <th>Admission No</th>
+          <th>Current Month</th>
+          <th>Total Due</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="studentsBody"></tbody>
+    </table>
+  </div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+let currentSession = localStorage.getItem("session") || "2024_25";
+let studentsCache = [];
+let allStudents = [];
+let masterStudents = [];
+let monthlyFeesByClass = {};
+let annualFeesByClass = {};
+let admissionFeesByClass = {};
+let examConfigs = [];
+const allMonths = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+let globalSearchMode = false;
+
+function normalizeClass(val){
+  return String(val || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
+function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
+function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
+
+async function loadSessions(){
+  try{
+    const res = await fetch(SESSION_API + "/session/list");
+    const data = await res.json();
+    const sel = document.getElementById("sessionSelect");
+    sel.innerHTML = "";
+    const sessions = (data.sessions && data.sessions.length) ? data.sessions : [currentSession];
+    sessions.forEach(s=>{
+      const opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      if (s === currentSession) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }catch(e){
+    const sel = document.getElementById("sessionSelect");
+    sel.innerHTML = `<option>${currentSession}</option>`;
+  }
+}
+
+function changeSession(){
+  currentSession = sessionSelect.value;
+  localStorage.setItem("session", currentSession);
+  Promise.all([loadFeeStructure(), loadExamConfig()]).then(loadClasses);
+}
+
+async function loadFeeStructure(){
+  try{
+    const res = await fetch(`${FEE_API}/fees/get?session=${encodeURIComponent(currentSession)}`, {
+      headers: { "X-Session": currentSession }
+    });
+    const data = await res.json();
+    if (!res.ok || data?.success === false) return;
+    monthlyFeesByClass = {};
+    annualFeesByClass = {};
+    admissionFeesByClass = {};
+    (data.fees || []).forEach(f => {
+      const cls = normalizeClassName(f.class_name || "");
+      if (!cls) return;
+      monthlyFeesByClass[cls] = Number(f.monthly_fee || 0);
+      annualFeesByClass[cls] = Number(f.annual_fee || f.annual_charge || 0);
+      admissionFeesByClass[cls] = Number((f.admission_charge ?? f.admission_fee) || 0);
+    });
+  }catch(e){}
+}
+
+async function loadExamConfig(){
+  try{
+    const res = await fetch(`${FEE_API}/exam/config?session=${encodeURIComponent(currentSession)}`, {
+      headers: { "X-Session": currentSession }
+    });
+    const data = await res.json().catch(() => ({}));
+    examConfigs = Array.isArray(data?.exams) ? data.exams : [];
+  }catch(e){
+    examConfigs = [];
+  }
+}
+
+async function loadClasses(){
+  const feeRows = await fetchFeeStudents();
+  masterStudents = await fetchMasterStudents();
+  const classMap = new Map();
+  masterStudents.forEach(r=>{
+    const raw = r.class_name || r.class;
+    if (!raw) return;
+    const norm = normalizeClass(raw);
+    if (!classMap.has(norm)) classMap.set(norm, String(raw).trim().replace(/\s+/g," "));
+  });
+  let classes = Array.from(classMap.values());
+  if (!classes.length) {
+    const feeMap = new Map();
+    feeRows.forEach(r=>{
+      const raw = r.class_name || r.class;
+      if (!raw) return;
+      const norm = normalizeClass(raw);
+      if (!feeMap.has(norm)) feeMap.set(norm, String(raw).trim().replace(/\s+/g," "));
+    });
+    classes = Array.from(feeMap.values());
+  }
+  classes.sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
+  classSelect.innerHTML = classes.map(c=>`<option value="${c}">${c}</option>`).join("");
+  loadStudents();
+}
+
+async function loadStudents(){
+  const cls = classSelect.value || "";
+  // Prefer master students for selected class, then merge in fee fields.
+  const target = normalizeClass(cls);
+  const feeRows = await fetchFeeStudents(cls);
+  const feeMap = buildFeeMap(feeRows);
+  const masterRows = masterStudents.filter(s => normalizeClass(s.class_name || s.class) === target);
+  if (masterRows.length) {
+    studentsCache = masterRows.map(s=>({
+      name: s.student_name || s.name || "",
+      father: s.father_name || s.father || "",
+      class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
+      roll: String(s.rollno ?? s.roll ?? "").trim(),
+      admission_no: String(s.admission_no ?? s.admission ?? "").trim(),
+      new_admission: Boolean(s.new_admission),
+      fee_info: findFeeInfo(feeMap, {
+        class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
+        roll: String(s.rollno ?? s.roll ?? "").trim(),
+        admission_no: String(s.admission_no ?? s.admission ?? "").trim()
+      })
+    }));
+  } else {
+    studentsCache = feeRows.map(s=>({
+      name: s.name || "",
+      father: s.father || "",
+      class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
+      roll: String(s.roll ?? "").trim(),
+      admission_no: String(s.admission_no ?? s.admission ?? "").trim(),
+      new_admission: Boolean(s.new_admission),
+      fee_info: findFeeInfo(feeMap, {
+        class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
+        roll: String(s.roll ?? "").trim(),
+        admission_no: String(s.admission_no ?? s.admission ?? "").trim()
+      })
+    }));
+  }
+  renderStudents();
+}
+
+function renderStudents(){
+  const q = (search.value || "").toLowerCase();
+  const rows = studentsCache.filter(s=>{
+    return (s.name||"").toLowerCase().includes(q) || String(s.roll||"").includes(q);
+  });
+  rows.sort((a,b)=>{
+    const ra = String(a.roll || "");
+    const rb = String(b.roll || "");
+    const na = parseInt(ra, 10);
+    const nb = parseInt(rb, 10);
+    const va = Number.isFinite(na) ? na : Number.MAX_SAFE_INTEGER;
+    const vb = Number.isFinite(nb) ? nb : Number.MAX_SAFE_INTEGER;
+    if (va !== vb) return va - vb;
+    return ra.localeCompare(rb, undefined, {numeric:true});
+  });
+  studentsBody.innerHTML = rows.map(s=>`
+    <tr>
+      <td>${s.name || ""}</td>
+      <td>${s.class_name || ""}</td>
+      <td>${s.roll || ""}</td>
+      <td>${s.admission_no || "-"}</td>
+      <td>${renderMonthStatus(s.fee_info)}</td>
+      <td>${renderTotalDue(s.fee_info, s)}</td>
+      <td><button class="btn" onclick="openIssue('${s.class_name}','${s.roll}')">Add Stationary</button></td>
+    </tr>
+  `).join("");
+}
+
+function openIssue(cls, roll){
+  const qs = new URLSearchParams({session: currentSession, class: cls, roll: roll});
+  window.location.href = `stationary_issue.html?${qs.toString()}`;
+}
+
+async function fetchFeeStudents(className = ""){
+  try{
+    const url = className ? `${FEE_API}/students?class=${encodeURIComponent(className)}` : `${FEE_API}/students`;
+    const res = await fetch(url, {headers:{"X-Session": currentSession}});
+    const data = await res.json();
+    return data.students || [];
+  }catch(e){
+    return [];
+  }
+}
+
+async function fetchMasterStudents(){
+  try{
+    const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.students || []);
+  }catch(e){
+    return [];
+  }
+}
+
+function monthKeyFromDate(dateVal){
+  const d = dateVal ? new Date(dateVal + "T00:00:00") : new Date();
+  const m = d.getMonth();
+  const map = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return map[m];
+}
+
+function normalizeClassName(value){
+  const text = String(value || "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  return text.replace(/\s+[AB]$/i, "").trim();
+}
+
+function getExamFeeForClassMonth(cls, month){
+  const c = normalizeClassName(cls || "");
+  const m = String(month || "").trim();
+  if (!c || !m) return 0;
+  return examConfigs.reduce((sum, ex) => {
+    const months = Array.isArray(ex?.months) ? ex.months.map(x => String(x || "").trim()) : [];
+    if (!months.includes(m)) return sum;
+    const classFees = (ex && typeof ex.class_fees === "object") ? ex.class_fees : {};
+    return sum + Number(classFees[c] || 0);
+  }, 0);
+}
+
+function getTransportFeeForStudentMonth(student, month){
+  const m = String(month || "").trim();
+  const route = String(student?.transport_route || "").trim();
+  const monthly = Number(student?.transport_fee || 0);
+  const monthsCount = Math.max(0, Math.min(12, Number(student?.transport_months ?? 0) || 0));
+  if (!route || monthly <= 0 || monthsCount <= 0) return 0;
+  const idx = allMonths.indexOf(m);
+  if (idx < 0) return 0;
+  return idx < monthsCount ? monthly : 0;
+}
+
+function normalizeMonthRecord(rec, defaultDue, options = {}){
+  const targetExam = Number(options.targetExam || 0);
+  const targetTransport = Number(options.targetTransport || 0);
+  if (!rec || typeof rec !== "object") {
+    return { paid: 0, due: Number(defaultDue || 0), status: Number(defaultDue || 0) > 0 ? "Due" : "Paid" };
+  }
+  const paid = Number(rec.paid || 0);
+  let due = Number(rec.due ?? defaultDue ?? 0);
+  const currentExam = Number(rec.exam_fee_applied || 0);
+  const currentTransport = Number(rec.transport_fee_applied || 0);
+  const feeDelta = (targetExam - currentExam) + (targetTransport - currentTransport);
+  if (feeDelta !== 0) {
+    due = Math.max(0, due + feeDelta);
+  }
+  if (due === 0 && paid === 0 && Number(defaultDue || 0) > 0) {
+    due = Number(defaultDue || 0);
+  }
+  let status = rec.status || "";
+  if (!["Paid","Partial","Due"].includes(status)) {
+    if (due <= 0 && paid > 0) status = "Paid";
+    else if (paid > 0 && due > 0) status = "Partial";
+    else status = "Due";
+  }
+  return { paid, due, status };
+}
+
+function buildFeeMap(rows){
+  const map = new Map();
+  rows.forEach(s=>{
+    const cls = String(s.class_name || "").trim().replace(/\s+/g," ");
+    const roll = String(s.roll || "").trim();
+    const adm = String(s.admission_no || s.admission || "").trim();
+    if (adm) map.set(`A:${adm}`, s);
+    if (cls && roll) map.set(`C:${cls}|R:${roll}`, s);
+  });
+  return map;
+}
+
+function findFeeInfo(map, student){
+  if (!map) return null;
+  const adm = String(student.admission_no || "").trim();
+  if (adm && map.has(`A:${adm}`)) return map.get(`A:${adm}`);
+  const cls = String(student.class_name || "").trim().replace(/\s+/g," ");
+  const roll = String(student.roll || "").trim();
+  return map.get(`C:${cls}|R:${roll}`) || null;
+}
+
+function renderMonthStatus(feeInfo){
+  if (!feeInfo || !feeInfo.months) return "-";
+  const key = monthKeyFromDate();
+  const rec = feeInfo.months[key];
+  if (!rec) return "-";
+  const status = rec.status || (rec.due > 0 ? (rec.paid > 0 ? "Partial" : "Due") : "Paid");
+  const cls = status === "Paid" ? "ok" : (status === "Partial" ? "partial" : "due");
+  return `<span class="${cls}">${status}</span>`;
+}
+
+function renderTotalDue(feeInfo, student){
+  if (!feeInfo) return "-";
+  const cls = normalizeClassName(student?.class_name || feeInfo.class_name || "");
+  const monthDefault = Number(monthlyFeesByClass[cls] || 0);
+  const annualDefault = Number(annualFeesByClass[cls] || 0) + (student?.new_admission ? Number(admissionFeesByClass[cls] || 0) : 0);
+  const months = feeInfo.months || {};
+  let total = Number(feeInfo.previous_due || 0);
+  allMonths.forEach(m=>{
+    const examPart = Number(getExamFeeForClassMonth(cls, m) || 0);
+    const transportPart = Number(getTransportFeeForStudentMonth(feeInfo, m) || 0);
+    const def = monthDefault + examPart + transportPart;
+    total += normalizeMonthRecord(months[m], def, {targetExam: examPart, targetTransport: transportPart}).due;
+  });
+  const annualRec = (months && typeof months.Annual === "object") ? months.Annual : null;
+  const annualPaid = Number(annualRec?.paid || 0);
+  let annualDue = Number(annualRec?.due);
+  if (!Number.isFinite(annualDue)) annualDue = annualDefault;
+  if (annualDue === 0 && annualPaid === 0 && annualDefault > 0) {
+    annualDue = annualDefault;
+  }
+  total += annualDue;
+  return total;
+}
+
+
+loadSessions().then(async () => {
+  await Promise.all([loadFeeStructure(), loadExamConfig()]);
+  loadClasses();
+});
+
+async function loadGlobalSearch(){
+  globalSearchMode = true;
+  const master = await fetchMasterStudents();
+  const feeRows = await fetchFeeStudents();
+  const feeMap = buildFeeMap(feeRows);
+  studentsCache = master.map(s=>({
+    name: s.student_name || s.name || "",
+    father: s.father_name || s.father || "",
+    class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
+    roll: String(s.rollno ?? s.roll ?? "").trim(),
+    admission_no: String(s.admission_no ?? s.admission ?? "").trim(),
+    new_admission: Boolean(s.new_admission),
+    fee_info: findFeeInfo(feeMap, {
+      class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
+      roll: String(s.rollno ?? s.roll ?? "").trim(),
+      admission_no: String(s.admission_no ?? s.admission ?? "").trim()
+    })
+  }));
+  renderStudents();
+}
+
+search.oninput = async () => {
+  const q = (search.value || "").trim();
+  if (q.length >= 2) {
+    await loadGlobalSearch();
+  } else {
+    globalSearchMode = false;
+    loadStudents();
+  }
+};
+</script>
+</body>
+</html>

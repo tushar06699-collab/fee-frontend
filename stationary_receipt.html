@@ -1,0 +1,195 @@
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Stationary Receipt</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+  body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
+  .topbar{width:100%;padding:15px 20px;background:#007bff;color:#fff;display:flex;align-items:center;gap:15px;box-sizing:border-box;position:sticky;top:0;z-index:4000}
+  .menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
+  .overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);display:none;z-index:1500;}
+  .overlay.show{display:block;}
+  .side-menu{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);padding:20px;overflow-y:auto;z-index:2000;transition:left 0.35s;border-radius:0 18px 18px 0;}
+  .side-menu.open{left:0;}
+  .menu-item{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600;color:#333;}
+
+  .container{max-width:900px;margin:15px auto;background:#fff;padding:20px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+  .header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .school{font-size:20px;font-weight:800;}
+  .meta{color:#6b7280;font-size:13px;}
+  .student-highlight{font-size:15px;font-weight:700;color:#111827;margin-top:6px;}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{border:1px solid #e6e6e6;padding:8px;text-align:left;font-size:14px}
+  th{background:#007bff;color:#fff}
+  .total{font-size:18px;font-weight:700;margin-top:12px;}
+  .codes{display:flex;gap:20px;align-items:center;margin-top:12px;flex-wrap:wrap;}
+  .btn{padding:8px 12px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
+  @media print{
+    .topbar,.btn{display:none;}
+    body{background:#fff;margin:0;padding:0;}
+    .container{
+      box-shadow:none;
+      margin:0;
+      border-radius:0;
+      width:80mm;
+      max-width:80mm;
+      padding:8mm 6mm;
+    }
+    table{font-size:12px;}
+    th,td{padding:4px;font-size:12px;}
+    .school{font-size:16px;}
+    .student-highlight{font-size:14px;}
+    .meta{font-size:11px;}
+    .codes{gap:10px;}
+    #barcode{max-width:100%;}
+    #qrcode{width:96px;height:96px;}
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">&#9776;</div>
+    <div style="font-size:20px;font-weight:600;">Stationary Receipt</div>
+    <div style="margin-left:auto;">
+      <button class="btn" onclick="goBackToIssue()">Back</button>
+      <button class="btn" onclick="goBackToHistory()">History</button>
+      <button class="btn" onclick="window.print()">Print</button>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay" onclick="closeMenu()"></div>
+  <div class="side-menu" id="sideMenu">
+    <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
+        <div class="menu-item" onclick="goToPage('index.html')">Home</div>
+    <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
+    <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
+        <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <div>
+        <div class="school">P.S. Public School</div>
+        <div class="meta" id="receiptMeta">Stationary Receipt</div>
+      </div>
+      <div class="meta" id="receiptNo">Receipt No: -</div>
+    </div>
+
+    <div class="student-highlight" id="studentLine"></div>
+    <div class="meta" id="ledgerNote" style="display:none;font-weight:700;color:#0f4aa3;">
+      Added to student fee ledger. Payment pending in fee details.
+    </div>
+    <div class="meta" id="dateLine"></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Price (&#8377;)</th>
+          <th>Qty</th>
+          <th>Total (&#8377;)</th>
+        </tr>
+      </thead>
+      <tbody id="itemsBody"></tbody>
+    </table>
+
+    <div class="total">Grand Total: &#8377;<span id="grandTotal">0</span></div>
+
+    <div class="codes">
+      <div>
+        <div class="meta">Barcode</div>
+        <svg id="barcode"></svg>
+      </div>
+      <div>
+        <div class="meta">QR Code</div>
+        <canvas id="qrcode" width="128" height="128"></canvas>
+      </div>
+    </div>
+  </div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+let currentSession = localStorage.getItem("session") || "2024_25";
+
+function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
+function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
+function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
+
+async function loadReceipt(){
+  const qs = new URLSearchParams(window.location.search);
+  const receiptNo = qs.get("receipt");
+  const sess = qs.get("session");
+  const clsParam = qs.get("class") || "";
+  const rollParam = qs.get("roll") || "";
+  if (sess){ currentSession = sess; localStorage.setItem("session", currentSession); }
+
+  let receipt = null;
+  try{
+    const cached = JSON.parse(localStorage.getItem("stationaryReceipt") || "{}");
+    if (cached && String(cached.receipt_no) === String(receiptNo)) receipt = cached;
+  }catch(e){}
+
+  if (!receipt){
+    const res = await fetch(`${FEE_API}/stationary/receipt/${receiptNo}`, {headers:{"X-Session": currentSession}});
+    const data = await res.json();
+    if (!res.ok || !data.success) return alert(data.message || "Receipt not found");
+    receipt = data.receipt;
+  }
+  window.__stationaryReceipt = receipt;
+  window.__stationaryClass = clsParam || receipt.class_name || "";
+  window.__stationaryRoll = rollParam || receipt.roll || "";
+
+  receiptNoEl = document.getElementById("receiptNo");
+  receiptNoEl.textContent = `Receipt No: ${receipt.receipt_no}`;
+  document.getElementById("studentLine").textContent =
+    `Student: ${receipt.student_name} | Father: ${receipt.father || "-"} | Class: ${receipt.class_name} | Roll: ${receipt.roll} | Admission: ${receipt.admission_no || "-"}`;
+  document.getElementById("dateLine").textContent = `Date: ${receipt.date} | Session: ${receipt.session}`;
+  if (receipt.added_to_fee) {
+    document.getElementById("ledgerNote").style.display = "block";
+  }
+
+  const tbody = document.getElementById("itemsBody");
+  tbody.innerHTML = (receipt.items || []).map(it=>`
+    <tr>
+      <td>${it.name}</td>
+      <td>${it.price}</td>
+      <td>${it.qty}</td>
+      <td>${it.total}</td>
+    </tr>
+  `).join("");
+  document.getElementById("grandTotal").textContent = receipt.total || 0;
+
+  try{
+    JsBarcode("#barcode", String(receipt.receipt_no), {format:"CODE128", width:2, height:50, displayValue:true});
+  }catch(e){}
+  try{
+    const qrText = JSON.stringify({
+      receipt: receipt.receipt_no,
+      student: receipt.student_name,
+      class: receipt.class_name,
+      roll: receipt.roll,
+      total: receipt.total,
+      date: receipt.date
+    });
+    QRCode.toCanvas(document.getElementById("qrcode"), qrText, {width:128});
+  }catch(e){}
+}
+
+function goBackToIssue(){
+  const cls = window.__stationaryClass || "";
+  const roll = window.__stationaryRoll || "";
+  const qs = new URLSearchParams({session: currentSession, class: cls, roll: roll});
+  window.location.href = `stationary_issue.html?${qs.toString()}`;
+}
+
+function goBackToHistory(){
+  const qs = new URLSearchParams({session: currentSession});
+  window.location.href = `stationary_receipt_history.html?${qs.toString()}`;
+}
+
+loadReceipt();
+</script>
+</body>
+</html>

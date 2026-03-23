@@ -1,10 +1,15 @@
 (function () {
   const ADMIN_MENU_ITEMS = [
     { label: "Home", page: "index.html" },
-    { label: "Student Fee Module", page: "outstanding.html" },
-    { label: "Stationary Module", page: "stationary_students.html" },
-    { label: "Students Transactions", page: "transactions.html" },
-    
+    { label: "Outstanding List", page: "outstanding.html" },
+    { label: "Fees Modify", page: "fees.html" },
+    { label: "Transport Fee", page: "transport_fee.html" },
+    { label: "Scholarship Data", page: "scholarship.html" },
+    { label: "Exam Data", page: "exam_schedule.html" },
+    { label: "Summary Data", page: "summary.html" },
+    { label: "Receipt History", page: "receipt_history.html" },
+    { label: "Export Data", page: "export.html" },
+    { label: "Transactions", page: "transactions.html" },
   ];
   const ACCOUNTANT_MENU_ITEMS = [
     { label: "Accountant Home", page: "accountant.html" }

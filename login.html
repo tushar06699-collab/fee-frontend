@@ -1,0 +1,111 @@
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fee Admin Login</title>
+<style>
+  body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
+  .wrap{max-width:420px;margin:60px auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+  h1{margin:0 0 10px;font-size:22px}
+  label{display:block;margin-top:12px;font-size:13px;color:#555}
+  input{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}
+  .btn{margin-top:16px;width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer}
+  .muted{color:#6b7280;font-size:13px;margin-top:10px}
+  .status{margin-top:10px;font-size:13px}
+  .status.ok{color:#0b6b33;font-weight:600}
+  .status.err{color:#b30000;font-weight:600}
+  .countdown{margin-top:6px;font-size:12px;color:#374151}
+  .row{display:flex;gap:8px}
+  .row .btn{width:auto;flex:1}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Fee Admin Login</h1>
+    <div class="muted">Enter login ID and password to receive OTP.</div>
+
+    <label>Login ID</label>
+    <input id="loginId" placeholder="admin" />
+
+    <label>Password</label>
+    <input id="loginPass" type="password" placeholder="******" />
+
+    <div class="row">
+      <button class="btn" id="sendBtn" onclick="requestOtp()">Send OTP</button>
+    </div>
+
+    <label>OTP</label>
+    <input id="otp" placeholder="6-digit OTP" />
+
+    <button class="btn" id="verifyBtn" onclick="verifyOtp()">Verify & Continue</button>
+    <div class="status" id="status"></div>
+    <div class="countdown" id="countdown"></div>
+  </div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+
+let otpTimer = null;
+let otpExpiresAt = 0;
+
+function setStatus(msg, type){
+  status.textContent = msg || "";
+  status.className = "status" + (type ? " " + type : "");
+}
+
+function startCountdown(){
+  clearInterval(otpTimer);
+  otpTimer = setInterval(() => {
+    const left = Math.max(0, otpExpiresAt - Date.now());
+    const sec = Math.floor(left / 1000);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    if (left <= 0){
+      countdown.textContent = "OTP expired. Please request again.";
+      clearInterval(otpTimer);
+      return;
+    }
+    countdown.textContent = `OTP expires in ${m}:${String(s).padStart(2,"0")}`;
+  }, 500);
+}
+
+async function requestOtp(){
+  const login_id = loginId.value.trim();
+  const password = loginPass.value.trim();
+  if (!login_id || !password) return setStatus("Enter login id and password.", "err");
+  sendBtn.disabled = true;
+  setStatus("Sending OTP...", "");
+  const res = await fetch(`${FEE_API}/auth/otp/request`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({login_id, password})
+  });
+  const data = await res.json();
+  sendBtn.disabled = false;
+  if (!res.ok || !data.success) return setStatus(data.message || "OTP request failed", "err");
+  setStatus("OTP sent to admin email.", "ok");
+  otpExpiresAt = Date.now() + (5 * 60 * 1000);
+  startCountdown();
+}
+
+async function verifyOtp(){
+  const login_id = loginId.value.trim();
+  const otpVal = otp.value.trim();
+  if (!login_id || !otpVal) return setStatus("Enter OTP.", "err");
+  verifyBtn.disabled = true;
+  setStatus("Verifying OTP...", "");
+  const res = await fetch(`${FEE_API}/auth/otp/verify`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({login_id, otp: otpVal})
+  });
+  const data = await res.json();
+  verifyBtn.disabled = false;
+  if (!res.ok || !data.success) return setStatus(data.message || "OTP verify failed", "err");
+  setStatus("OTP verified. Redirecting...", "ok");
+  localStorage.setItem("feeAdminToken", data.token || "ok");
+  window.location.href = "index.html";
+}
+</script>
+</body>
+</html>

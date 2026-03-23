@@ -159,6 +159,11 @@ th{background:#f2f7ff;color:#0f3c84;font-weight:700}
             </thead>
             <tbody id="dateSummaryBody"></tbody>
           </table>
+          <div class="pager" style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+            <button class="btn" id="datePrev" onclick="changeDatePage(-1)">Prev</button>
+            <div class="muted" id="datePageInfo">Page 1</div>
+            <button class="btn" id="dateNext" onclick="changeDatePage(1)">Next</button>
+          </div>
         </div>
 
         <div class="table-wrap">
@@ -174,6 +179,11 @@ th{background:#f2f7ff;color:#0f3c84;font-weight:700}
             </thead>
             <tbody id="detailsBody"></tbody>
           </table>
+          <div class="pager" style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+            <button class="btn" id="detailPrev" onclick="changeDetailPage(-1)">Prev</button>
+            <div class="muted" id="detailPageInfo">Page 1</div>
+            <button class="btn" id="detailNext" onclick="changeDetailPage(1)">Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -185,6 +195,10 @@ const params = new URLSearchParams(window.location.search);
 let allReceipts = [];
 let grouped = [];
 let selectedDateKey = "";
+let datePage = 1;
+let detailPage = 1;
+const DATE_PAGE_SIZE = 12;
+const DETAIL_PAGE_SIZE = 20;
 
 function safeText(v){ return String(v ?? "").trim(); }
 function money(v){ return `Rs. ${Number(v || 0).toLocaleString("en-IN")}`; }
@@ -287,10 +301,18 @@ function renderSummary(){
   if (!filtered.length){
     tbody.innerHTML = `<tr><td colspan="5" class="empty">No date-wise data found.</td></tr>`;
     renderDetails([]);
+    document.getElementById("datePageInfo").textContent = "Page 0";
+    document.getElementById("datePrev").disabled = true;
+    document.getElementById("dateNext").disabled = true;
     return;
   }
 
-  tbody.innerHTML = filtered.map(g => `
+  const totalDatePages = Math.max(1, Math.ceil(filtered.length / DATE_PAGE_SIZE));
+  if (datePage > totalDatePages) datePage = totalDatePages;
+  const start = (datePage - 1) * DATE_PAGE_SIZE;
+  const pageRows = filtered.slice(start, start + DATE_PAGE_SIZE);
+
+  tbody.innerHTML = pageRows.map(g => `
     <tr>
       <td>${displayDate(g.dateKey)}</td>
       <td>${g.count}</td>
@@ -303,16 +325,27 @@ function renderSummary(){
   const chosen = filtered.find(x => x.dateKey === selectedDateKey) || filtered[0];
   selectedDateKey = chosen.dateKey;
   renderDetails(chosen.rows);
+
+  document.getElementById("datePageInfo").textContent = `Page ${datePage} of ${totalDatePages}`;
+  document.getElementById("datePrev").disabled = datePage <= 1;
+  document.getElementById("dateNext").disabled = datePage >= totalDatePages;
 }
 
 function renderDetails(rows){
   const tbody = document.getElementById("detailsBody");
   if (!rows.length){
     tbody.innerHTML = `<tr><td colspan="5" class="empty">No receipts for selected date.</td></tr>`;
+    document.getElementById("detailPageInfo").textContent = "Page 0";
+    document.getElementById("detailPrev").disabled = true;
+    document.getElementById("detailNext").disabled = true;
     return;
   }
   rows.sort((a,b) => Number(b.id || 0) - Number(a.id || 0));
-  tbody.innerHTML = rows.map(r => `
+  const totalDetailPages = Math.max(1, Math.ceil(rows.length / DETAIL_PAGE_SIZE));
+  if (detailPage > totalDetailPages) detailPage = totalDetailPages;
+  const start = (detailPage - 1) * DETAIL_PAGE_SIZE;
+  const pageRows = rows.slice(start, start + DETAIL_PAGE_SIZE);
+  tbody.innerHTML = pageRows.map(r => `
     <tr>
       <td>${safeText(r.receipt_number || "-")}</td>
       <td>${safeText(r.name)}</td>
@@ -321,23 +354,37 @@ function renderDetails(rows){
       <td class="money">${money(r.total_due ?? r.totalDue ?? 0)}</td>
     </tr>
   `).join("");
+
+  document.getElementById("detailPageInfo").textContent = `Page ${detailPage} of ${totalDetailPages}`;
+  document.getElementById("detailPrev").disabled = detailPage <= 1;
+  document.getElementById("detailNext").disabled = detailPage >= totalDetailPages;
 }
 
 function selectDate(dateKey){
   selectedDateKey = dateKey;
+  detailPage = 1;
   const g = grouped.find(x => x.dateKey === dateKey);
   renderDetails(g ? g.rows : []);
 }
 
-document.getElementById("sessionSelect").addEventListener("change", loadReceipts);
-document.getElementById("searchDate").addEventListener("input", renderSummary);
+function changeDatePage(delta){
+  datePage = Math.max(1, datePage + delta);
+  renderSummary();
+}
+function changeDetailPage(delta){
+  detailPage = Math.max(1, detailPage + delta);
+  const g = grouped.find(x => x.dateKey === selectedDateKey);
+  renderDetails(g ? g.rows : []);
+}
+
+document.getElementById("sessionSelect").addEventListener("change", () => { datePage = 1; detailPage = 1; loadReceipts(); });
+document.getElementById("searchDate").addEventListener("input", () => { datePage = 1; renderSummary(); });
 
 (async function init(){
   await loadSessions();
   await loadReceipts();
 })();
 </script>
-<script src="shared_menu.js"></script>
+<script src="feeshared_menu.js"></script>
 </body>
 </html>
-

@@ -1,0 +1,348 @@
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Stationary Issue</title>
+<style>
+  body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
+  .topbar{width:100%;padding:15px 20px;background:#007bff;color:#fff;display:flex;align-items:center;gap:15px;box-sizing:border-box;position:sticky;top:0;z-index:4000}
+  .menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
+  .overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);display:none;z-index:1500;}
+  .overlay.show{display:block;}
+  .side-menu{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);padding:20px;overflow-y:auto;z-index:2000;transition:left 0.35s;border-radius:0 18px 18px 0;}
+  .side-menu.open{left:0;}
+  .menu-item{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600;color:#333;}
+
+  .container{max-width:1100px;margin:15px auto;background:#fff;padding:20px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+  .card{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:16px;}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+  .row > div{flex:1;min-width:200px;}
+  input{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;}
+  table{width:100%;border-collapse:collapse;margin-top:10px}
+  th,td{border:1px solid #e6e6e6;padding:8px;text-align:left;font-size:14px}
+  th{background:#007bff;color:#fff}
+  .btn{padding:10px 16px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
+  .btn.secondary{background:#64748b;}
+  .muted{color:#6b7280;font-size:13px;}
+  .total{font-size:18px;font-weight:700;}
+  .history{margin-top:16px;}
+  .history table{margin-top:8px;}
+  .pager{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;}
+  .pager button{padding:6px 10px;border:0;border-radius:6px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
+  .pager button:disabled{opacity:.5;cursor:not-allowed;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">&#9776;</div>
+    <div style="font-size:20px;font-weight:600;">Stationary Issue</div>
+    <div style="margin-left:auto; display:flex; align-items:center;">
+      <span id="sessionLabel"></span>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay" onclick="closeMenu()"></div>
+  <div class="side-menu" id="sideMenu">
+    <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
+    <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
+    <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
+    <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
+    <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
+  </div>
+
+  <div class="container">
+    <div class="card" id="studentCard">
+      <div class="row">
+        <div><strong>Name:</strong> <span id="stName">-</span></div>
+        <div><strong>Father:</strong> <span id="stFather">-</span></div>
+        <div><strong>Class:</strong> <span id="stClass">-</span></div>
+        <div><strong>Roll:</strong> <span id="stRoll">-</span></div>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <div><strong>Admission No:</strong> <span id="stAdmission">-</span></div>
+        <div><strong>Date:</strong> <span id="todayDate">-</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="muted">Select items and quantity</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Select</th>
+            <th>Item</th>
+            <th>Price (&#8377;)</th>
+            <th>Qty</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+      </table>
+      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="total">Grand Total: &#8377;<span id="grandTotal">0</span></div>
+        <div>
+          <button class="btn secondary" onclick="goBack()">Back</button>
+          <button class="btn secondary" onclick="addToFeeLedger()">Add to Fee Ledger</button>
+          <button class="btn" onclick="generateReceipt()">Generate Receipt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card history">
+      <div style="font-weight:700;margin-bottom:6px;">Previous Stationary Summary</div>
+      <div class="muted" id="historyNote">Loading...</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Receipt No</th>
+            <th>Date</th>
+            <th>Items</th>
+            <th>Total (&#8377;)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+      <div class="pager">
+        <button id="prevBtn" onclick="changeHistoryPage(-1)">Prev</button>
+        <div class="muted" id="historyPageInfo">Page 1</div>
+        <button id="nextBtn" onclick="changeHistoryPage(1)">Next</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+let currentSession = localStorage.getItem("session") || "2024_25";
+let student = null;
+let items = [];
+let addedToFeeLedger = false;
+let historyPage = 1;
+const HISTORY_PAGE_SIZE = 6;
+
+function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
+function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
+function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
+
+function readParams(){
+  const qs = new URLSearchParams(window.location.search);
+  const cls = qs.get("class") || "";
+  const roll = qs.get("roll") || "";
+  const sess = qs.get("session");
+  if (sess) {
+    currentSession = sess;
+    localStorage.setItem("session", currentSession);
+  }
+  sessionLabel.textContent = currentSession;
+  return {cls, roll};
+}
+
+async function loadStudent(cls, roll){
+  const res = await fetch(`${FEE_API}/student/${encodeURIComponent(cls)}/${encodeURIComponent(roll)}`, {
+    headers: {"X-Session": currentSession}
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    alert(data.message || "Student not found");
+    return;
+  }
+  student = data.student;
+  if (!student.father || !student.admission_no) {
+    await enrichFromStudentBackend(cls, roll);
+  }
+  stName.textContent = student.name || "-";
+  stFather.textContent = student.father || "-";
+  stClass.textContent = student.class_name || "-";
+  stRoll.textContent = student.roll || "-";
+  stAdmission.textContent = student.admission_no || "-";
+}
+
+async function enrichFromStudentBackend(cls, roll){
+  try{
+    const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.students || []);
+    const match = rows.find(r => String(r.class_name || r.class || "").trim() === cls && String(r.rollno ?? r.roll ?? "").trim() === String(roll));
+    if (!match) return;
+    student.name = student.name || match.student_name || match.name || "";
+    student.father = student.father || match.father_name || match.father || "";
+    student.admission_no = student.admission_no || match.admission_no || match.admission || "";
+  }catch(e){}
+}
+
+async function loadItems(){
+  const res = await fetch(`${FEE_API}/stationary/items`, {headers:{"X-Session": currentSession}});
+  const data = await res.json();
+  items = data.items || [];
+  const tbody = document.getElementById("itemsBody");
+  tbody.innerHTML = items.map(item=>`
+    <tr>
+      <td><input type="checkbox" data-id="${item.id}" onchange="recalc()"></td>
+      <td>${item.name}</td>
+      <td>${item.price}</td>
+      <td><input type="number" min="1" value="1" data-qty="${item.id}" style="width:80px" oninput="recalc()"></td>
+      <td id="line-${item.id}">0</td>
+    </tr>
+  `).join("");
+  recalc();
+}
+
+function recalc(){
+  let total = 0;
+  items.forEach(item=>{
+    const chk = document.querySelector(`input[data-id='${item.id}']`);
+    const qtyInput = document.querySelector(`input[data-qty='${item.id}']`);
+    const qty = Math.max(1, Number(qtyInput.value || 1));
+    if (chk && chk.checked){
+      const line = item.price * qty;
+      total += line;
+      document.getElementById(`line-${item.id}`).textContent = line;
+    } else {
+      document.getElementById(`line-${item.id}`).textContent = 0;
+    }
+  });
+  grandTotal.textContent = total;
+}
+
+async function generateReceipt(){
+  if (!student) return;
+  const selected = [];
+  items.forEach(item=>{
+    const chk = document.querySelector(`input[data-id='${item.id}']`);
+    const qtyInput = document.querySelector(`input[data-qty='${item.id}']`);
+    const qty = Math.max(1, Number(qtyInput.value || 1));
+    if (chk && chk.checked){
+      selected.push({id: item.id, name: item.name, price: item.price, qty});
+    }
+  });
+  if (!selected.length) return alert("Select at least one item");
+
+  const payload = {
+    student: {
+      name: student.name,
+      father: student.father,
+      class_name: student.class_name,
+      roll: student.roll,
+      admission_no: student.admission_no || ""
+    },
+    items: selected,
+    date: new Date().toISOString().slice(0,10),
+    added_to_fee: addedToFeeLedger
+  };
+
+  const res = await fetch(`${FEE_API}/stationary/receipt`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json","X-Session": currentSession},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) return alert(data.message || "Receipt failed");
+
+  localStorage.setItem("stationaryReceipt", JSON.stringify(data.receipt || {}));
+  const qs = new URLSearchParams({
+    session: currentSession,
+    receipt: data.receipt.receipt_no,
+    class: student.class_name || "",
+    roll: student.roll || ""
+  });
+  window.location.href = `stationary_receipt.html?${qs.toString()}`;
+}
+
+async function addToFeeLedger(){
+  if (!student) return;
+  const selected = [];
+  items.forEach(item=>{
+    const chk = document.querySelector(`input[data-id='${item.id}']`);
+    const qtyInput = document.querySelector(`input[data-qty='${item.id}']`);
+    const qty = Math.max(1, Number(qtyInput.value || 1));
+    if (chk && chk.checked){
+      selected.push({id: item.id, name: item.name, price: item.price, qty});
+    }
+  });
+  if (!selected.length) return alert("Select at least one item");
+
+  const payload = {
+    student: {
+      name: student.name,
+      father: student.father,
+      class_name: student.class_name,
+      roll: student.roll,
+      admission_no: student.admission_no || ""
+    },
+    items: selected,
+    date: new Date().toISOString().slice(0,10)
+  };
+
+  const res = await fetch(`${FEE_API}/stationary/add-to-fee`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json","X-Session": currentSession},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) return alert(data.message || "Failed to add in fee ledger");
+  addedToFeeLedger = true;
+  alert(`Added to fee ledger: ${data.month} (+${data.total}). Generating receipt...`);
+  generateReceipt();
+}
+
+function goBack(){
+  window.location.href = `stationary_students.html?session=${encodeURIComponent(currentSession)}`;
+}
+
+const params = readParams();
+todayDate.textContent = new Date().toISOString().slice(0,10);
+loadStudent(params.cls, params.roll);
+loadItems();
+loadHistory(params.cls, params.roll);
+
+async function loadHistory(cls, roll){
+  if (!cls || !roll) return;
+  const res = await fetch(`${FEE_API}/stationary/receipts?class=${encodeURIComponent(cls)}&roll=${encodeURIComponent(roll)}&page=${historyPage}&page_size=${HISTORY_PAGE_SIZE}`, {
+    headers: {"X-Session": currentSession}
+  });
+  const data = await res.json();
+  const rows = data.receipts || [];
+  const body = document.getElementById("historyBody");
+  if (!rows.length){
+    historyNote.textContent = "No previous stationery receipts.";
+    body.innerHTML = "";
+    historyPageInfo.textContent = "Page 0";
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    return;
+  }
+  historyNote.textContent = `Total receipts: ${data.total || rows.length}`;
+  historyPageInfo.textContent = `Page ${data.page} of ${data.total_pages || 1}`;
+  prevBtn.disabled = (data.page <= 1);
+  nextBtn.disabled = (data.page >= (data.total_pages || 1));
+  body.innerHTML = rows.map(r=>{
+    const items = (r.items || []).map(it=>`${it.name} x${it.qty}`).join(", ");
+    return `<tr>
+      <td>${r.receipt_no}</td>
+      <td>${r.date || "-"}</td>
+      <td>${items || "-"}</td>
+      <td>${r.total || 0}</td>
+      <td><button class="btn" onclick="openReceipt(${r.receipt_no})">View</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function changeHistoryPage(delta){
+  historyPage = Math.max(1, historyPage + delta);
+  loadHistory(params.cls, params.roll);
+}
+
+function openReceipt(no){
+  const qs = new URLSearchParams({
+    session: currentSession,
+    receipt: String(no),
+    class: params.cls || "",
+    roll: params.roll || ""
+  });
+  window.location.href = `stationary_receipt.html?${qs.toString()}`;
+}
+</script>
+</body>
+</html>

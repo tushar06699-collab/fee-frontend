@@ -88,6 +88,28 @@ body{
     margin-bottom:12px;
     flex-wrap:wrap;
 }
+.one-time{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:12px;
+    margin:12px 0 18px;
+}
+.one-time .box{
+    background:#f5f9ff;
+    border:1px solid #d8e6ff;
+    padding:12px;
+    border-radius:10px;
+}
+.one-time label{
+    display:block;
+    font-size:13px;
+    margin-bottom:6px;
+    color:#1f2a44;
+    font-weight:600;
+}
+.one-time input{
+    width:100%;
+}
 table{
     width:100%;
     border-collapse:collapse;
@@ -129,19 +151,33 @@ button{
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 
 <div id="sideMenu" class="side-menu">
-    <div class="menu-item" onclick="goToPage('edit.html')">Edit Student</div>
-    <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
-    <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
-    <div class="menu-item" onclick="goToPage('exam_schedule.html')">Exam Schedule</div>
+    <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
+    <div class="menu-item" onclick="goToPage('outstanding.html')">Outstanding List</div>
+  <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
+        <div class="menu-item" onclick="goToPage('transport_fee.html')">Transport Fee</div>
+    <div class="menu-item" onclick="goToPage('scholarship.html')">Scholarship Data</div>
+      <div class="menu-item" onclick="goToPage('exam_schedule.html')">Exam Data</div>
+            <div class="menu-item" onclick="goToPage('summary.html')">Summary Data</div>
     <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
     <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
-</div>
+`;</div>
 
 <div class="container">
     <div class="actions">
         <button class="btn-blue" onclick="location.href='index.html?session='+currentSession">Back to Home</button>
         <button onclick="saveAllFees()">Save All Classes</button>
         <button class="btn-purple" onclick="downloadFeesPdf()">Download PDF</button>
+    </div>
+
+    <div class="one-time">
+        <div class="box">
+            <label>Registration Fee (Rs.)</label>
+            <input id="registrationFee" type="number" min="0" value="0">
+        </div>
+        <div class="box">
+            <label>ID Card Fee (Rs.)</label>
+            <input id="idCardFee" type="number" min="0" value="0">
+        </div>
     </div>
 
     <h2>Class-wise Fee Structure</h2>
@@ -152,6 +188,7 @@ button{
                 <th>Monthly Fee (Rs.)</th>
                 <th>Annual Charge (Rs.)</th>
                 <th>Admission Charge (Rs.)</th>
+                <th>Books Charge (Rs.)</th>
             </tr>
         </thead>
         <tbody id="feeBody"></tbody>
@@ -243,7 +280,17 @@ async function fetchStudentClasses(){
 
 async function loadFees(){
     const body = document.getElementById("feeBody");
-    body.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5">Loading...</td></tr>`;
+    try{
+        const settingsRes = await fetch(`${FEE_API}/fees/settings?session=${encodeURIComponent(currentSession)}`, {
+            headers: { "X-Session": currentSession }
+        });
+        const settings = await settingsRes.json().catch(() => ({}));
+        document.getElementById("registrationFee").value = Number(settings.registration_fee || 0);
+        document.getElementById("idCardFee").value = Number(settings.id_card_fee || 0);
+    }catch(e){
+        // ignore settings load errors
+    }
 
     let feeRows = [];
     try{
@@ -269,25 +316,27 @@ async function loadFees(){
             {
                 monthly_fee: Number(f.monthly_fee || 0),
                 annual_charge: Number(f.annual_charge || 0),
-                admission_charge: Number(f.admission_charge ?? f.admission_fee ?? 0)
+                admission_charge: Number(f.admission_charge ?? f.admission_fee ?? 0),
+                books_charge: Number(f.books_charge || 0)
             }
         ])
     );
 
     body.innerHTML = "";
     if (!classes.length) {
-        body.innerHTML = `<tr><td colspan="4">No classes found for selected session</td></tr>`;
+        body.innerHTML = `<tr><td colspan="5">No classes found for selected session</td></tr>`;
         return;
     }
 
     classes.forEach(cls => {
-        const row = feeMap.get(cls) || { monthly_fee: 0, annual_charge: 0, admission_charge: 0 };
+        const row = feeMap.get(cls) || { monthly_fee: 0, annual_charge: 0, admission_charge: 0, books_charge: 0 };
         body.innerHTML += `
             <tr data-class="${cls}">
                 <td>${cls}</td>
                 <td><input class="monthly-fee" value="${row.monthly_fee}" type="number" min="0"></td>
                 <td><input class="annual-fee" value="${row.annual_charge}" type="number" min="0"></td>
                 <td><input class="admission-fee" value="${row.admission_charge}" type="number" min="0"></td>
+                <td><input class="books-fee" value="${row.books_charge}" type="number" min="0"></td>
             </tr>
         `;
     });
@@ -300,7 +349,8 @@ function collectFeeRows(){
         monthly_fee: Number(row.querySelector(".monthly-fee")?.value || 0),
         annual_charge: Number(row.querySelector(".annual-fee")?.value || 0),
         admission_charge: Number(row.querySelector(".admission-fee")?.value || 0),
-        admission_fee: Number(row.querySelector(".admission-fee")?.value || 0)
+        admission_fee: Number(row.querySelector(".admission-fee")?.value || 0),
+        books_charge: Number(row.querySelector(".books-fee")?.value || 0)
     })).filter(x => x.class_name);
 }
 
@@ -310,9 +360,16 @@ async function saveAllFees(){
         alert("No classes to save");
         return;
     }
+    const registration_fee = Number(document.getElementById("registrationFee").value || 0);
+    const id_card_fee = Number(document.getElementById("idCardFee").value || 0);
 
     let res;
     try {
+        await fetch(`${FEE_API}/fees/settings?session=${encodeURIComponent(currentSession)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Session": currentSession },
+            body: JSON.stringify({ registration_fee, id_card_fee })
+        });
         res = await fetch(`${FEE_API}/fees/update_many?session=${encodeURIComponent(currentSession)}`, {
             method: "POST",
             headers: {
@@ -371,7 +428,8 @@ function downloadFeesPdf(){
         row.getAttribute("data-class") || "",
         Number(row.querySelector(".monthly-fee")?.value || 0),
         Number(row.querySelector(".annual-fee")?.value || 0),
-        Number(row.querySelector(".admission-fee")?.value || 0)
+        Number(row.querySelector(".admission-fee")?.value || 0),
+        Number(row.querySelector(".books-fee")?.value || 0)
     ]);
 
     const { jsPDF } = window.jspdf;
@@ -380,7 +438,7 @@ function downloadFeesPdf(){
     doc.text(`Fee Structure - Session ${currentSession}`, 40, 40);
     doc.autoTable({
         startY: 60,
-        head: [["Class", "Monthly Fee (Rs.)", "Annual Charge (Rs.)", "Admission Charge (Rs.)"]],
+        head: [["Class", "Monthly Fee (Rs.)", "Annual Charge (Rs.)", "Admission Charge (Rs.)", "Books Charge (Rs.)"]],
         body,
         theme: "grid",
         headStyles: { fillColor: [0, 123, 255] }
@@ -391,6 +449,6 @@ function downloadFeesPdf(){
 loadSessions().then(loadFees);
 </script>
 
-<script src="shared_menu.js"></script>
+<script src="feeshared_menu.js"></script>
 </body>
 </html>

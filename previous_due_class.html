@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Previous Due - Class Wise</title>
+<style>
+:root{
+  --brand:#0f4aa3;
+  --brand-2:#1f6feb;
+  --bg:#eef3fb;
+  --card:#ffffff;
+  --text:#1f2937;
+  --muted:#6b7280;
+  --line:#d8e2f0;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 400px at -10% -20%, #dce9ff 0%, transparent 50%),
+    radial-gradient(900px 300px at 100% 0%, #d7f0ff 0%, transparent 45%),
+    var(--bg);
+}
+.topbar{
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  color:#fff;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;line-height:1}
+.title{font-size:20px;font-weight:700}
+.spacer{flex:1}
+.overlay {
+  position: fixed;top:0;left:0;width:100%;height:100%;
+  background: rgba(0,0,0,0.35);display:none;z-index:1500;
+}
+.overlay.show { display:block; }
+.side-menu{
+  position:fixed;top:0;left:-280px;width:260px;height:100%;
+  background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+  padding:20px;overflow-y:auto;z-index:2000;
+  transition: left 0.35s;
+  border-radius:0 18px 18px 0;
+}
+.side-menu.open{ left:0; }
+.menu-item{
+  padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+  font-size:16px;font-weight:600;color:#333;
+}
+.wrap{max-width:1200px;margin:18px auto;padding:0 14px}
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:0 10px 28px rgba(15,74,163,.10);
+  padding:16px;
+}
+.toolbar{
+  display:grid;
+  grid-template-columns:220px 220px 160px;
+  gap:10px;
+  align-items:end;
+}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+select,input{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px 11px;
+  font-size:14px;
+  background:#fff;
+}
+.btn{
+  border:none;border-radius:8px;padding:10px 12px;cursor:pointer;
+  background:#0f4aa3;color:#fff;font-size:14px;
+}
+.btn.secondary{background:#475569}
+.btn.success{background:#16a34a}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.table-wrap{margin-top:14px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:800px}
+th,td{border-bottom:1px solid var(--line);padding:10px 8px;font-size:14px;text-align:left}
+th{background:#f2f7ff;color:#0f3c84;font-weight:700}
+.status{margin-top:10px;font-size:13px;color:#0f3c84}
+@media (max-width:900px){
+  .toolbar{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div class="title">Previous Due (Class Wise)</div>
+    <div class="spacer"></div>
+  </div>
+  <div id="overlay" class="overlay"></div>
+  <div id="sideMenu" class="side-menu"></div>
+
+  <div class="wrap">
+    <div class="panel">
+      <div class="toolbar">
+        <div>
+          <label>Session (Previous)</label>
+          <select id="sessionSelect"></select>
+        </div>
+        <div>
+          <label>Class</label>
+          <select id="classSelect"></select>
+        </div>
+        <div>
+          <button class="btn" id="loadBtn">Load Class</button>
+        </div>
+      </div>
+      <div class="hint">This page loads one class at a time to avoid lag.</div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Class</th>
+              <th>Roll</th>
+              <th>Previous Due</th>
+            </tr>
+          </thead>
+          <tbody id="prevDueBody"></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn success" id="saveBtn">Save Previous Due</button>
+        <button class="btn secondary" id="refreshBtn">Refresh</button>
+      </div>
+      <div class="status" id="statusText"></div>
+    </div>
+  </div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+
+let currentSession = localStorage.getItem("session") || "";
+let students = [];
+let masterByRoll = new Map();
+
+function setStatus(msg){
+  document.getElementById("statusText").textContent = msg || "";
+}
+
+async function loadSessions(){
+  const sel = document.getElementById("sessionSelect");
+  try{
+    const res = await fetch(`${FEE_API}/session/list`);
+    const data = await res.json();
+    const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+    sel.innerHTML = sessions.map(s => `<option value="${s}">${s}</option>`).join("");
+    if (!sessions.length) return;
+
+    // default to previous session if available
+    const prev = sessions.length >= 2 ? sessions[sessions.length - 2] : sessions[sessions.length - 1];
+    sel.value = prev;
+    currentSession = prev;
+    localStorage.setItem("session", currentSession);
+  }catch(e){
+    sel.innerHTML = currentSession ? `<option value="${currentSession}">${currentSession}</option>` : "";
+  }
+}
+
+async function loadClasses(){
+  const clsSel = document.getElementById("classSelect");
+  clsSel.innerHTML = "";
+  if(!currentSession) return;
+  try{
+    // Prefer master student backend to avoid empty fee-ledger classes.
+    const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (Array.isArray(data?.students) ? data.students : []);
+    const classes = [...new Set(rows.map(s => String(s.class_name || s.class || "").trim()).filter(Boolean))].sort();
+    clsSel.innerHTML = classes.map(c => `<option value="${c}">${c}</option>`).join("");
+    if(!classes.length){
+      // Fallback to fee backend class list if master is empty.
+      const r2 = await fetch(`${FEE_API}/getClassList/${encodeURIComponent(currentSession)}`);
+      const d2 = await r2.json();
+      const c2 = Array.isArray(d2) ? d2 : [];
+      clsSel.innerHTML = c2.map(c => `<option value="${c.class_name}">${c.class_name}</option>`).join("");
+    }
+  }catch(e){
+    clsSel.innerHTML = "";
+  }
+}
+
+function renderTable(){
+  const tbody = document.getElementById("prevDueBody");
+  if(!students.length){
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#6b7280;padding:16px;">No students found.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = students.map((s, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${s.name || s.student_name || "-"}</td>
+      <td>${s.class_name || "-"}</td>
+      <td>${s.roll || s.rollno || "-"}</td>
+      <td><input type="number" min="0" value="${Number(s.previous_due || 0)}" data-roll="${s.roll}" /></td>
+    </tr>
+  `).join("");
+}
+
+async function loadClassStudents(){
+  const cls = document.getElementById("classSelect").value;
+  if(!cls) return;
+  setStatus("Loading students...");
+  try{
+    const [feeRes, masterRes] = await Promise.allSettled([
+      fetch(`${FEE_API}/students?session=${encodeURIComponent(currentSession)}&class_name=${encodeURIComponent(cls)}`, {
+        headers: { "X-Session": currentSession }
+      }),
+      fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}&class_name=${encodeURIComponent(cls)}`)
+    ]);
+
+    let feeRows = [];
+    if (feeRes.status === "fulfilled" && feeRes.value.ok){
+      const data = await feeRes.value.json().catch(() => ({}));
+      feeRows = Array.isArray(data?.students) ? data.students : [];
+    }
+
+    let masterRows = [];
+    if (masterRes.status === "fulfilled" && masterRes.value.ok){
+      const data = await masterRes.value.json().catch(() => ({}));
+      masterRows = Array.isArray(data) ? data : (Array.isArray(data?.students) ? data.students : []);
+    }
+
+    masterByRoll = new Map();
+    masterRows.forEach(m => {
+      const roll = String(m.rollno ?? m.roll ?? "").trim();
+      if(!roll) return;
+      masterByRoll.set(roll, m);
+    });
+
+    if (masterRows.length){
+      // Build list from master to avoid 0 students when fee ledger is empty
+      students = masterRows.map(m => ({
+        name: m.student_name || m.name || "",
+        class_name: m.class_name || m.class || cls,
+        roll: String(m.rollno ?? m.roll ?? "").trim(),
+        previous_due: 0
+      }));
+      // overlay fee previous_due if exists
+      const feeMap = new Map(feeRows.map(s => [String(s.roll || "").trim(), s]));
+      students = students.map(s => {
+        const fs = feeMap.get(s.roll);
+        if (fs) s.previous_due = Number(fs.previous_due || 0);
+        return s;
+      });
+    }else{
+      students = feeRows;
+    }
+    renderTable();
+    setStatus(`Loaded ${students.length} students.`);
+  }catch(e){
+    setStatus("Failed to load students.");
+  }
+}
+
+async function savePreviousDue(){
+  if(!students.length) return;
+  const cls = document.getElementById("classSelect").value;
+  const inputs = document.querySelectorAll("#prevDueBody input[data-roll]");
+  const updates = Array.from(inputs).map(inp => ({
+    roll: inp.dataset.roll,
+    previous_due: Number(inp.value || 0)
+  }));
+
+  setStatus("Saving...");
+  try{
+    let ok = 0;
+    for (const u of updates){
+      const res = await fetch(`${FEE_API}/update_student`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Session": currentSession },
+        body: JSON.stringify({
+          class: cls,
+          roll: u.roll,
+          student: { previous_due: u.previous_due }
+        })
+      });
+      if(res.ok){
+        ok += 1;
+        continue;
+      }
+      // If missing in fee ledger, create minimal student then update.
+      const m = masterByRoll.get(String(u.roll)) || {};
+      await fetch(`${FEE_API}/student/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Session": currentSession },
+        body: JSON.stringify({
+          name: m.student_name || m.name || "Student",
+          class_name: cls,
+          roll: u.roll,
+          previous_due: u.previous_due
+        })
+      });
+      const res2 = await fetch(`${FEE_API}/update_student`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Session": currentSession },
+        body: JSON.stringify({
+          class: cls,
+          roll: u.roll,
+          student: { previous_due: u.previous_due }
+        })
+      });
+      if(res2.ok) ok += 1;
+    }
+    setStatus(`Saved ${ok}/${updates.length} records.`);
+  }catch(e){
+    setStatus("Save failed.");
+  }
+}
+
+document.getElementById("sessionSelect").addEventListener("change", async () => {
+  currentSession = document.getElementById("sessionSelect").value;
+  localStorage.setItem("session", currentSession);
+  await loadClasses();
+});
+document.getElementById("loadBtn").addEventListener("click", loadClassStudents);
+document.getElementById("refreshBtn").addEventListener("click", loadClassStudents);
+document.getElementById("saveBtn").addEventListener("click", savePreviousDue);
+
+(async function init(){
+  await loadSessions();
+  await loadClasses();
+})();
+</script>
+<script src="shared_menu.js"></script>
+</body>
+</html>

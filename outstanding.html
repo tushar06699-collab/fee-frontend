@@ -150,7 +150,7 @@ th{background:#f2f7ff;color:#0f3c84;font-weight:700}
     <div class="title">Outstanding List</div>
     <div class="spacer"></div>
   </div>
-  <div id="overlay" class="overlay"></div>
+  <div id="overlay" class="overlay" onclick="closeMenu()"></div>
   <div id="sideMenu" class="side-menu"></div>
 
   <div class="wrap">
@@ -176,9 +176,10 @@ th{background:#f2f7ff;color:#0f3c84;font-weight:700}
       <div class="hint">Students are shown when selected month fee is pending (not fully paid).</div>
       <div class="template-wrap">
         <label>Message Template ({name}, {class}, {roll}, {month}, {due})</label>
-        <textarea id="msgTemplate">Dear Parent, fee due reminder for {name} (Class {class}, Roll {roll}). Pending for {month}: Rs. {due}. Kindly pay at the earliest. - P.S. Public School</textarea>
+        <textarea id="msgTemplate">Dear Parent, fee due reminder for {name} (Class {class}, Roll {roll}).\nPending:\n{month}\nTotal Due: Rs. {due}\nKindly pay at the earliest.\n- P.S. Public School</textarea>
         <div class="template-actions">
           <button class="btn" style="background:#16a34a" onclick="sendAllWhatsApp()">Send All WhatsApp</button>
+          <button class="btn" style="background:#2563eb" onclick="sendAllEmail()">Send All Email</button>
         </div>
       </div>
 
@@ -201,12 +202,18 @@ th{background:#f2f7ff;color:#0f3c84;font-weight:700}
               <th>Month Due</th>
               <th>Total Pending Due</th>
               <th>Mobile</th>
+              <th>Email</th>
               <th>Phone Valid</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody id="outstandingBody"></tbody>
         </table>
+        <div class="pager" style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+          <button class="btn" id="prevPageBtn" onclick="changePage(-1)">Prev</button>
+          <div class="hint" id="pageInfo">Page 1</div>
+          <button class="btn" id="nextPageBtn" onclick="changePage(1)">Next</button>
+        </div>
       </div>
     </div>
   </div>
@@ -222,6 +229,27 @@ let monthlyFeesByClass = {};
 let annualFeesByClass = {};
 let admissionFeesByClass = {};
 let filteredDueRows = [];
+let currentPage = 1;
+const PAGE_SIZE = 25;
+
+const sideMenu = document.getElementById("sideMenu");
+const overlay = document.getElementById("overlay");
+
+function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
+function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
+function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
+
+sideMenu.innerHTML = `
+  <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
+    <div class="menu-item" onclick="goToPage('outstanding.html')">Outstanding List</div>
+  <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
+        <div class="menu-item" onclick="goToPage('transport_fee.html')">Transport Fee</div>
+    <div class="menu-item" onclick="goToPage('scholarship.html')">Scholarship Data</div>
+      <div class="menu-item" onclick="goToPage('exam_schedule.html')">Exam Data</div>
+            <div class="menu-item" onclick="goToPage('summary.html')">Summary Data</div>
+    <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
+`;
 
 function money(v){ return `Rs. ${Number(v || 0).toLocaleString("en-IN")}`; }
 function toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -255,6 +283,13 @@ function isValidPhone(raw){
   const n = normalizePhone(raw);
   // Strict India validation for this portal.
   return /^91\d{10}$/.test(n);
+}
+function normalizeEmail(raw){
+  return safeText(raw).toLowerCase();
+}
+function isValidEmail(raw){
+  const e = normalizeEmail(raw);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 }
 function monthKeyFromDate(dateVal){
   const d = dateVal ? new Date(dateVal + "T00:00:00") : new Date();
@@ -294,12 +329,31 @@ function totalPendingDue(student){
 }
 function buildReminderMessage(student, monthKey, monthDue){
   const tpl = document.getElementById("msgTemplate").value || "";
-  return tpl
+  const cls = normalizeClassName(student.class_name);
+  const monthDefault = toNum(monthlyFeesByClass[cls] || 0);
+  const months = student.months || {};
+  const order = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Annual","previousDue"];
+  const pendingList = [];
+  let totalPending = 0;
+  order.forEach(m => {
+    const def = (m === "previousDue") ? toNum(student.previous_due) :
+      (m === "Annual") ? (toNum(annualFeesByClass[cls] || 0) + (student.new_admission ? toNum(admissionFeesByClass[cls] || 0) : 0)) :
+      monthDefault;
+    const rec = monthDueRecord(months[m], def);
+    if (rec.due > 0) {
+      const label = m === "previousDue" ? "Previous Due" : (m === "Annual" ? "Annual" : m);
+      pendingList.push(`${label}: ${rec.status} Rs.${rec.due}`);
+      totalPending += rec.due;
+    }
+  });
+  const pendingText = pendingList.length ? pendingList.join("\n") : `${monthKey}: ${monthDue ? "Due" : "Paid"} Rs.${monthDue || 0}`;
+  const msg = tpl
     .replaceAll("{name}", student.name || "")
     .replaceAll("{class}", student.class_name || "")
     .replaceAll("{roll}", student.roll || "")
-    .replaceAll("{month}", monthKey || "")
-    .replaceAll("{due}", String(monthDue || 0));
+    .replaceAll("{month}", pendingText)
+    .replaceAll("{due}", String(totalPending || monthDue || 0));
+  return msg.replace(/\\n/g, "\n");
 }
 function sendWhatsApp(phone, message){
   const num = normalizePhone(phone);
@@ -335,6 +389,51 @@ function sendAllWhatsApp(){
       sendWhatsApp(r.mobile, r.message);
     }, i * 350);
   });
+}
+
+async function sendAllEmail(){
+  const list = filteredDueRows.filter(r => r.email && r.isEmailValid);
+  if (!list.length){
+    alert("No valid email ids in current filtered list.");
+    return;
+  }
+  if (!confirm(`Send email to ${list.length} students?`)) return;
+
+  // Send personalized email per student (message has their data).
+  list.forEach((r, i) => {
+    setTimeout(() => {
+      sendSingleEmail(r.email, encodeURIComponent(r.message));
+    }, i * 300);
+  });
+}
+
+async function sendSingleEmail(email, message){
+  const addr = normalizeEmail(email);
+  if(!isValidEmail(addr)){
+    alert("No valid email id for this student.");
+    return;
+  }
+  try{
+    const subject = `Fee Due Reminder - ${document.getElementById("selectedMonthLabel").textContent}`;
+    const decodedMessage = decodeURIComponent(message || "");
+    const res = await fetch(`${FEE_API}/email/send-bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        emails: [addr],
+        subject,
+        message: decodedMessage
+      })
+    });
+    const data = await res.json();
+    if(!res.ok || data.success === false){
+      alert(data.message || "Email send failed.");
+      return;
+    }
+    alert("Email sent.");
+  }catch(e){
+    alert("Email send failed.");
+  }
 }
 
 async function loadSessions(){
@@ -418,6 +517,14 @@ async function loadOutstandingRows(){
         fs.phone ||
         ""
       ),
+      email: safeText(
+        m.parent_email ||
+        m.email ||
+        m.guardian_email ||
+        fs.parent_email ||
+        fs.email ||
+        ""
+      ),
       new_admission: Boolean(m.new_admission),
       previous_due: toNum(fs.previous_due),
       months: (fs.months && typeof fs.months === "object") ? fs.months : {}
@@ -463,18 +570,21 @@ function renderTable(){
   });
 
   if (!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="10" class="empty">No pending students for selected month.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="empty">No pending students for selected month.</td></tr>`;
     filteredDueRows = [];
     document.getElementById("pendingCount").textContent = "0";
     document.getElementById("monthDueTotal").textContent = "Rs. 0";
     document.getElementById("allDueTotal").textContent = "Rs. 0";
+    document.getElementById("pageInfo").textContent = "Page 0";
+    document.getElementById("prevPageBtn").disabled = true;
+    document.getElementById("nextPageBtn").disabled = true;
     return;
   }
 
   let monthDueTotal = 0;
   let allDueTotal = 0;
   filteredDueRows = [];
-  tbody.innerHTML = filtered.map((r, i) => {
+  filtered.forEach((r) => {
     const cls = normalizeClassName(r.class_name);
     const monthDefault = toNum(monthlyFeesByClass[cls] || 0);
     const rec = monthDueRecord((r.months || {})[monthKey], monthDefault);
@@ -484,17 +594,38 @@ function renderTable(){
     const message = buildReminderMessage(r, monthKey, rec.due);
     const mobile = normalizePhone(r.mobile);
     const valid = isValidPhone(r.mobile);
+    const email = normalizeEmail(r.email);
+    const emailValid = isValidEmail(r.email);
     filteredDueRows.push({
       ...r,
       message,
       mobile,
       isPhoneValid: valid,
+      email,
+      isEmailValid: emailValid,
       monthDue: rec.due
     });
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = filtered.slice(start, start + PAGE_SIZE);
+
+  tbody.innerHTML = pageRows.map((r, i) => {
+    const cls = normalizeClassName(r.class_name);
+    const monthDefault = toNum(monthlyFeesByClass[cls] || 0);
+    const rec = monthDueRecord((r.months || {})[monthKey], monthDefault);
+    const allDue = totalPendingDue(r);
+    const message = buildReminderMessage(r, monthKey, rec.due);
+    const mobile = normalizePhone(r.mobile);
+    const valid = isValidPhone(r.mobile);
+    const email = normalizeEmail(r.email);
+    const emailValid = isValidEmail(r.email);
     const detailsLink = `student_details.html?roll=${encodeURIComponent(r.roll)}&class=${encodeURIComponent(r.class_name)}&session=${encodeURIComponent(currentSession)}`;
     return `
       <tr>
-        <td>${i + 1}</td>
+        <td>${start + i + 1}</td>
         <td>${r.name}</td>
         <td>${r.class_name}</td>
         <td>${r.roll}</td>
@@ -502,9 +633,10 @@ function renderTable(){
         <td class="money due">${money(rec.due)}</td>
         <td class="money due">${money(allDue)}</td>
         <td>${mobile || "-"}</td>
+        <td>${email || "-"}</td>
         <td>${valid ? '<span class="ok-dot"></span>Valid' : '<span class="bad-dot"></span>Invalid'}</td>
         <td>
-          <button class="btn" onclick="window.location.href='${detailsLink}'">Open</button>
+          <button class="btn" style="background:#2563eb;${emailValid ? "" : "opacity:.6;"}" ${emailValid ? "" : "disabled"} onclick="sendSingleEmail('${email}', '${encodeURIComponent(message)}')">Email</button>
           <button class="btn" style="background:#16a34a;${valid ? "" : "opacity:.6;"}" ${valid ? "" : "disabled"} onclick="sendWhatsAppEncoded('${mobile}', '${encodeURIComponent(message)}')">WhatsApp</button>
           <button class="btn" style="background:#475569" onclick="copyMessageEncoded('${encodeURIComponent(message)}')">Copy</button>
         </td>
@@ -515,6 +647,9 @@ function renderTable(){
   document.getElementById("pendingCount").textContent = String(filtered.length);
   document.getElementById("monthDueTotal").textContent = money(monthDueTotal);
   document.getElementById("allDueTotal").textContent = money(allDueTotal);
+  document.getElementById("pageInfo").textContent = `Page ${currentPage} of ${totalPages}`;
+  document.getElementById("prevPageBtn").disabled = currentPage <= 1;
+  document.getElementById("nextPageBtn").disabled = currentPage >= totalPages;
 }
 
 document.getElementById("sessionSelect").addEventListener("change", async () => {
@@ -523,9 +658,14 @@ document.getElementById("sessionSelect").addEventListener("change", async () => 
   await loadFeeStructure();
   await loadOutstandingRows();
 });
-document.getElementById("classFilter").addEventListener("change", renderTable);
-document.getElementById("searchInput").addEventListener("input", renderTable);
-document.getElementById("asOnDate").addEventListener("change", renderTable);
+document.getElementById("classFilter").addEventListener("change", () => { currentPage = 1; renderTable(); });
+document.getElementById("searchInput").addEventListener("input", () => { currentPage = 1; renderTable(); });
+document.getElementById("asOnDate").addEventListener("change", () => { currentPage = 1; renderTable(); });
+
+function changePage(delta){
+  currentPage = Math.max(1, currentPage + delta);
+  renderTable();
+}
 
 (async function init(){
   const today = new Date();
@@ -535,6 +675,6 @@ document.getElementById("asOnDate").addEventListener("change", renderTable);
   await loadOutstandingRows();
 })();
 </script>
-<script src="shared_menu.js"></script>
+<script src="feeshared_menu.js"></script>
 </body>
 </html>

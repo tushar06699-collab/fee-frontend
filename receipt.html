@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Fee Receipt â€” P.S. Public School</title>
+<title>Fee Receipt — P.S. Public School</title>
 
 <style>
 body{
@@ -123,6 +123,9 @@ th{background:#eef6ff;}
 
 .small{font-size:13px;color:#666;}
 .muted{color:#666;font-size:13px;}
+.barcode-wrap{margin-top:8px;display:flex;justify-content:flex-end;}
+#receiptBarcode{max-width:320px;}
+.slip .barcode{margin-top:6px;}
 
 
 /* ---------------------------------- */
@@ -162,6 +165,10 @@ th{background:#eef6ff;}
         font-size: 11px;
         line-height: 1.3;
     }
+    .slip .barcode {
+        max-width: 68mm;
+        height: 20mm;
+    }
 
     .slip h2 {
         margin: 0;
@@ -178,6 +185,13 @@ th{background:#eef6ff;}
         font-size: 10px;
         text-align: left;
     }
+    .slip th + th, .slip td + td {
+        border-left: 1px dotted #000;
+        padding-left: 4px;
+    }
+    .slip thead tr {
+        border-bottom: 1px solid #000;
+    }
     .slip td.num, .slip th.num { text-align: right; }
 }
 </style>
@@ -185,27 +199,28 @@ th{background:#eef6ff;}
 
 <body>
 <div class="topbar">
-  <div class="menu-btn" onclick="toggleMenu()">â˜°</div>
+  <div class="menu-btn" onclick="toggleMenu()">☰</div>
   <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
 </div>
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 <div class="side-menu" id="sideMenu">
-  <div class="menu-item" onclick="goToPage('edit.html')">Edit Student</div>
-  <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
-  <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
-  <div class="menu-item" onclick="goToPage('exam_schedule.html')">Exam Schedule</div>
+  <div class="menu-item" onclick="goToPage('index.html')">Home</div>
+  <div class="menu-item" onclick="goToPage('index.html')">Home</div>
+
   <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
-  <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
 </div>
 
 <div class="container">
   <div class="header">
     <div class="header-left">
       <img src="images/logo1.png" alt="School logo" class="schoolLogo">
-      <h1>P.S. Public School â€“ Fee Receipt</h1>
+      <h1>P.S. Public School – Fee Receipt</h1>
     </div>
     <div style="text-align:right">
       <div id="showTopReceipt" class="muted"></div>
+      <div class="barcode-wrap">
+        <svg id="receiptBarcode"></svg>
+      </div>
     </div>
   </div>
 
@@ -215,13 +230,13 @@ th{background:#eef6ff;}
   <div class="controls">
     <button class="btn gray" onclick="goBackToStudent()">Back</button>
 
-    <label>Session:</label>
-    <select id="sessionSelect" style="padding:8px;border-radius:6px;border:1px solid #ccc"></select>
+    <label class="history-hide">Session:</label>
+    <select id="sessionSelect" class="history-hide" style="padding:8px;border-radius:6px;border:1px solid #ccc"></select>
 
-    <button class="btn blue" id="btnSave">Save to session</button>
+    <button class="btn blue history-hide" id="btnSave">Save to session</button>
     <button class="btn" id="btnPrint">Print</button>
 
-    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <div class="history-hide" style="margin-left:auto;display:flex;gap:8px;align-items:center">
       <div class="small">Auto-save: <span id="autoSaveFlag">waiting</span></div>
     </div>
   </div>
@@ -231,16 +246,16 @@ th{background:#eef6ff;}
   <table id="monthsTbl">
     <thead>
       <tr>
-        <th>Month</th><th>Paid (â‚¹)</th><th>Due (â‚¹)</th><th>Status</th><th>Purpose</th><th>Extra</th>
+        <th>Month</th><th>Paid (&#8377;)</th><th>Due (&#8377;)</th><th>Status</th><th>Other Fees</th><th>Extra</th>
       </tr>
     </thead>
     <tbody id="monthsTable"></tbody>
   </table>
 
   <div style="margin-top:12px">
-    <h3 style="display:inline-block;margin:0 12px 0 0">Total Paid: â‚¹<span id="tPaid"></span></h3>
-    <h3 style="display:inline-block;margin:0 12px">Total Due: â‚¹<span id="tDue"></span></h3>
-    <h3 style="display:inline-block;margin:0 12px">Advance Left: â‚¹<span id="tAdv"></span></h3>
+    <h3 style="display:inline-block;margin:0 12px 0 0">Total Paid: &#8377;<span id="tPaid"></span></h3>
+    <h3 style="display:inline-block;margin:0 12px">Total Due: &#8377;<span id="tDue"></span></h3>
+    <h3 style="display:inline-block;margin:0 12px">Advance Left: &#8377;<span id="tAdv"></span></h3>
     <div id="transportTotals" class="small muted" style="margin-top:8px">Transport Included: 0 (Paid: 0, Due: 0)</div>
   </div>
 
@@ -258,6 +273,7 @@ th{background:#eef6ff;}
   <div class="print-grid" id="printGrid"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
 <script>
 /* ----------------------------- */
@@ -334,8 +350,9 @@ data.months = Array.isArray(data.months) ? data.months : (
   }) : []
 );
 
-if (!data.receiptKey && data.receipt_number) {
-  data.receiptKey = String(data.receipt_number);
+if (!data.receiptKey) {
+  if (data.receipt_key) data.receiptKey = String(data.receipt_key);
+  else if (data.receipt_number) data.receiptKey = String(data.receipt_number);
 }
 
 let sessionsList = ["2024_25","2025_26"];
@@ -357,6 +374,17 @@ if (incomingSession) {
   }
   sel.value = incomingSession;
 }
+const sessionFromUrl = String(params.get("session") || "").trim();
+if (!incomingSession && sessionFromUrl) {
+  const exists = sessionsList.includes(sessionFromUrl);
+  if (!exists) {
+    const opt=document.createElement("option");
+    opt.value=sessionFromUrl;
+    opt.textContent=sessionFromUrl;
+    sel.appendChild(opt);
+  }
+  sel.value = sessionFromUrl;
+}
 data.session = sel.value;
 
 function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
@@ -368,7 +396,9 @@ function generateReceiptKey(){
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
   data.receiptKey = `${data.class}-${data.roll}-${data.session}-${ts}-${rand}`;
 }
-generateReceiptKey();
+if (!isHistoryView) {
+  generateReceiptKey();
+}
 
 sel.addEventListener("change", () => {
   data.session = sel.value;
@@ -384,7 +414,14 @@ function toNum(v){
 
 function monthLabel(m, rec){
   if (m === "previousDue" || m === "Previous Due") return "Previous Due";
-  if (m === "Annual") return data.new_admission ? "Annual + Admission" : "Annual";
+  if (m === "Annual") {
+    const extras = [];
+    if (data.new_admission && Number(data.admission_charge || 0) > 0) extras.push("Admission");
+    if (Number(data.registration_fee || 0) > 0) extras.push("Registration");
+    if (Number(data.id_card_fee || 0) > 0) extras.push("ID Card");
+    if (Number(data.books_charge || 0) > 0) extras.push("Books");
+    return extras.length ? `Annual + ${extras.join(" + ")}` : "Annual";
+  }
   const examApplied = Number((rec && rec.exam_fee_applied) || 0) > 0;
   const examByConfig = data.exam_months.includes(String(m || "").trim());
   const transportApplied = Number((rec && rec.transport_fee_applied) || 0) > 0;
@@ -470,6 +507,16 @@ function escapeHtml(s){
   return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 }
 
+function displayOrNA(val){
+  const s = String(val ?? "").trim();
+  return s ? s : "NA";
+}
+
+function moneyOrNA(val){
+  const n = Number(val);
+  return Number.isFinite(n) && n > 0 ? `&#8377;${escapeHtml(n)}` : "NA";
+}
+
 function renderInfo(){
   const fallbackType = (() => {
     if (data.paid_type) return data.paid_type;
@@ -483,20 +530,24 @@ function renderInfo(){
   })();
   const paidTypeLabel = (fallbackType || "-").toUpperCase();
   document.getElementById("info").innerHTML = `
-    <p><strong>Name:</strong> ${escapeHtml(data.name)}</p>
-    <p class="muted"><strong>Father:</strong> ${escapeHtml(data.father)}</p>
-    <p class="muted"><strong>Class:</strong> ${escapeHtml(data.class)} &nbsp; 
-    <strong>Roll:</strong> ${escapeHtml(data.roll)}</p>
-    <p class="muted"><strong>Admission No:</strong> ${escapeHtml(data.admission_no || "-")}</p>
-    <p class="muted"><strong>Paid Type:</strong> ${escapeHtml(paidTypeLabel)}</p>
+    <p><strong>Name:</strong> ${escapeHtml(displayOrNA(data.name))}</p>
+    <p class="muted"><strong>Father:</strong> ${escapeHtml(displayOrNA(data.father))}</p>
+    <p class="muted"><strong>Class:</strong> ${escapeHtml(displayOrNA(data.class))} &nbsp; 
+    <strong>Roll:</strong> ${escapeHtml(displayOrNA(data.roll))}</p>
+    <p class="muted"><strong>Admission No:</strong> ${escapeHtml(displayOrNA(data.admission_no))}</p>
+    <p class="muted"><strong>Paid Type:</strong> ${escapeHtml(displayOrNA(paidTypeLabel))}</p>
     <p class="muted"><strong>New Admission:</strong> ${data.new_admission ? "Yes" : "No"}</p>
-    <p class="muted"><strong>Admission Charge:</strong> ${data.new_admission ? "â‚¹" + escapeHtml(data.admission_charge) : "-"}</p>
-    <p class="muted"><strong>Scholarship:</strong> ${escapeHtml(discountLabel(data.scholarship))}</p>
-    <p class="muted"><strong>Concession:</strong> ${escapeHtml(discountLabel(data.concession))}</p>
-    <p class="muted"><strong>Session:</strong> ${escapeHtml(data.session)}</p>
-    <p class="muted"><strong>Date:</strong> ${escapeHtml(data.date)}</p>
-    <p class="small muted"><strong>Receipt Key:</strong> ${escapeHtml(data.receiptKey)}</p>
+    <p class="muted"><strong>Admission Charge:</strong> ${data.new_admission ? moneyOrNA(data.admission_charge) : "NA"}</p>
+    <p class="muted"><strong>Registration Fee:</strong> ${moneyOrNA(data.registration_fee || 0)}</p>
+    <p class="muted"><strong>ID Card Fee:</strong> ${moneyOrNA(data.id_card_fee || 0)}</p>
+    <p class="muted"><strong>Books Fee:</strong> ${moneyOrNA(data.books_charge || 0)}</p>
+    <p class="muted"><strong>Scholarship:</strong> ${escapeHtml(displayOrNA(discountLabel(data.scholarship)))}</p>
+    <p class="muted"><strong>Concession:</strong> ${escapeHtml(displayOrNA(discountLabel(data.concession)))}</p>
+    <p class="muted"><strong>Session:</strong> ${escapeHtml(displayOrNA(data.session))}</p>
+    <p class="muted"><strong>Date:</strong> ${escapeHtml(displayOrNA(data.date))}</p>
+    <p class="small muted"><strong>Receipt Key:</strong> ${escapeHtml(displayOrNA(data.receiptKey))}</p>
   `;
+  renderBarcode();
 }
 
 function renderMonths(){
@@ -533,6 +584,9 @@ function buildSlipHTML(){
     </tr>
   `).join("");
   const admissionRow = data.new_admission ? `<div>Admission Charge: ${data.admission_charge}</div>` : "";
+  const regRow = Number(data.registration_fee || 0) > 0 ? `<div>Registration Fee: ${data.registration_fee}</div>` : "";
+  const idRow = Number(data.id_card_fee || 0) > 0 ? `<div>ID Card Fee: ${data.id_card_fee}</div>` : "";
+  const booksRow = Number(data.books_charge || 0) > 0 ? `<div>Books Fee: ${data.books_charge}</div>` : "";
   const scholarshipRow = `<div>Scholarship: ${discountLabel(data.scholarship)}</div>`;
   const concessionRow = `<div>Concession: ${discountLabel(data.concession)}</div>`;
   const paidTypeRow = `<div>Paid Type: ${(data.paid_type || "-").toUpperCase()}</div>`;
@@ -543,14 +597,18 @@ function buildSlipHTML(){
     <div class="center">Fee Receipt</div>
     <div class="line"></div>
     <div>Receipt Key: ${data.receiptKey}</div>
-    <div>Name: ${data.name}</div>
-    <div>Father: ${data.father}</div>
-    <div>Class: ${data.class}   Roll: ${data.roll}</div>
-    <div>Admission No: ${data.admission_no || "-"}</div>
+    <svg class="barcode" id="slipBarcode"></svg>
+    <div>Name: ${displayOrNA(data.name)}</div>
+    <div>Father: ${displayOrNA(data.father)}</div>
+    <div>Class: ${displayOrNA(data.class)}   Roll: ${displayOrNA(data.roll)}</div>
+    <div>Admission No: ${displayOrNA(data.admission_no)}</div>
     ${paidTypeRow}
-    <div>Session: ${data.session}</div>
-    <div>Date: ${data.date}</div>
+    <div>Session: ${displayOrNA(data.session)}</div>
+    <div>Date: ${displayOrNA(data.date)}</div>
     ${admissionRow}
+    ${regRow}
+    ${idRow}
+    ${booksRow}
     ${scholarshipRow}
     ${concessionRow}
     <div class="line"></div>
@@ -566,7 +624,10 @@ function buildSlipHTML(){
     <div><strong>Advance:</strong> ${data.advance}</div>
     <div><strong>Transport Included:</strong> Rs ${tt.total} (Paid: Rs ${tt.paid}, Due: Rs ${tt.due})</div>
     <div style="margin-top:8px" class="center">Thank You</div>
-    <div style="margin-top:10px">Sign: _______________</div>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+      <div>Sign:</div>
+      <img src="sign.png" alt="Signature" style="height:32px;object-fit:contain;">
+    </div>
   </div>`;
 }
 
@@ -581,21 +642,24 @@ function buildReceiptHTML(label){
     </div>
     <hr>
     <div style="font-size:12px;line-height:16px;">
-      Name: ${data.name}<br>
-      Father: ${data.father}<br>
-      Class: ${data.class} | Roll: ${data.roll}<br>
-      Admission: ${data.admission_no || "-"}<br>
-      Paid Type: ${(data.paid_type || "-").toUpperCase()}<br>
-      ${data.new_admission ? `Admission Charge: â‚¹${data.admission_charge}<br>` : ""}
+      Name: ${displayOrNA(data.name)}<br>
+      Father: ${displayOrNA(data.father)}<br>
+      Class: ${displayOrNA(data.class)} | Roll: ${displayOrNA(data.roll)}<br>
+      Admission: ${displayOrNA(data.admission_no)}<br>
+      Paid Type: ${displayOrNA((data.paid_type || "-").toUpperCase())}<br>
+      ${data.new_admission ? `Admission Charge: &#8377;${data.admission_charge}<br>` : ""}
+      ${Number(data.registration_fee || 0) > 0 ? `Registration Fee: &#8377;${data.registration_fee}<br>` : ""}
+      ${Number(data.id_card_fee || 0) > 0 ? `ID Card Fee: &#8377;${data.id_card_fee}<br>` : ""}
+      ${Number(data.books_charge || 0) > 0 ? `Books Fee: &#8377;${data.books_charge}<br>` : ""}
       Scholarship: ${discountLabel(data.scholarship)}<br>
       Concession: ${discountLabel(data.concession)}<br>
-      Session: ${data.session}<br>
-      Date: ${data.date}
+      Session: ${displayOrNA(data.session)}<br>
+      Date: ${displayOrNA(data.date)}
     </div>
     <div style="margin-top:6px;font-size:12px;">
-      <strong>Total Paid:</strong> â‚¹${data.totalPaid} &nbsp;&nbsp;
-      <strong>Total Due:</strong> â‚¹${data.totalDue} &nbsp;&nbsp;
-      <strong>Advance:</strong> â‚¹${data.advance}
+      <strong>Total Paid:</strong> &#8377;${data.totalPaid} &nbsp;&nbsp;
+      <strong>Total Due:</strong> &#8377;${data.totalDue} &nbsp;&nbsp;
+      <strong>Advance:</strong> &#8377;${data.advance}
     </div>
     <div style="margin-top:4px;font-size:12px;">
       <strong>Transport Included:</strong> Rs ${tt.total} (Paid: Rs ${tt.paid}, Due: Rs ${tt.due})
@@ -619,8 +683,9 @@ async function saveToSession(isAuto = false){
       return;
     }
 
-    // fresh key for each new saved receipt
-    generateReceiptKey();
+    if (!data.receiptKey) {
+      generateReceiptKey();
+    }
 
     const saveRes = await fetch(`${API}/receipt/add`,{
       method:"POST",
@@ -633,11 +698,12 @@ async function saveToSession(isAuto = false){
     }
 
     document.getElementById("saveStatus").innerHTML = 
-      `Saved âœ” â€” Receipt Key: ${data.receiptKey}`;
+      `Saved ✔ — Receipt Key: ${data.receiptKey}`;
     document.getElementById("saveStatus").style.display="block";
     document.getElementById("saveError").style.display="none";
     document.getElementById("showTopReceipt").textContent =
       "Receipt Key: " + data.receiptKey;
+    renderInfo();
     if (isAuto) setAutoSaveFlag("saved");
 
   }catch(e){
@@ -651,9 +717,45 @@ function printReceipt(){
   const grid = document.getElementById("printGrid");
 
   grid.innerHTML = buildSlipHTML();
+  if (typeof JsBarcode === "function") {
+    const slipBarcode = document.getElementById("slipBarcode");
+    if (slipBarcode && data.receiptKey) {
+      JsBarcode(slipBarcode, data.receiptKey, {
+        format: "CODE128",
+        width: 0.7,
+        height: 20,
+        displayValue: true,
+        fontSize: 8,
+        margin: 0
+      });
+    }
+  }
 
   document.getElementById("printPage").style.display="block";
   window.print();
+}
+
+function renderBarcode(){
+  if (typeof JsBarcode !== "function") return;
+  const el = document.getElementById("receiptBarcode");
+  if (!el || !data.receiptKey) return;
+  JsBarcode(el, data.receiptKey, {
+    format: "CODE128",
+    width: 1,
+    height: 40,
+    displayValue: true,
+    fontSize: 10,
+    margin: 0
+  });
+}
+
+function getStoredIndexClass(session){
+  try{
+    const key = `selectedClass:${session || ""}`;
+    return String(localStorage.getItem(key) || "").trim();
+  }catch(e){
+    return "";
+  }
 }
 
 function goBackToStudent(){
@@ -661,20 +763,21 @@ function goBackToStudent(){
   const roll = String(data.roll || "").trim();
   const session = String(data.session || "").trim();
 
-  if (!cls || !roll) {
-    history.back();
-    return;
-  }
-
-  const qs = new URLSearchParams();
-  qs.set("class", cls);
-  qs.set("roll", roll);
-  if (session) qs.set("session", session);
   if (isAccountantView) {
+    const qs = new URLSearchParams();
+    if (cls) qs.set("class", cls);
+    if (roll) qs.set("roll", roll);
+    if (session) qs.set("session", session);
     window.location.href = `accountant_student_details.html?${qs.toString()}`;
     return;
   }
-  window.location.href = `student_details.html?${qs.toString()}`;
+
+  const storedClass = getStoredIndexClass(session);
+  const targetClass = storedClass || cls;
+  const qs = new URLSearchParams();
+  if (targetClass) qs.set("class", targetClass);
+  if (session) qs.set("session", session);
+  window.location.href = `index.html?${qs.toString()}`;
 }
 
 
@@ -698,6 +801,9 @@ document.getElementById("btnWhats").addEventListener("click", ()=>{
   const annualRec = (data.months || []).find(x => x.month === "Annual") || {};
   msg += `Previous Due: Paid ${Number(prevRec.paid || 0)}, Due ${Number(prevRec.due || 0)}\n`;
   msg += `Admission Fee: ${data.new_admission ? Number(data.admission_charge || 0) : 0}\n`;
+  msg += `Registration Fee: ${Number(data.registration_fee || 0)}\n`;
+  msg += `ID Card Fee: ${Number(data.id_card_fee || 0)}\n`;
+  msg += `Books Fee: ${Number(data.books_charge || 0)}\n`;
   if (annualRec && Object.keys(annualRec).length) {
     msg += `${monthLabel("Annual")}: Paid ${Number(annualRec.paid || 0)}, Due ${Number(annualRec.due || 0)}\n`;
   }
@@ -743,7 +849,9 @@ renderMonths();
 if (isHistoryView) {
   const controls = document.querySelector(".controls");
   const whatsWrap = document.getElementById("whatsWrap");
-  if (controls) controls.style.display = "none";
+  document.querySelectorAll(".history-hide").forEach(el => {
+    el.style.display = "none";
+  });
   if (whatsWrap) whatsWrap.style.display = "none";
   const statusOk = document.getElementById("saveStatus");
   const statusErr = document.getElementById("saveError");

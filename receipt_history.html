@@ -119,6 +119,21 @@ th{
 tbody tr:hover{background:#f8fbff}
 .money{font-weight:700}
 .muted{color:var(--muted)}
+.diff-cell{max-width:260px}
+.diff-list{display:flex;flex-wrap:wrap;gap:6px}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:600;
+  background:#eef4ff;
+  color:#0f3c84;
+}
+.badge.warn{background:#fff4e6;color:#9a5a00}
+.badge.muted{background:#f2f4f7;color:#6b7280}
 .action-cell{display:flex;gap:6px}
 .small-btn{
   border:none;
@@ -166,6 +181,10 @@ tbody tr:hover{background:#f8fbff}
     <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
     <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
     <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
+    <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
+    <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
+    <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Stationary History</div>
+    <div class="menu-item" onclick="goToPage('stationary_fee_ledger.html')">Stationary Fee Ledger</div>
   </div>
 
   <div class="wrap">
@@ -176,7 +195,7 @@ tbody tr:hover{background:#f8fbff}
           <select id="sessionSelect"></select>
         </div>
         <div>
-          <label>Search (Receipt No, Name, Father, Class, Roll)</label>
+          <label>Search (Receipt No, Receipt Key, Name, Father, Class, Roll)</label>
           <input id="searchInput" type="text" placeholder="Type to filter receipts">
         </div>
         <div>
@@ -215,6 +234,7 @@ tbody tr:hover{background:#f8fbff}
               <th>Date</th>
               <th>Total Paid</th>
               <th>Total Due</th>
+              <th>Changes</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -268,6 +288,22 @@ function formatMoney(v){
 
 function safeText(v){
   return String(v ?? "").trim();
+}
+
+function receiptKey(r){
+  return safeText(r.receipt_number || r.id || "");
+}
+
+function studentKey(r){
+  const cls = safeText(r.class_name || r.class || "-");
+  const roll = safeText(r.roll || "-");
+  const name = safeText(r.name || "-");
+  return `${cls}|${roll}|${name}`.toLowerCase();
+}
+
+function parseDateValue(v){
+  const t = Date.parse(String(v || "").trim());
+  return Number.isFinite(t) ? t : 0;
 }
 
 function getSession(){
@@ -337,10 +373,11 @@ function applyFilters(){
     const name = safeText(r.name).toLowerCase();
     const father = safeText(r.father).toLowerCase();
     const receiptNo = safeText(r.receipt_number).toLowerCase();
+    const receiptKey = safeText(r.receipt_key || r.receiptKey).toLowerCase();
     const date = safeText(r.date).toLowerCase();
 
     const classOk = !classVal || cls === classVal;
-    const searchOk = !q || [receiptNo, name, father, cls, roll, date].some(v => v.includes(q));
+    const searchOk = !q || [receiptNo, receiptKey, name, father, cls, roll, date].some(v => v.includes(q));
     return classOk && searchOk;
   });
 
@@ -371,15 +408,18 @@ function renderPager(){
 function renderTable(){
   const tbody = document.getElementById("historyTable");
   if (!filteredRows.length){
-    tbody.innerHTML = `<tr><td colspan="10" class="empty">No receipts found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="empty">No receipts found.</td></tr>`;
     return;
   }
 
+  const prevLookup = buildPrevLookup(filteredRows);
   tbody.innerHTML = filteredRows.map((r, i) => {
     const cls = safeText(r.class_name || r.class || "-");
     const totalPaid = Number(r.total_paid ?? r.totalPaid ?? 0);
     const totalDue = Number(r.total_due ?? r.totalDue ?? 0);
     const encoded = encodeURIComponent(JSON.stringify(r));
+    const prev = prevLookup.get(receiptKey(r)) || null;
+    const diffHtml = renderDiffBadges(r, prev);
     return `
       <tr>
         <td>${i + 1}</td>
@@ -391,6 +431,7 @@ function renderTable(){
         <td class="muted">${safeText(r.date)}</td>
         <td class="money">${formatMoney(totalPaid)}</td>
         <td class="money">${formatMoney(totalDue)}</td>
+        <td class="diff-cell">${diffHtml}</td>
         <td class="action-cell">
           <button class="small-btn view" onclick='viewReceipt("${encoded}")'>View</button>
           <button class="small-btn del" onclick='deleteReceipt(${Number(r.id || 0)})'>Delete</button>
@@ -400,9 +441,82 @@ function renderTable(){
   }).join("");
 }
 
+function buildPrevLookup(rows){
+  const sorted = [...rows].sort((a,b) => {
+    const da = parseDateValue(a.date);
+    const db = parseDateValue(b.date);
+    if (da !== db) return da - db;
+    const ra = String(a.receipt_number || a.id || "");
+    const rb = String(b.receipt_number || b.id || "");
+    return ra.localeCompare(rb, undefined, { numeric:true, sensitivity:"base" });
+  });
+
+  const lastByStudent = new Map();
+  const prevByReceipt = new Map();
+  sorted.forEach(r => {
+    const sk = studentKey(r);
+    const prev = lastByStudent.get(sk) || null;
+    prevByReceipt.set(receiptKey(r), prev);
+    lastByStudent.set(sk, r);
+  });
+  return prevByReceipt;
+}
+
+function normalizePurpose(p){
+  return String(p || "").trim();
+}
+
+function shortPurpose(p){
+  let text = normalizePurpose(p);
+  if (!text) return "";
+  text = text.replace(/^Stationary\s*:\s*/i, "");
+  text = text.replace(/\s*\|\s*Stationary\s*:\s*/gi, " | ");
+  return text;
+}
+
+function renderDiffBadges(curr, prev){
+  if (!prev) return `<span class="badge">First receipt</span>`;
+  const changes = [];
+  const currMonths = (curr && typeof curr.months === "object") ? curr.months : {};
+  const prevMonths = (prev && typeof prev.months === "object") ? prev.months : {};
+  const keys = new Set([...Object.keys(currMonths), ...Object.keys(prevMonths)]);
+
+  keys.forEach(k => {
+    const c = currMonths[k] || {};
+    const p = prevMonths[k] || {};
+    const cPaid = Number(c.paid || 0);
+    const pPaid = Number(p.paid || 0);
+    const cDue = Number(c.due || 0);
+    const pDue = Number(p.due || 0);
+    const cPurpose = normalizePurpose(c.purpose);
+    const pPurpose = normalizePurpose(p.purpose);
+
+    if (cPurpose && cPurpose !== pPurpose) {
+      const purposeText = shortPurpose(cPurpose);
+      changes.push(`${k}: ${purposeText || "Updated"}`);
+      return;
+    }
+    if (cPaid > pPaid || cDue > pDue) {
+      changes.push(`${k} updated`);
+    }
+  });
+
+  if (!changes.length) return `<span class="badge muted">No change</span>`;
+
+  const shown = changes.slice(0, 3).map(t => `<span class="badge">${t}</span>`).join("");
+  const remaining = changes.length - 3;
+  const more = remaining > 0 ? `<span class="badge warn">+${remaining} more</span>` : "";
+  return `<div class="diff-list">${shown}${more}</div>`;
+}
+
 function viewReceipt(encoded){
   const obj = JSON.parse(decodeURIComponent(encoded));
-  window.open("receipt.html?mode=history&data=" + encodeURIComponent(JSON.stringify(obj)), "_blank");
+  const session = safeText(obj.session || getSession() || localStorage.getItem("session") || "");
+  const qs = new URLSearchParams();
+  qs.set("mode", "history");
+  qs.set("data", JSON.stringify(obj));
+  if (session) qs.set("session", session);
+  window.open("receipt.html?" + qs.toString(), "_blank");
 }
 
 async function deleteReceipt(id){
@@ -458,6 +572,6 @@ document.getElementById("nextPageBtn").addEventListener("click", async () => {
   await loadHistory();
 })();
 </script>
-<script src="shared_menu.js"></script>
+<script src="feeshared_menu.js"></script>
 </body>
 </html>
