@@ -51,6 +51,15 @@ th{background:#007bff;color:#fff}
 .method-options label{display:flex;align-items:center;gap:6px;margin:0}
 .method-options input[type="checkbox"]{width:auto;padding:0;margin:0}
 .action-buttons{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.qr-modal{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:5000}
+.qr-modal.show{display:flex}
+.qr-card{background:#fff;border-radius:12px;padding:16px;width:320px;box-shadow:0 10px 30px rgba(0,0,0,.2);text-align:center}
+.qr-title{font-weight:700;margin-bottom:6px}
+.qr-amount{color:#0b6b33;font-weight:700;margin-bottom:6px}
+.qr-upi{font-size:12px;color:#666;margin-top:6px;word-break:break-all}
+.qr-timer{font-size:12px;color:#b45309;margin-top:6px;font-weight:700}
+.qr-actions{display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+#upiQrImage{width:220px;height:220px;border:1px solid #eee;border-radius:8px}
 .one-time-box{
   display:flex;flex-wrap:wrap;gap:16px;align-items:center;
   background:#f3f7ff;border:1px solid #dbe7ff;border-radius:10px;
@@ -125,13 +134,28 @@ th{background:#007bff;color:#fff}
         <div class="pill">Books Fee (Class): Rs <span id="booksFeeLabel">0</span></div>
       </div>
 
-      <div class="action-buttons">
-        <button class="btn primary" onclick="submitPayment()">Submit Payment</button>
-        <button class="btn advance" onclick="applyAdvance()">Apply Advance</button>
-        <button class="btn back" onclick="goBackToIndex()">Back</button>
-        <button class="btn paid-btn" onclick="generateReceipt()">Generate Receipt</button>
-      </div>
+  <div class="action-buttons">
+    <button class="btn primary" onclick="submitPayment()">Submit Payment</button>
+    <button class="btn advance" onclick="applyAdvance()">Apply Advance</button>
+    <button class="btn back" onclick="goBackToIndex()">Back</button>
+    <button class="btn paid-btn" onclick="generateReceipt()">Generate Receipt</button>
   </div>
+</div>
+
+<div id="upiQrModal" class="qr-modal" onclick="closeUpiQr(event)">
+  <div class="qr-card" onclick="event.stopPropagation()">
+    <div class="qr-title">UPI Payment</div>
+    <div class="qr-amount">Amount: Rs <span id="upiQrAmount">0</span></div>
+    <img id="upiQrImage" alt="UPI QR">
+    <div class="qr-upi" id="upiQrUpi"></div>
+    <div class="qr-timer">Expires in <span id="upiQrTimer">10:00</span></div>
+    <div class="qr-actions">
+      <button class="btn primary" onclick="markUpiPaid()">Paid</button>
+      <button class="btn advance" onclick="markUpiNotPaid()">Not Paid</button>
+      <button class="btn back" onclick="closeUpiQr()">Close</button>
+    </div>
+  </div>
+</div>
 
   <table>
     <thead>
@@ -189,10 +213,21 @@ let booksFees = {};     // class_name -> books_charge
 let registrationFee = 0;
 let idCardFee = 0;
 let examConfigs = [];   // [{name, months[], class_fees{class:fee}}]
+let lastPaymentAmount = 0;
+let autoReceiptTimer = null;
 
 /* Utility: safe number */
 function cleanNumber(x){
   return isNaN(Number(x)) ? 0 : Number(x);
+}
+
+function scheduleAutoReceipt(){
+  if (autoReceiptTimer) clearTimeout(autoReceiptTimer);
+  autoReceiptTimer = setTimeout(() => {
+    try{
+      generateReceipt();
+    }catch(e){}
+  }, 2000);
 }
 
 function normalizeDiscount(raw){
@@ -269,6 +304,7 @@ function toggleBooksFee(checked){
   student.months["Annual"] = annualRec;
   saveToBackend();
   render();
+  scheduleAutoReceipt();
 }
 
 function selectPaymentMethod(el){
@@ -278,11 +314,117 @@ function selectPaymentMethod(el){
       if (cb !== el) cb.checked = false;
     });
   }
+  maybeOpenUpiQr();
 }
 
 function getSelectedPaymentMethod(){
   const selected = [...document.querySelectorAll(".pm-method")].find(cb => cb.checked);
   return selected ? selected.value : "";
+}
+
+function getUpiId(){
+  let id = String(localStorage.getItem("upiId") || "").trim();
+  if (!id) {
+    id = "9416293661@okbizaxis";
+    localStorage.setItem("upiId", id);
+  }
+  return String(id || "").trim();
+}
+
+function getUpiName(){
+  let name = String(localStorage.getItem("upiName") || "").trim();
+  if (!name) {
+    name = "P.S. Public School";
+    localStorage.setItem("upiName", name);
+  }
+  return name;
+}
+
+function buildUpiUrl(amount){
+  const upiId = getUpiId();
+  if (!upiId) return "";
+  const name = getUpiName();
+  const note = `Fee ${student?.name || ""} ${student?.class_name || ""} ${student?.roll || ""}`.trim();
+  const params = new URLSearchParams();
+  params.set("pa", upiId);
+  params.set("pn", name);
+  params.set("am", String(Number(amount || 0)));
+  params.set("cu", "INR");
+  if (note) params.set("tn", note);
+  return `upi://pay?${params.toString()}`;
+}
+
+function showUpiQr(amount){
+  const upiUrl = buildUpiUrl(amount);
+  if (!upiUrl) return;
+  document.getElementById("upiQrAmount").textContent = String(Number(amount || 0));
+  document.getElementById("upiQrUpi").textContent = upiUrl;
+  document.getElementById("upiQrImage").src =
+    "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(upiUrl);
+  document.getElementById("upiQrModal").classList.add("show");
+  startUpiTimer(10 * 60);
+}
+
+function closeUpiQr(){
+  document.getElementById("upiQrModal").classList.remove("show");
+  stopUpiTimer();
+}
+
+function maybeOpenUpiQr(){
+  const method = getSelectedPaymentMethod();
+  const amount = cleanNumber(document.getElementById("payAmount").value);
+  if (method === "upi" && amount > 0) {
+    showUpiQr(amount);
+  } else {
+    closeUpiQr();
+  }
+}
+
+let upiTimerId = null;
+let upiTimerEnd = 0;
+function startUpiTimer(seconds){
+  stopUpiTimer();
+  upiTimerEnd = Date.now() + seconds * 1000;
+  const tick = () => {
+    const remaining = Math.max(0, upiTimerEnd - Date.now());
+    const totalSec = Math.ceil(remaining / 1000);
+    const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+    const ss = String(totalSec % 60).padStart(2, "0");
+    const el = document.getElementById("upiQrTimer");
+    if (el) el.textContent = `${mm}:${ss}`;
+    if (remaining <= 0) {
+      stopUpiTimer();
+      closeUpiQr();
+    }
+  };
+  tick();
+  upiTimerId = setInterval(tick, 1000);
+}
+
+function stopUpiTimer(){
+  if (upiTimerId) {
+    clearInterval(upiTimerId);
+    upiTimerId = null;
+  }
+}
+
+function setPaymentMethod(method){
+  const m = String(method || "").toLowerCase();
+  document.querySelectorAll(".pm-method").forEach(cb => {
+    cb.checked = cb.value === m;
+  });
+}
+
+function markUpiPaid(){
+  const amt = cleanNumber(document.getElementById("payAmount").value);
+  if (!amt) { alert("Enter amount first"); return; }
+  setPaymentMethod("upi");
+  closeUpiQr();
+  submitPayment();
+}
+
+function markUpiNotPaid(){
+  closeUpiQr();
 }
 
 function addPaymentMethodAmount(method, amount){
@@ -810,6 +952,7 @@ async function applyAdvance(){
   student.advance = adv;
   await saveToBackend();
   render();
+  scheduleAutoReceipt();
   alert("Advance applied.");
 }
 
@@ -821,6 +964,7 @@ async function submitPayment(){
   if(!enteredAmount){ alert("Enter amount"); return; }
   const method = getSelectedPaymentMethod();
   if (!method) { alert("Select payment method (Cash/UPI/Bank)"); return; }
+  lastPaymentAmount = enteredAmount;
   let amt = enteredAmount;
 
   // If student had advance, add it to amt (previous behavior) and zero student's advance
@@ -840,6 +984,8 @@ async function submitPayment(){
       rec.due = cleanNumber(rec.due || 0) - pay;
       rec.status = rec.due === 0 ? "Paid" : "Partial";
       rec.date = new Date().toISOString().split("T")[0];
+      rec.last_paid = cleanNumber(rec.last_paid || 0) + pay;
+      rec.last_method = method;
       amt -= pay;
     }
   }
@@ -854,6 +1000,7 @@ async function submitPayment(){
   document.getElementById("payAmount").value = "";
   await saveToBackend();
   render();
+  scheduleAutoReceipt();
 }
 
 /* ---------------- MARK PAID / DUE ---------------- */
@@ -867,10 +1014,13 @@ async function markPaid(m){
   rec.due = 0;
   rec.status = "Paid";
   rec.date = new Date().toISOString().split("T")[0];
+  rec.last_paid = cleanNumber(rec.last_paid || 0) + duePaid;
+  rec.last_method = method;
   addPaymentMethodAmount(method, duePaid);
   student.last_payment_method = method;
   await saveToBackend();
   render();
+  scheduleAutoReceipt();
 
   localStorage.setItem("paymentMade", Date.now());
 
@@ -885,6 +1035,16 @@ async function markDue(m){
   else if(m === "Annual") feeNow = computeAnnualTotal();
   else feeNow = getMonthlyFeeForClass(student.class_name) + getExamFeeForClassMonth(student.class_name, m) + getTransportFeeForMonth(m);
 
+  // revert method totals for the last payment on this month (if tracked)
+  const lastMethod = String(rec.last_method || "").toLowerCase();
+  const lastPaid = cleanNumber(rec.last_paid || rec.paid || 0);
+  if (lastMethod && ["cash","upi","bank"].includes(lastMethod) && lastPaid > 0) {
+    ensurePaymentMethods();
+    const cur = cleanNumber(student.payment_methods[lastMethod] || 0);
+    student.payment_methods[lastMethod] = Math.max(0, cur - lastPaid);
+  }
+  rec.last_paid = 0;
+  rec.last_method = "";
   rec.paid = 0;
   rec.exam_fee_applied = (m !== "previousDue" && m !== "Annual") ? getExamFeeForClassMonth(student.class_name, m) : 0;
   rec.transport_fee_applied = (m !== "previousDue" && m !== "Annual") ? getTransportFeeForMonth(m) : 0;
@@ -893,6 +1053,7 @@ async function markDue(m){
   rec.date = "";
   await saveToBackend();
   render();
+  scheduleAutoReceipt();
 }
 
 /* ---------------- GENERATE RECEIPT (simple open ) ---------------- */
@@ -900,6 +1061,7 @@ function generateReceipt() {
 
     let finalMonths = [];
 
+    const todayIso = new Date().toISOString().split("T")[0];
     monthsList.forEach(m => {
         const rec = student.months[m];
         if (!rec) return;
@@ -911,6 +1073,7 @@ function generateReceipt() {
             status: rec.status || "Due",
             purpose: rec.purpose || "",
             extra: rec.extra || 0,
+            date: rec.date || "",
             exam_fee_applied: cleanNumber(rec.exam_fee_applied || 0),
             transport_fee_applied: cleanNumber(rec.transport_fee_applied || 0)
         });
@@ -938,6 +1101,7 @@ function generateReceipt() {
         totalPaid: finalMonths.reduce((a, m) => a + m.paid, 0),
         totalDue: finalMonths.reduce((a, m) => a + m.due, 0),
         advance: student.advance || 0,
+        latest_paid: cleanNumber(lastPaymentAmount || 0),
 
         months: finalMonths,
 
@@ -954,6 +1118,8 @@ function goBackToIndex(){
   if (classParam) qs.set("class", classParam);
   window.location.href = `index.html?${qs.toString()}`;
 }
+
+document.getElementById("payAmount").addEventListener("input", maybeOpenUpiQr);
 
 window.addEventListener("focus", () => {
     const flag = localStorage.getItem("paymentMade");
@@ -978,7 +1144,3 @@ window.addEventListener("focus", () => {
 <script src="feeshared_menu.js"></script>
 </body>
 </html>
-
-
-
-

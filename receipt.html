@@ -256,6 +256,9 @@ th{background:#eef6ff;}
     <h3 style="display:inline-block;margin:0 12px 0 0">Total Paid: &#8377;<span id="tPaid"></span></h3>
     <h3 style="display:inline-block;margin:0 12px">Total Due: &#8377;<span id="tDue"></span></h3>
     <h3 style="display:inline-block;margin:0 12px">Advance Left: &#8377;<span id="tAdv"></span></h3>
+    <h3 id="latestPaidWrap" style="display:none;margin:6px 12px 0 0;font-weight:800;color:#0b6b33;">
+      Latest Paid: &#8377;<span id="tLatestPaid"></span>
+    </h3>
     <div id="transportTotals" class="small muted" style="margin-top:8px">Transport Included: 0 (Paid: 0, Due: 0)</div>
   </div>
 
@@ -552,7 +555,20 @@ function renderInfo(){
 
 function renderMonths(){
   const tbody = document.getElementById("monthsTable");
-  tbody.innerHTML = (data.months||[]).map(m=>`
+  const monthOrder = [
+    "Previous Due","Annual","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"
+  ];
+  const rows = [...(data.months||[])].sort((a,b) => {
+    const aKey = String(a.month || "").trim();
+    const bKey = String(b.month || "").trim();
+    const ai = monthOrder.indexOf(aKey);
+    const bi = monthOrder.indexOf(bKey);
+    if (ai !== -1 || bi !== -1) {
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    }
+    return aKey.localeCompare(bKey, undefined, { numeric: true, sensitivity: "base" });
+  });
+  tbody.innerHTML = rows.map(m=>`
     <tr>
       <td>${escapeHtml(monthLabel(m.month, m))}</td>
       <td style="text-align:right">${escapeHtml(m.paid||0)}</td>
@@ -566,14 +582,63 @@ function renderMonths(){
   document.getElementById("tPaid").textContent = data.totalPaid;
   document.getElementById("tDue").textContent = data.totalDue;
   document.getElementById("tAdv").textContent = data.advance;
+  const dateKey = (v) => {
+    const s = String(v || "").trim();
+    if (!s) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  let latest = Number(data.latest_paid || 0);
+  if (!latest && Array.isArray(data.months) && data.date) {
+    const target = dateKey(data.date);
+    latest = data.months.reduce((sum, m) => {
+      const md = dateKey(m.date || "");
+      return md && md === target ? sum + Number(m.paid || 0) : sum;
+    }, 0);
+  }
+  const latestWrap = document.getElementById("latestPaidWrap");
+  if (latestWrap) {
+    if (latest > 0) {
+      document.getElementById("tLatestPaid").textContent = latest;
+      latestWrap.style.display = "inline-block";
+    } else {
+      latestWrap.style.display = "none";
+    }
+  }
+  data.latest_paid = latest;
   const tt = getTransportTotals();
   const block = document.getElementById("transportTotals");
-  if (block) block.textContent = `Transport Included: ${tt.total} (Paid: ${tt.paid}, Due: ${tt.due})`;
+  if (block) {
+    if (tt.total > 0) {
+      block.textContent = `Transport Included: ${tt.total} (Paid: ${tt.paid}, Due: ${tt.due})`;
+      block.style.display = "block";
+    } else {
+      block.style.display = "none";
+    }
+  }
 }
 
 function buildSlipHTML(){
   const tt = getTransportTotals();
-  const rows = (data.months||[]).map(m=>`
+  const monthOrder = [
+    "Previous Due","Annual","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"
+  ];
+  const slipRows = [...(data.months||[])].sort((a,b) => {
+    const aKey = String(a.month || "").trim();
+    const bKey = String(b.month || "").trim();
+    const ai = monthOrder.indexOf(aKey);
+    const bi = monthOrder.indexOf(bKey);
+    if (ai !== -1 || bi !== -1) {
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    }
+    return aKey.localeCompare(bKey, undefined, { numeric: true, sensitivity: "base" });
+  });
+  const rows = slipRows.map(m=>`
     <tr>
       <td>${monthLabel(m.month||"", m)}</td>
       <td class="num">${m.paid||0}</td>
@@ -621,6 +686,7 @@ function buildSlipHTML(){
     <div class="line"></div>
     <div><strong>Total Paid:</strong> ${data.totalPaid}</div>
     <div><strong>Total Due:</strong> ${data.totalDue}</div>
+    ${Number(data.latest_paid || 0) > 0 ? `<div><strong>Latest Paid:</strong> ${data.latest_paid}</div>` : ""}
     <div><strong>Advance:</strong> ${data.advance}</div>
     <div><strong>Transport Included:</strong> Rs ${tt.total} (Paid: Rs ${tt.paid}, Due: Rs ${tt.due})</div>
     <div style="margin-top:8px" class="center">Thank You</div>
@@ -762,6 +828,13 @@ function goBackToStudent(){
   const cls = String(data.class || "").trim();
   const roll = String(data.roll || "").trim();
   const session = String(data.session || "").trim();
+
+  if (isHistoryView) {
+    const qs = new URLSearchParams();
+    if (session) qs.set("session", session);
+    window.location.href = `receipt_history.html?${qs.toString()}`;
+    return;
+  }
 
   if (isAccountantView) {
     const qs = new URLSearchParams();
