@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>UPI Display</title>
+  <style>
+    body{
+      margin:0;
+      font-family:Segoe UI, Arial, sans-serif;
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+      background:
+        linear-gradient(rgba(10,15,30,0.75), rgba(10,15,30,0.75)),
+        url("images/school.png") center/cover no-repeat fixed;
+    }
+    .card{
+      background:#111a2e;
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:16px;
+      padding:24px;
+      width:360px;
+      text-align:center;
+      box-shadow:0 20px 40px rgba(0,0,0,0.35);
+    }
+    .title{font-size:18px;font-weight:700;margin-bottom:6px;}
+    .amount{font-size:28px;font-weight:800;color:#48e086;margin-bottom:6px;}
+    .student{font-size:14px;color:#dbe6ff;margin-bottom:6px;font-weight:600;}
+    .timer{font-size:14px;color:#ffcc66;margin-bottom:10px;}
+    .placeholder{color:#94a3b8;font-size:14px;margin-top:8px;}
+    #qrImg{width:260px;height:260px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:#fff;}
+    .upi{font-size:12px;color:#9ca3af;word-break:break-all;margin-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">Scan to Pay</div>
+    <div class="student" id="studentText">Student: -</div>
+    <div class="amount" id="amountText">₹0</div>
+    <div class="timer">Expires in <span id="timerText">05:00</span></div>
+    <img id="qrImg" alt="UPI QR" />
+    <div class="upi" id="upiText"></div>
+    <img id="schoolImg" src="images/logo1.png" alt="School" style="width:160px;height:auto;display:none;margin:8px auto 0;">
+    <div class="placeholder" id="placeholder">Waiting for QR...</div>
+  </div>
+
+<script>
+const amountText = document.getElementById("amountText");
+const studentText = document.getElementById("studentText");
+const timerText = document.getElementById("timerText");
+const qrImg = document.getElementById("qrImg");
+const upiText = document.getElementById("upiText");
+const placeholder = document.getElementById("placeholder");
+let timerId = null;
+let endAt = 0;
+let lastPayloadTs = 0;
+const params = new URLSearchParams(window.location.search);
+const apiBase = params.get("api")
+  || localStorage.getItem("upiApiBase")
+  || localStorage.getItem("apiBaseUrl")
+  || `${window.location.protocol}//${window.location.hostname}:5000`;
+
+function setTimer(seconds){
+  if (timerId) clearInterval(timerId);
+  endAt = Date.now() + seconds * 1000;
+  const tick = () => {
+    const left = Math.max(0, endAt - Date.now());
+    const totalSec = Math.floor(left / 1000);
+    const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+    const ss = String(totalSec % 60).padStart(2, "0");
+    timerText.textContent = `${mm}:${ss}`;
+    if (left <= 0) {
+      clearInterval(timerId);
+      timerId = null;
+      placeholder.textContent = "QR expired";
+    }
+  };
+  tick();
+  timerId = setInterval(tick, 1000);
+}
+
+function showPayload(p){
+  if (!p || !p.upiUrl || !p.amount) {
+    placeholder.textContent = "Waiting for QR...";
+    timerText.textContent = "05:00";
+    qrImg.style.display = "none";
+    upiText.textContent = "";
+    studentText.textContent = "Student: -";
+    document.getElementById("schoolImg").style.display = "block";
+    return;
+  }
+  if (p.studentName) {
+    studentText.textContent = `Student: ${p.studentName}`;
+  } else {
+    studentText.textContent = "Student: -";
+  }
+  amountText.textContent = `₹${p.amount}`;
+  upiText.textContent = "";
+  qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=" + encodeURIComponent(p.upiUrl);
+  qrImg.style.display = "block";
+  document.getElementById("schoolImg").style.display = "none";
+  placeholder.textContent = "";
+  const newTs = Number(p.ts || 0);
+  if (newTs && newTs !== lastPayloadTs) {
+    lastPayloadTs = newTs;
+    endAt = newTs + Number(p.expiresSec || 600) * 1000;
+  setTimer(Number(p.expiresSec || 300));
+}
+}
+
+async function fetchPayload(){
+  try{
+    const res = await fetch(`${apiBase}/upi/display`);
+    const data = await res.json();
+    return data?.payload || null;
+  }catch(e){
+    return null;
+  }
+}
+
+async function poll(){
+  const p = await fetchPayload();
+  showPayload(p);
+}
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>

@@ -59,6 +59,7 @@ th{background:#007bff;color:#fff}
 .qr-upi{font-size:12px;color:#666;margin-top:6px;word-break:break-all}
 .qr-timer{font-size:12px;color:#b45309;margin-top:6px;font-weight:700}
 .qr-actions{display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.qr-actions .btn.tablet{background:#0ea5e9;color:#fff}
 #upiQrImage{width:220px;height:220px;border:1px solid #eee;border-radius:8px}
 .one-time-box{
   display:flex;flex-wrap:wrap;gap:16px;align-items:center;
@@ -148,8 +149,9 @@ th{background:#007bff;color:#fff}
     <div class="qr-amount">Amount: Rs <span id="upiQrAmount">0</span></div>
     <img id="upiQrImage" alt="UPI QR">
     <div class="qr-upi" id="upiQrUpi"></div>
-    <div class="qr-timer">Expires in <span id="upiQrTimer">10:00</span></div>
+    <div class="qr-timer">Expires in <span id="upiQrTimer">05:00</span></div>
     <div class="qr-actions">
+      <button class="btn tablet" onclick="openTabletDisplay()">Show on Tablet</button>
       <button class="btn primary" onclick="markUpiPaid()">Paid</button>
       <button class="btn advance" onclick="markUpiNotPaid()">Not Paid</button>
       <button class="btn back" onclick="closeUpiQr()">Close</button>
@@ -354,6 +356,14 @@ function buildUpiUrl(amount){
   return `upi://pay?${params.toString()}`;
 }
 
+function resolveApiBase(){
+  let apiBase = FEE_API;
+  if (/127\.0\.0\.1|localhost/i.test(apiBase)) {
+    apiBase = `${window.location.protocol}//${window.location.hostname}:5000`;
+  }
+  return apiBase;
+}
+
 function showUpiQr(amount){
   const upiUrl = buildUpiUrl(amount);
   if (!upiUrl) return;
@@ -361,13 +371,16 @@ function showUpiQr(amount){
   document.getElementById("upiQrUpi").textContent = upiUrl;
   document.getElementById("upiQrImage").src =
     "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(upiUrl);
+  publishTabletPayload(amount, upiUrl);
   document.getElementById("upiQrModal").classList.add("show");
-  startUpiTimer(10 * 60);
+  startUpiTimer(5 * 60);
 }
 
 function closeUpiQr(){
   document.getElementById("upiQrModal").classList.remove("show");
   stopUpiTimer();
+  const apiBase = resolveApiBase();
+  fetch(`${apiBase}/upi/display?clear=1`).catch(() => {});
 }
 
 function maybeOpenUpiQr(){
@@ -378,6 +391,36 @@ function maybeOpenUpiQr(){
   } else {
     closeUpiQr();
   }
+}
+
+function publishTabletPayload(amount, upiUrl){
+  const payload = {
+    amount: Number(amount || 0),
+    upiUrl: upiUrl,
+    expiresSec: 300,
+    ts: Date.now(),
+    studentName: student?.name || ""
+  };
+  const apiBase = resolveApiBase();
+  const qs = new URLSearchParams({
+    amount: String(payload.amount || 0),
+    upiUrl: payload.upiUrl,
+    expiresSec: String(payload.expiresSec || 600),
+    ts: String(payload.ts || Date.now()),
+    studentName: payload.studentName || ""
+  });
+  fetch(`${apiBase}/upi/display?${qs.toString()}`).catch(() => {});
+}
+
+function openTabletDisplay(){
+  const amount = cleanNumber(document.getElementById("payAmount").value);
+  const upiUrl = buildUpiUrl(amount);
+  if (!upiUrl || !amount) { alert("Enter amount and select UPI"); return; }
+  publishTabletPayload(amount, upiUrl);
+  const apiBase = resolveApiBase();
+  try{ localStorage.setItem("upiApiBase", apiBase); }catch(e){}
+  const base = window.location.href.split("/").slice(0,-1).join("/");
+  window.open(base + "/upi_display.html?api=" + encodeURIComponent(apiBase), "_blank");
 }
 
 let upiTimerId = null;
