@@ -51,6 +51,42 @@ th{background:#007bff;color:#fff}
 .method-options label{display:flex;align-items:center;gap:6px;margin:0}
 .method-options input[type="checkbox"]{width:auto;padding:0;margin:0}
 .action-buttons{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tablet-panel{
+  margin:14px 0 18px;
+  border:1px solid #dbe7ff;
+  background:linear-gradient(180deg,#f6f9ff,#ffffff);
+  border-radius:12px;
+  padding:12px;
+}
+.tablet-panel .row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.tablet-panel h3{
+  margin:0;
+  font-size:14px;
+  letter-spacing:0.2px;
+  color:#0f3c84;
+}
+.tablet-panel .actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.btn.tabletView{background:#111827;color:#fff}
+.btn.tabletResult{background:#2563eb;color:#fff}
+.btn.tabletAttend{background:#0ea5e9;color:#fff}
+.btn.tabletFees{background:#7c3aed;color:#fff}
+.tablet-panel .status{
+  margin-top:8px;
+  font-size:12px;
+  color:#334155;
+}
+.tablet-panel .status.ok{color:#0b7a0b;font-weight:700}
+.tablet-panel .status.err{color:#b30000;font-weight:700}
 .qr-modal{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:5000}
 .qr-modal.show{display:flex}
 .qr-card{background:#fff;border-radius:12px;padding:16px;width:320px;box-shadow:0 10px 30px rgba(0,0,0,.2);text-align:center}
@@ -143,7 +179,21 @@ th{background:#007bff;color:#fff}
   </div>
 </div>
 
-<div id="upiQrModal" class="qr-modal" onclick="closeUpiQr(event)">
+<div class="tablet-panel">
+  <div class="row">
+    <h3>Tablet Panel (Student / Result / Attendance / Fee Structure)</h3>
+    <div class="actions">
+      <button class="btn tabletView" onclick="tabletShowStudent()">Student</button>
+      <button class="btn tabletResult" onclick="tabletShowResult()">Result</button>
+      <button class="btn tabletAttend" onclick="tabletShowAttendance()">Attendance</button>
+      <button class="btn tabletFees" onclick="tabletShowFeeStructure()">Fee Structure</button>
+      <button class="btn back" onclick="tabletClear()">Clear</button>
+    </div>
+  </div>
+  <div id="tabletStatus" class="status">Tip: Keep `upi_display.html` open on the tablet. These buttons will switch what the parents see.</div>
+</div>
+
+<div id="upiQrModal" class="qr-modal" onclick="closeUpiQr(true)">
   <div class="qr-card" onclick="event.stopPropagation()">
     <div class="qr-title">UPI Payment</div>
     <div class="qr-amount">Amount: Rs <span id="upiQrAmount">0</span></div>
@@ -154,7 +204,7 @@ th{background:#007bff;color:#fff}
       <button class="btn tablet" onclick="openTabletDisplay()">Show on Tablet</button>
       <button class="btn primary" onclick="markUpiPaid()">Paid</button>
       <button class="btn advance" onclick="markUpiNotPaid()">Not Paid</button>
-      <button class="btn back" onclick="closeUpiQr()">Close</button>
+      <button class="btn back" onclick="closeUpiQr(true)">Close</button>
     </div>
   </div>
 </div>
@@ -189,6 +239,7 @@ th{background:#007bff;color:#fff}
 <script>
 const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
 const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+const EXAM_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
 
 // ---------------- PARAMS ----------------
 const params = new URLSearchParams(window.location.search);
@@ -217,6 +268,7 @@ let idCardFee = 0;
 let examConfigs = [];   // [{name, months[], class_fees{class:fee}}]
 let lastPaymentAmount = 0;
 let autoReceiptTimer = null;
+let autoReceiptHoldUntil = 0;
 
 /* Utility: safe number */
 function cleanNumber(x){
@@ -225,11 +277,26 @@ function cleanNumber(x){
 
 function scheduleAutoReceipt(){
   if (autoReceiptTimer) clearTimeout(autoReceiptTimer);
+  const now = Date.now();
+  const holdDelay = Math.max(0, autoReceiptHoldUntil - now);
   autoReceiptTimer = setTimeout(() => {
     try{
       generateReceipt();
     }catch(e){}
-  }, 2000);
+  }, holdDelay + 2000);
+}
+
+function calculateTotals(){
+  if (!student || !student.months) return { totalPaid: 0, totalDue: 0 };
+  let totalPaid = 0;
+  let totalDue = 0;
+  monthsList.forEach(m => {
+    const rec = student.months[m];
+    if (!rec) return;
+    totalPaid += cleanNumber(rec.paid || 0);
+    totalDue += cleanNumber(rec.due || 0);
+  });
+  return { totalPaid, totalDue };
 }
 
 function normalizeDiscount(raw){
@@ -317,6 +384,7 @@ function selectPaymentMethod(el){
     });
   }
   maybeOpenUpiQr();
+  showCashCounterMessage();
 }
 
 function getSelectedPaymentMethod(){
@@ -376,11 +444,13 @@ function showUpiQr(amount){
   startUpiTimer(5 * 60);
 }
 
-function closeUpiQr(){
+function closeUpiQr(clearTablet = false){
   document.getElementById("upiQrModal").classList.remove("show");
   stopUpiTimer();
-  const apiBase = resolveApiBase();
-  fetch(`${apiBase}/upi/display?clear=1`).catch(() => {});
+  if (clearTablet) {
+    const apiBase = resolveApiBase();
+    fetch(`${apiBase}/upi/display?clear=1`).catch(() => {});
+  }
 }
 
 function maybeOpenUpiQr(){
@@ -389,8 +459,27 @@ function maybeOpenUpiQr(){
   if (method === "upi" && amount > 0) {
     showUpiQr(amount);
   } else {
-    closeUpiQr();
+    // Auto-close the modal without clearing the tablet/student display.
+    closeUpiQr(false);
   }
+}
+
+function showCashCounterMessage(){
+  const method = getSelectedPaymentMethod();
+  if (method !== "cash") return;
+  const amt = cleanNumber(document.getElementById("payAmount").value);
+  if (!amt) return;
+  const apiBase = resolveApiBase();
+  const totals = calculateTotals();
+  const qs = new URLSearchParams({
+    mode: "cash",
+    name: student?.name || "",
+    admission_no: student?.admission_no || "",
+    totalPaid: String(cleanNumber(totals?.totalPaid || 0)),
+    amount: String(amt),
+    ts: String(Date.now())
+  });
+  fetch(`${apiBase}/upi/display?${qs.toString()}`).catch(() => {});
 }
 
 function publishTabletPayload(amount, upiUrl){
@@ -399,7 +488,8 @@ function publishTabletPayload(amount, upiUrl){
     upiUrl: upiUrl,
     expiresSec: 300,
     ts: Date.now(),
-    studentName: student?.name || ""
+    studentName: student?.name || "",
+    mode: "qr"
   };
   const apiBase = resolveApiBase();
   const qs = new URLSearchParams({
@@ -407,7 +497,30 @@ function publishTabletPayload(amount, upiUrl){
     upiUrl: payload.upiUrl,
     expiresSec: String(payload.expiresSec || 600),
     ts: String(payload.ts || Date.now()),
-    studentName: payload.studentName || ""
+    studentName: payload.studentName || "",
+    mode: "qr"
+  });
+  fetch(`${apiBase}/upi/display?${qs.toString()}`).catch(() => {});
+}
+
+function publishStudentToTablet(){
+  if (!student) return;
+  const apiBase = resolveApiBase();
+  const totals = calculateTotals();
+  const totalDue = cleanNumber(totals?.totalDue || 0);
+  const latestPaid = cleanNumber(lastPaymentAmount || 0) || cleanNumber(totals?.totalPaid || 0);
+  const qs = new URLSearchParams({
+    mode: "student",
+    name: student.name || "",
+    father: student.father || "",
+    class: student.class_name || "",
+    roll: student.roll || "",
+    admission_no: student.admission_no || "",
+    photoUrl: student.photo_url || "",
+    totalDue: String(totalDue),
+    latestPaid: String(latestPaid),
+    status: totalDue > 0 ? "Pending" : "Received",
+    ts: String(Date.now())
   });
   fetch(`${apiBase}/upi/display?${qs.toString()}`).catch(() => {});
 }
@@ -462,12 +575,455 @@ function markUpiPaid(){
   const amt = cleanNumber(document.getElementById("payAmount").value);
   if (!amt) { alert("Enter amount first"); return; }
   setPaymentMethod("upi");
+  autoReceiptHoldUntil = Date.now() + 11000;
+  showThanksOnTablet();
+  setTimeout(() => {
+    publishReceiptToTablet();
+  }, 10000);
   closeUpiQr();
   submitPayment();
 }
 
 function markUpiNotPaid(){
-  closeUpiQr();
+  closeUpiQr(true);
+}
+
+function showThanksOnTablet(){
+  const apiBase = resolveApiBase();
+  const qs = new URLSearchParams({
+    mode: "thanks",
+    ts: String(Date.now())
+  });
+  fetch(`${apiBase}/upi/display?${qs.toString()}`, { keepalive: true }).catch(() => {});
+}
+
+function publishReceiptToTablet(){
+  if (!student) return;
+  const apiBase = resolveApiBase();
+  const totals = calculateTotals();
+  const method = getSelectedPaymentMethod() || String(student?.last_payment_method || "");
+  const qs = new URLSearchParams({
+    mode: "receipt",
+    name: student.name || "",
+    class: student.class_name || "",
+    roll: student.roll || "",
+    admission_no: student.admission_no || "",
+    totalPaid: String(cleanNumber(totals?.totalPaid || 0)),
+    totalDue: String(cleanNumber(totals?.totalDue || 0)),
+    latestPaid: String(cleanNumber(lastPaymentAmount || 0)),
+    date: new Date().toLocaleDateString(),
+    paymentMode: String(method || "").toUpperCase(),
+    status: "Paid",
+    ts: String(Date.now())
+  });
+  fetch(`${apiBase}/upi/display?${qs.toString()}`, { keepalive: true }).catch(() => {});
+}
+
+/* ---------------- TABLET PANEL (Result / Attendance / Fee Structure) ---------------- */
+const tabletStatusEl = document.getElementById("tabletStatus");
+function setTabletStatus(msg, kind){
+  if (!tabletStatusEl) return;
+  tabletStatusEl.classList.remove("ok", "err");
+  if (kind === "ok") tabletStatusEl.classList.add("ok");
+  if (kind === "err") tabletStatusEl.classList.add("err");
+  tabletStatusEl.textContent = String(msg || "");
+}
+
+function normalizeExamSession(s){
+  return String(s || "").trim().replace(/-/g, "_");
+}
+function sessionCandidates(s){
+  const base = normalizeExamSession(s);
+  return Array.from(new Set([
+    base,
+    base.replace(/_/g, "-"),
+    base.replace(/-/g, "_")
+  ].filter(Boolean)));
+}
+async function safeFetchJson(url){
+  const res = await fetch(url);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return data;
+}
+
+function postTabletPayload(payload){
+  const apiBase = resolveApiBase();
+  return fetch(`${apiBase}/upi/display`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ payload }),
+    keepalive: true
+  }).then(r => r.json().catch(() => ({ success: true }))).catch(() => ({ success: false }));
+}
+
+function tabletClear(){
+  const apiBase = resolveApiBase();
+  fetch(`${apiBase}/upi/display?clear=1`, { keepalive: true }).catch(() => {});
+  setTabletStatus("Cleared tablet screen (idle video will play).", "ok");
+}
+
+function tabletShowStudent(){
+  if (!student) {
+    setTabletStatus("Student not loaded yet.", "err");
+    return;
+  }
+  const lines = [];
+  const pushLine = (label, val) => {
+    const v = String(val || "").trim();
+    if (!v) return;
+    lines.push(`${label}: ${v}`);
+  };
+  pushLine("Father", student.father);
+  pushLine("Mother", student.mother);
+  pushLine("Phone", student.phone);
+  pushLine("Father Phone", student.father_phone);
+  pushLine("Email", student.email);
+  pushLine("DOB", student.dob);
+  pushLine("Address", student.address);
+
+  postTabletPayload({
+    mode: "info",
+    ts: Date.now(),
+    expiresSec: 1800,
+    info: {
+      title: "Student Details",
+      subtitle: `${student.name || ""} | ${student.class_name || ""} | Roll: ${student.roll || ""} | Adm: ${student.admission_no || ""}`.trim(),
+      photoUrl: student.photo_url || "",
+      pills: [
+        { k: "Class", v: student.class_name || "-" },
+        { k: "Roll", v: student.roll || "-" },
+        { k: "Adm", v: student.admission_no || "-" }
+      ],
+      lines: lines.length ? lines : ["No extra profile data found."]
+    }
+  });
+  setTabletStatus("Showing full student profile on tablet.", "ok");
+}
+
+async function findExamProfile(){
+  if (!student) throw new Error("Student not loaded");
+  const adm = String(student.admission_no || "").trim();
+  if (!adm) throw new Error("Admission no is missing for this student");
+
+  const data = await safeFetchJson(`${EXAM_API}/portal/students`);
+  const rows = Array.isArray(data?.students) ? data.students : [];
+  const cls = String(student.class_name || "").trim();
+  const candidates = sessionCandidates(sessionParam);
+
+  const byAdmAndClass = rows.find(r =>
+    String(r.admission_no || "").trim() === adm &&
+    String(r.class_name || "").trim() === cls &&
+    (!r.session || candidates.includes(normalizeExamSession(r.session)))
+  );
+  if (byAdmAndClass) return byAdmAndClass;
+
+  const byAdm = rows.find(r => String(r.admission_no || "").trim() === adm);
+  if (byAdm) return byAdm;
+
+  throw new Error("Student not found in EXAM backend (portal/students)");
+}
+
+async function tabletShowFeeStructure(){
+  try{
+    const classes = Array.from(new Set([
+      ...Object.keys(monthlyFees || {}),
+      ...Object.keys(annualFees || {}),
+      ...Object.keys(admissionFees || {}),
+      ...Object.keys(booksFees || {})
+    ].filter(Boolean))).sort((a,b)=>String(a).localeCompare(String(b), undefined, { numeric:true, sensitivity:"base" }));
+
+    const rows = classes.map(cls => ([
+      cls,
+      String(cleanNumber(monthlyFees?.[cls] || 0)),
+      String(cleanNumber(annualFees?.[cls] || 0)),
+      String(cleanNumber(admissionFees?.[cls] || 0)),
+      String(cleanNumber(booksFees?.[cls] || 0))
+    ]));
+
+    await postTabletPayload({
+      mode: "info",
+      ts: Date.now(),
+      expiresSec: 1800,
+      info: {
+        title: "Fee Structure",
+        subtitle: `Session: ${sessionParam}`,
+        pills: [
+          { k: "Registration", v: `₹${cleanNumber(registrationFee || 0)}` },
+          { k: "ID Card", v: `₹${cleanNumber(idCardFee || 0)}` }
+        ],
+        lines: [
+          "Monthly / Annual / Admission / Books are class-wise.",
+          "Registration and ID Card fees are common."
+        ],
+        table: {
+          headers: ["Class", "Monthly", "Annual", "Admission", "Books"],
+          rows
+        }
+      }
+    });
+    setTabletStatus("Showing fee structure on tablet.", "ok");
+  }catch(e){
+    setTabletStatus(`Fee structure error: ${e?.message || e}`, "err");
+  }
+}
+
+async function tabletShowAttendance(){
+  try{
+    setTabletStatus("Loading attendance from EXAM backend...", "");
+    await postTabletPayload({
+      mode: "info",
+      ts: Date.now(),
+      expiresSec: 1800,
+      info: {
+        title: "Attendance",
+        subtitle: `${student?.name || ""} | ${student?.class_name || ""} | Adm: ${student?.admission_no || ""}`.trim(),
+        lines: ["Loading attendance..."]
+      }
+    });
+
+    const profile = await findExamProfile();
+    const sess = normalizeExamSession(profile.session || sessionParam);
+    const cls = String(profile.class_name || student.class_name || "").trim();
+    const sid = String(profile.id || "").trim();
+    const sroll = String(profile.roll || student.roll || "").trim();
+
+    const dates = [];
+    for(let i=0;i<10 && dates.length<7;i++){
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const day = d.getDay();
+      if (day === 0) continue; // skip Sunday
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      dates.push(`${yyyy}-${mm}-${dd}`);
+    }
+
+    const rows = [];
+    let present=0, absent=0, leave=0, missing=0;
+    for (const date of dates){
+      const a = await safeFetchJson(`${EXAM_API}/attendance/list?session=${encodeURIComponent(sess)}&class_name=${encodeURIComponent(cls)}&date=${encodeURIComponent(date)}`);
+      const list = Array.isArray(a?.attendance) ? a.attendance : [];
+      const rec = list.find(x =>
+        String(x.student_id || "").trim() === sid ||
+        (sroll && String(x.student_roll || "").trim() === sroll)
+      );
+      const st = String(rec?.status || "").toLowerCase();
+      let label = "No Record";
+      if (st === "present") { label = "Present"; present++; }
+      else if (st === "absent") { label = "Absent"; absent++; }
+      else if (st === "leave") { label = "Leave"; leave++; }
+      else { missing++; }
+      rows.push([date, label]);
+    }
+
+    await postTabletPayload({
+      mode: "info",
+      ts: Date.now(),
+      expiresSec: 1800,
+      info: {
+        title: "Attendance (Last 7 Days)",
+        subtitle: `${student?.name || ""} | ${cls} | Roll: ${sroll} | Adm: ${student?.admission_no || ""}`.trim(),
+        pills: [
+          { k: "Present", v: String(present) },
+          { k: "Absent", v: String(absent) },
+          { k: "Leave", v: String(leave) },
+          { k: "No record", v: String(missing) }
+        ],
+        table: { headers: ["Date", "Status"], rows }
+      }
+    });
+    setTabletStatus("Showing attendance on tablet.", "ok");
+  }catch(e){
+    setTabletStatus(`Attendance error: ${e?.message || e}`, "err");
+    await postTabletPayload({
+      mode: "info",
+      ts: Date.now(),
+      expiresSec: 1800,
+      info: { title: "Attendance", subtitle: "Error", lines: [String(e?.message || e)] }
+    });
+  }
+}
+
+async function tabletShowResult(){
+  try{
+    setTabletStatus("Loading result from EXAM backend...", "");
+    await postTabletPayload({
+      mode: "info",
+      ts: Date.now(),
+      expiresSec: 1800,
+      info: {
+        title: "Result",
+        subtitle: `${student?.name || ""} | ${student?.class_name || ""} | Adm: ${student?.admission_no || ""}`.trim(),
+        lines: ["Loading result..."]
+      }
+    });
+
+    const profile = await findExamProfile();
+    const eligibleFlag = (profile.eligible === false) ? "No" : "Yes";
+    const releaseFlag = (profile.release_result === false) ? "No" : "Yes";
+
+    const sess = normalizeExamSession(profile.session || sessionParam);
+    const cls = String(profile.class_name || student.class_name || "").trim();
+    const roll = String(profile.roll || student.roll || "").trim();
+
+    const exData = await safeFetchJson(`${EXAM_API}/exam/list-all`);
+    const exams = Array.isArray(exData?.exams) ? exData.exams : [];
+    const candidates = exams
+      .filter(ex => normalizeExamSession(ex.session || "") === sess)
+      .sort((a,b)=>String(b.exam_name || "").localeCompare(String(a.exam_name || ""), undefined, { numeric:true, sensitivity:"base" }));
+
+    let picked = null;
+    for (const ex of candidates){
+      const st = await safeFetchJson(`${EXAM_API}/result/status?session=${encodeURIComponent(sess)}&class_name=${encodeURIComponent(cls)}&exam_name=${encodeURIComponent(ex.exam_name || "")}`);
+      if (st?.success && st?.published) { picked = ex; break; }
+    }
+
+    if (!picked) {
+      await postTabletPayload({
+        mode: "info",
+        ts: Date.now(),
+        expiresSec: 1800,
+        info: {
+          title: "Result",
+          subtitle: `${cls} | Session: ${sess}`,
+          pills: [
+            { k: "Eligible", v: eligibleFlag },
+            { k: "Released", v: releaseFlag }
+          ],
+          lines: ["No published result found."]
+        }
+      });
+      setTabletStatus("No published result found.", "err");
+      return;
+    }
+
+    const marksData = await safeFetchJson(
+      `${EXAM_API}/exam/get-marks?session=${encodeURIComponent(sess)}&class_name=${encodeURIComponent(cls)}&exam_name=${encodeURIComponent(picked.exam_name || "")}`
+    );
+    const marks = Array.isArray(marksData?.marks) ? marksData.marks : [];
+    const rollKey = roll.replace(/\.0$/, "").replace(/^0+/, "") || roll;
+
+    const bySubject = {};
+    marks.forEach(m => {
+      const r = String(m.roll || "").trim().replace(/\.0$/, "").replace(/^0+/, "") || String(m.roll || "").trim();
+      if (r !== rollKey) return;
+      const sub = String(m.subject || "").trim();
+      if (!sub) return;
+      bySubject[sub] = m.marks;
+    });
+
+    // Internal marks (optional)
+    let internalBySubject = {};
+    let internalMaxBySubject = {};
+    let externalMaxBySubject = {};
+    try{
+      const subjRes = await safeFetchJson(
+        `${EXAM_API}/internal-marks/subjects?session=${encodeURIComponent(sess)}&class_name=${encodeURIComponent(cls)}&exam_name=${encodeURIComponent(picked.exam_name || "")}`
+      );
+      const internalSubjects = Array.isArray(subjRes?.subjects) ? subjRes.subjects : [];
+
+      const idCandidates = Array.from(new Set([
+        String(profile.id || "").trim(),
+        String(profile.roll || "").trim(),
+        String(student?.roll || "").trim(),
+        String(student?.admission_no || "").trim()
+      ].filter(Boolean)));
+
+      const subjectUnion = Array.from(new Set([
+        ...Object.keys(bySubject || {}),
+        ...internalSubjects.map(s => String(s || "").trim()).filter(Boolean)
+      ])).filter(Boolean);
+
+      const cfgPromises = subjectUnion.map(sub =>
+        safeFetchJson(`${EXAM_API}/exam/subject-config/get?session=${encodeURIComponent(sess)}&class_name=${encodeURIComponent(cls)}&exam_name=${encodeURIComponent(picked.exam_name || "")}&subject=${encodeURIComponent(sub)}`)
+          .then(j => ({ sub, cfg: j?.config || {} }))
+          .catch(() => ({ sub, cfg: {} }))
+      );
+      const cfgs = await Promise.all(cfgPromises);
+      cfgs.forEach(({ sub, cfg }) => {
+        const extMax = cfg?.external_max_marks;
+        const intMax = cfg?.internal_max_marks;
+        if (extMax != null && extMax !== "") externalMaxBySubject[sub] = Number(extMax);
+        if (intMax != null && intMax !== "") internalMaxBySubject[sub] = Number(intMax);
+      });
+
+      const internalPromises = subjectUnion.map(sub =>
+        safeFetchJson(`${EXAM_API}/internal-marks/list?session=${encodeURIComponent(sess)}&class_name=${encodeURIComponent(cls)}&subject=${encodeURIComponent(sub)}&exam_name=${encodeURIComponent(picked.exam_name || "")}`)
+          .then(j => ({ sub, rows: Array.isArray(j?.marks) ? j.marks : [] }))
+          .catch(() => ({ sub, rows: [] }))
+      );
+      const internalResults = await Promise.all(internalPromises);
+      internalResults.forEach(({ sub, rows }) => {
+        const rec = rows.find(r => {
+          const sid = String(r.student_id || "").trim();
+          return idCandidates.includes(sid);
+        });
+        if (rec && rec.marks != null && rec.marks !== "") {
+          internalBySubject[sub] = Number(rec.marks);
+        }
+      });
+    }catch(_){
+      internalBySubject = {};
+      internalMaxBySubject = {};
+      externalMaxBySubject = {};
+    }
+
+    const subjects = Array.from(new Set([
+      ...Object.keys(bySubject || {}),
+      ...Object.keys(internalBySubject || {}),
+      ...Object.keys(internalMaxBySubject || {}),
+      ...Object.keys(externalMaxBySubject || {})
+    ])).sort((a,b)=>a.localeCompare(b, undefined, { numeric:true, sensitivity:"base" }));
+
+    const defaultExtMax = cleanNumber(picked.total_marks || 0);
+    const rows = subjects.map(sub => {
+      const ext = bySubject[sub];
+      const internal = internalBySubject[sub];
+      const extMax = (externalMaxBySubject[sub] != null) ? externalMaxBySubject[sub] : defaultExtMax;
+      const intMax = (internalMaxBySubject[sub] != null) ? internalMaxBySubject[sub] : 0;
+      const extNum = (ext != null && ext !== "") ? Number(ext) : null;
+      const intNum = (internal != null && internal !== "") ? Number(internal) : null;
+      const total = (extNum != null ? extNum : 0) + (intNum != null ? intNum : 0);
+      const maxTotal = (Number(extMax || 0) || 0) + (Number(intMax || 0) || 0);
+      return [
+        sub,
+        extNum != null ? String(extNum) : "-",
+        intNum != null ? String(intNum) : "-",
+        String(total),
+        maxTotal ? String(maxTotal) : "-"
+      ];
+    });
+    const max = cleanNumber(picked.total_marks || 0);
+
+    await postTabletPayload({
+      mode: "info",
+      ts: Date.now(),
+      expiresSec: 1800,
+      info: {
+        title: `Result: ${picked.exam_name || "Exam"}`,
+        subtitle: `${student?.name || ""} | ${cls} | Roll: ${roll} | Adm: ${student?.admission_no || ""}`.trim(),
+        lines: [
+          max ? `External max per subject: ${max}` : "Marks shown are subject-wise."
+        ],
+        pills: [
+          { k: "Eligible", v: eligibleFlag },
+          { k: "Released", v: releaseFlag }
+        ],
+        table: { headers: ["Subject", "External", "Internal", "Total", "Max"], rows }
+      }
+    });
+    setTabletStatus("Showing result on tablet.", "ok");
+  }catch(e){
+    setTabletStatus(`Result error: ${e?.message || e}`, "err");
+    await postTabletPayload({
+      mode: "info",
+      ts: Date.now(),
+      expiresSec: 1800,
+      info: { title: "Result", subtitle: "Error", lines: [String(e?.message || e)] }
+    });
+  }
 }
 
 function addPaymentMethodAmount(method, amount){
@@ -688,6 +1244,14 @@ async function loadStudent(){
       class_name: masterStudent?.class_name || masterStudent?.class || feeStudent?.class_name || classParam || "",
       roll: String(masterStudent?.rollno ?? masterStudent?.roll ?? feeStudent?.roll ?? rollParam ?? "").trim(),
       admission_no: String(masterStudent?.admission_no ?? masterStudent?.admissionNo ?? feeStudent?.admission_no ?? "").trim(),
+      photo_url: masterStudent?.photo || masterStudent?.photo_url || masterStudent?.image || masterStudent?.image_url || masterStudent?.profile || masterStudent?.avatar || "",
+      email: masterStudent?.email || masterStudent?.email_id || masterStudent?.mail_id || masterStudent?.student_email || "",
+      phone: masterStudent?.phone || masterStudent?.mobile || masterStudent?.contact || masterStudent?.student_mobile || "",
+      father_phone: masterStudent?.father_mobile || masterStudent?.father_phone || "",
+      mother: masterStudent?.mother_name || masterStudent?.mother || "",
+      dob: masterStudent?.dob || "",
+      address: masterStudent?.address || masterStudent?.residential_address || masterStudent?.permanent_address || "",
+      raw_profile: masterStudent || null,
       new_admission: Boolean(masterStudent?.new_admission),
       previous_due: resolvedPrevDue,
       advance: cleanNumber(feeStudent?.advance || 0),
@@ -718,6 +1282,7 @@ async function loadStudent(){
     initializeStudentData();
     refreshOneTimeLabels();
     render();
+    publishStudentToTablet();
 
     // If current session didn't have previous_due but previous session did, persist it.
     if (!currentPrev && prevCarry > 0) {
@@ -1043,6 +1608,10 @@ async function submitPayment(){
   document.getElementById("payAmount").value = "";
   await saveToBackend();
   render();
+  // For cash payments, show a receipt summary on the tablet immediately.
+  if (method === "cash") {
+    publishReceiptToTablet();
+  }
   scheduleAutoReceipt();
 }
 
@@ -1163,6 +1732,7 @@ function goBackToIndex(){
 }
 
 document.getElementById("payAmount").addEventListener("input", maybeOpenUpiQr);
+document.getElementById("payAmount").addEventListener("input", showCashCounterMessage);
 
 window.addEventListener("focus", () => {
     const flag = localStorage.getItem("paymentMade");

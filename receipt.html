@@ -824,10 +824,26 @@ function getStoredIndexClass(session){
   }
 }
 
+function resolveTabletApiBase(){
+  let apiBase = String(localStorage.getItem("upiApiBase") || localStorage.getItem("apiBaseUrl") || "").trim();
+  if (!apiBase || /127\.0\.0\.1|localhost/i.test(apiBase)) {
+    apiBase = `${window.location.protocol}//${window.location.hostname}:5000`;
+  }
+  return apiBase;
+}
+
+function clearTabletDisplay(){
+  const apiBase = resolveTabletApiBase();
+  fetch(`${apiBase}/upi/display?clear=1`, { keepalive: true }).catch(() => {});
+}
+
 function goBackToStudent(){
   const cls = String(data.class || "").trim();
   const roll = String(data.roll || "").trim();
   const session = String(data.session || "").trim();
+
+  // Don't leave the tablet stuck on a receipt screen after you go back.
+  clearTabletDisplay();
 
   if (isHistoryView) {
     const qs = new URLSearchParams();
@@ -852,6 +868,10 @@ function goBackToStudent(){
   if (session) qs.set("session", session);
   window.location.href = `index.html?${qs.toString()}`;
 }
+
+window.addEventListener("beforeunload", () => {
+  try{ clearTabletDisplay(); }catch(e){}
+});
 
 
 /* BUTTON EVENTS */

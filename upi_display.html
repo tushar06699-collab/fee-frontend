@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>UPI Display</title>
   <style>
+    :root{
+      --ink:#eaf2ff;
+      --muted:#a7b9dc;
+      --brand:#4ea1ff;
+      --ok:#48e086;
+      --warn:#ffd37a;
+      --danger:#ff6b6b;
+      --card1:rgba(17,26,46,0.92);
+      --card2:rgba(10,18,36,0.92);
+    }
     body{
       margin:0;
       font-family:Segoe UI, Arial, sans-serif;
@@ -17,43 +27,230 @@
         linear-gradient(rgba(10,15,30,0.75), rgba(10,15,30,0.75)),
         url("images/school.png") center/cover no-repeat fixed;
     }
+
+    /* Idle screen (no active job on tablet) */
+    .idle-wrap{
+      position:fixed;
+      inset:0;
+      display:none;
+      background:#061024;
+      overflow:hidden;
+      z-index:1;
+    }
+    .idle-video{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      filter:saturate(1.05) contrast(1.05);
+      transform:scale(1.02);
+    }
+    .idle-shade{
+      position:absolute;
+      inset:0;
+      background:linear-gradient(rgba(6,10,20,0.78), rgba(6,10,20,0.78));
+    }
+    .idle-overlay{
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:24px;
+      gap:10px;
+    }
+    .idle-logo{
+      width:min(22vw, 180px);
+      height:auto;
+      opacity:0.95;
+      filter:drop-shadow(0 8px 20px rgba(0,0,0,0.35));
+    }
+    .idle-title{
+      font-size:44px;
+      font-weight:950;
+      letter-spacing:0.4px;
+      color:var(--ink);
+      text-shadow:0 1px 0 rgba(0,0,0,0.25);
+    }
+    .idle-sub{
+      font-size:20px;
+      font-weight:800;
+      color:var(--muted);
+    }
+    .idle-support{
+      margin-top:10px;
+      font-size:18px;
+      font-weight:800;
+      color:#cfe2ff;
+      opacity:0.9;
+    }
     .card{
-      background:#111a2e;
+      background:linear-gradient(180deg,var(--card1),var(--card2));
       border:1px solid rgba(255,255,255,0.08);
       border-radius:16px;
-      padding:24px;
-      width:360px;
+      padding:28px;
+      width:min(92vw, 900px);
+      min-height:min(70vh, 720px);
       text-align:center;
       box-shadow:0 20px 40px rgba(0,0,0,0.35);
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
     }
-    .title{font-size:18px;font-weight:700;margin-bottom:6px;}
-    .amount{font-size:28px;font-weight:800;color:#48e086;margin-bottom:6px;}
-    .student{font-size:14px;color:#dbe6ff;margin-bottom:6px;font-weight:600;}
-    .timer{font-size:14px;color:#ffcc66;margin-bottom:10px;}
-    .placeholder{color:#94a3b8;font-size:14px;margin-top:8px;}
-    #qrImg{width:260px;height:260px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:#fff;}
+    .title{font-size:34px;font-weight:900;margin-bottom:10px;color:var(--ink);text-shadow:0 1px 0 rgba(0,0,0,0.25);}
+    .amount{font-size:64px;font-weight:900;color:var(--ok);margin-bottom:14px;}
+    .student{font-size:28px;color:var(--ink);margin-bottom:14px;font-weight:900;}
+    .support{font-size:18px;color:var(--muted);margin-bottom:18px;}
+    #studentName{font-size:26px;font-weight:900;letter-spacing:0.6px;}
+    #studentMeta{font-size:18px;font-weight:800;color:#e1e8ff;}
+    .timer{font-size:18px;color:var(--warn);margin-bottom:16px;}
+    .placeholder{color:var(--muted);font-size:18px;margin-top:10px;}
+    #qrImg{width:min(58vw, 420px);height:auto;aspect-ratio:1/1;border-radius:14px;border:1px solid rgba(255,255,255,0.1);background:#fff;}
     .upi{font-size:12px;color:#9ca3af;word-break:break-all;margin-top:8px;}
+    #receiptCard{margin-top:18px;}
+    #receiptCard .rc-title{font-size:30px;font-weight:900;margin-bottom:10px;}
+    #receiptCard #rcName{font-size:28px;font-weight:900;}
+    #receiptCard #rcMeta{font-size:22px;font-weight:800;color:#e1e8ff;}
+    #receiptCard #rcLatest{font-size:22px;font-weight:900;}
+    #receiptCard #rcTotalPaid{font-size:22px;font-weight:900;}
+    #receiptCard #rcTotalDue{font-size:22px;font-weight:900;}
+    #receiptCard #rcDate{font-size:18px;font-weight:800;color:#cbd5f5;}
+
+    /* Info view (Result / Attendance / Fee Structure) */
+    #infoCard{margin-top:18px;text-align:left;display:none;}
+    #infoTitle{font-size:30px;font-weight:950;color:var(--ink);text-align:center;margin-bottom:6px;}
+    #infoSub{font-size:18px;font-weight:800;color:var(--muted);text-align:center;margin-bottom:14px;}
+    #infoBody{max-width:820px;margin:0 auto;}
+    .info-photo{
+      display:flex;
+      justify-content:center;
+      margin:8px 0 14px;
+    }
+    .info-photo img{
+      width:160px;
+      height:160px;
+      border-radius:16px;
+      object-fit:cover;
+      border:1px solid rgba(255,255,255,0.15);
+      box-shadow:0 10px 24px rgba(0,0,0,0.35);
+    }
+    .info-lines{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+    .info-line{font-size:18px;font-weight:850;color:#e7f1ff;}
+    .info-table{width:100%;border-collapse:collapse;border:1px solid rgba(255,255,255,0.12);border-radius:12px;overflow:hidden;}
+    .info-table th,.info-table td{border-bottom:1px solid rgba(255,255,255,0.10);padding:10px 12px;font-size:16px;}
+    .info-table th{background:rgba(78,161,255,0.12);color:#dbeafe;text-align:left;}
+    .info-table td{color:#eaf2ff;}
+    .pill-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:12px;}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:999px;
+      padding:8px 12px;
+      font-weight:900;
+      color:#eaf2ff;
+      font-size:16px;
+    }
+    .pill .k{color:var(--muted);font-weight:900;}
+
+    @media (max-width:520px){
+      .card{min-height:auto;padding:18px}
+      .title{font-size:22px}
+      .support{font-size:12px}
+      .student{font-size:18px}
+      .amount{font-size:42px}
+      #qrImg{width:260px}
+    }
+
+    /* When showing QR, make it compact to avoid scrolling on tablets */
+    body.mode-qr .card{min-height:auto;padding:22px 22px 18px}
+    body.mode-qr .title{font-size:26px;margin-bottom:6px}
+    body.mode-qr .support{font-size:14px;margin-bottom:10px}
+    body.mode-qr .student{font-size:22px;margin-bottom:10px}
+    body.mode-qr .amount{font-size:52px;margin-bottom:8px}
+    body.mode-qr .timer{font-size:16px;margin-bottom:12px}
+    body.mode-qr #qrImg{width:min(40vw, 280px)}
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="title">Scan to Pay</div>
+  <!-- Idle video (place `idle.mp4` in `fee-frontend/`, or open with `?video=PATH`) -->
+  <div id="idleWrap" class="idle-wrap" aria-hidden="true">
+    <video id="idleVideo" class="idle-video" autoplay muted loop playsinline preload="auto">
+      <source id="idleVideoSrc" src="idle.mp4" type="video/mp4">
+    </video>
+    <div class="idle-shade"></div>
+    <div class="idle-overlay">
+      <img class="idle-logo" src="images/logo1.png" alt="P.S. Public School">
+      <div class="idle-title">P.S. Public School</div>
+      <div class="idle-sub">Welcome. Please wait.</div>
+      <div class="idle-support">Support: 9416293661</div>
+    </div>
+  </div>
+
+    <div class="card" id="mainCard">
+    <div class="title" id="titleText">Scan to Pay</div>
+    <div class="support" id="supportText">Support: 9416293661</div>
     <div class="student" id="studentText">Student: -</div>
-    <div class="amount" id="amountText">₹0</div>
-    <div class="timer">Expires in <span id="timerText">05:00</span></div>
+    <div class="amount" id="amountText">&#8377;0</div>
+    <div class="timer" id="timerWrap">Expires in <span id="timerText">05:00</span></div>
     <img id="qrImg" alt="UPI QR" />
     <div class="upi" id="upiText"></div>
     <img id="schoolImg" src="images/logo1.png" alt="School" style="width:160px;height:auto;display:none;margin:8px auto 0;">
     <div class="placeholder" id="placeholder">Waiting for QR...</div>
+
+    <div id="studentCard" style="display:none;margin-top:12px;text-align:center;">
+      <img id="studentPhoto" src="images/logo1.png" alt="Student" style="width:140px;height:140px;border-radius:12px;object-fit:cover;border:1px solid rgba(255,255,255,0.15);">
+      <div style="margin-top:8px;font-weight:700;" id="studentName">-</div>
+      <div style="font-size:12px;color:#cbd5f5;" id="studentMeta">-</div>
+      <div style="margin-top:8px;font-size:16px;font-weight:800;color:#48e086;" id="studentLatestPaid">Latest Paid: &#8377;0</div>
+      <div style="margin-top:4px;font-size:16px;font-weight:800;color:#ffd37a;" id="studentTotalDue">Total Due: &#8377;0</div>
+      <div style="margin-top:6px;font-size:14px;font-weight:700;" id="studentPayStatus">Status: Pending</div>
+    </div>
+
+    <div id="receiptCard" style="display:none;text-align:center;">
+      <div class="rc-title" style="color:var(--brand)">Receipt</div>
+      <div id="rcName" style="color:var(--ink)">-</div>
+      <div id="rcMeta" style="color:var(--muted)">-</div>
+      <div id="rcLatest" style="color:var(--ok)">Latest Paid: &#8377;0</div>
+      <div id="rcTotalPaid" style="color:#9fe7ff">Total Paid: &#8377;0</div>
+      <div id="rcTotalDue" style="color:var(--warn)">Total Due: &#8377;0</div>
+      <div id="rcDate" style="color:var(--muted)">Date: -</div>
+    </div>
+
+    <div id="infoCard">
+      <div id="infoTitle">Info</div>
+      <div id="infoSub">-</div>
+      <div id="infoBody"></div>
+    </div>
+
+    <div id="thanksOverlay" style="display:none;position:absolute;inset:0;z-index:5;background:rgba(8,14,28,0.85);border-radius:16px;align-items:center;justify-content:center;text-align:center;">
+      <div>
+        <div style="font-size:26px;font-weight:800;color:#48e086;">Payment Received</div>
+        <div style="margin-top:6px;font-size:18px;color:#e7f3ff;">Thank You</div>
+        <div style="margin-top:6px;font-size:12px;color:#a7b4d6;">Have a great day.</div>
+      </div>
+    </div>
   </div>
 
 <script>
+const mainCard = document.getElementById("mainCard");
+const idleWrap = document.getElementById("idleWrap");
+const idleVideo = document.getElementById("idleVideo");
+const idleVideoSrc = document.getElementById("idleVideoSrc");
 const amountText = document.getElementById("amountText");
 const studentText = document.getElementById("studentText");
 const timerText = document.getElementById("timerText");
 const qrImg = document.getElementById("qrImg");
 const upiText = document.getElementById("upiText");
 const placeholder = document.getElementById("placeholder");
+const infoCard = document.getElementById("infoCard");
+const infoTitle = document.getElementById("infoTitle");
+const infoSub = document.getElementById("infoSub");
+const infoBody = document.getElementById("infoBody");
 let timerId = null;
 let endAt = 0;
 let lastPayloadTs = 0;
@@ -62,6 +259,104 @@ const apiBase = params.get("api")
   || localStorage.getItem("upiApiBase")
   || localStorage.getItem("apiBaseUrl")
   || `${window.location.protocol}//${window.location.hostname}:5000`;
+
+// Idle video can be overridden via `?video=...` or localStorage `upiIdleVideo`.
+const idleVideoUrl = params.get("video") || localStorage.getItem("upiIdleVideo") || "idle.mp4";
+if (idleVideoUrl) {
+  idleVideoSrc.src = idleVideoUrl;
+  try { idleVideo.load(); } catch(e) {}
+}
+// Some Android browsers are flaky with the HTML `loop` attribute; enforce it in JS too.
+try {
+  idleVideo.loop = true;
+  idleVideo.addEventListener("ended", () => {
+    try {
+      idleVideo.currentTime = 0;
+      const pr = idleVideo.play();
+      if (pr && typeof pr.catch === "function") pr.catch(() => {});
+    } catch(e) {}
+  });
+} catch(e) {}
+
+function showIdle(){
+  document.body.classList.remove("mode-qr");
+  if (timerId) { clearInterval(timerId); timerId = null; }
+  idleWrap.style.display = "block";
+  mainCard.style.display = "none";
+  // Attempt autoplay (works on most Android browsers only if muted).
+  try {
+    idleVideo.muted = true;
+    const pr = idleVideo.play();
+    if (pr && typeof pr.catch === "function") pr.catch(() => {});
+  } catch(e) {}
+}
+
+function showCard(){
+  idleWrap.style.display = "none";
+  mainCard.style.display = "flex";
+}
+
+function renderInfo(info){
+  const title = String(info?.title || "Info");
+  const sub = String(info?.subtitle || "");
+  const lines = Array.isArray(info?.lines) ? info.lines : [];
+  const photoUrl = String(info?.photoUrl || "").trim();
+  const pills = (info && typeof info.pills === "object" && info.pills) ? info.pills : null;
+  const table = (info && typeof info.table === "object" && info.table) ? info.table : null;
+
+  infoTitle.textContent = title;
+  infoSub.textContent = sub || "-";
+
+  const parts = [];
+  if (pills && Array.isArray(pills)) {
+    const pillHtml = pills.map(p => {
+      const k = String(p?.k || "");
+      const v = String(p?.v || "");
+      return `<span class="pill"><span class="k">${escapeHtml(k)}</span> ${escapeHtml(v)}</span>`;
+    }).join("");
+    parts.push(`<div class="pill-row">${pillHtml}</div>`);
+  }
+  if (photoUrl) {
+    parts.push(`<div class="info-photo"><img src="${escapeHtml(photoUrl)}" alt="Student"></div>`);
+  }
+  if (lines.length) {
+    parts.push(`<div class="info-lines">${lines.map(x => `<div class="info-line">${escapeHtml(String(x))}</div>`).join("")}</div>`);
+  }
+  if (table && Array.isArray(table.headers) && Array.isArray(table.rows)) {
+    const thead = `<tr>${table.headers.map(h => `<th>${escapeHtml(String(h))}</th>`).join("")}</tr>`;
+    const tbody = table.rows.map(r => {
+      const cells = Array.isArray(r) ? r : [];
+      return `<tr>${cells.map(c => `<td>${escapeHtml(String(c ?? ""))}</td>`).join("")}</tr>`;
+    }).join("");
+    parts.push(`<table class="info-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`);
+  }
+
+  infoBody.innerHTML = parts.length ? parts.join("") : `<div class="placeholder">No data</div>`;
+
+  // Hide other sections
+  document.getElementById("thanksOverlay").style.display = "none";
+  document.getElementById("receiptCard").style.display = "none";
+  document.getElementById("studentCard").style.display = "none";
+  document.getElementById("titleText").style.display = "none";
+  document.getElementById("amountText").style.display = "none";
+  document.getElementById("timerWrap").style.display = "none";
+  qrImg.style.display = "none";
+  upiText.textContent = "";
+  placeholder.textContent = "";
+  document.getElementById("schoolImg").style.display = "none";
+
+  infoCard.style.display = "block";
+  studentText.textContent = "Student Info";
+}
+
+function escapeHtml(s){
+  return String(s || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
+}
 
 function setTimer(seconds){
   if (timerId) clearInterval(timerId);
@@ -83,23 +378,117 @@ function setTimer(seconds){
 }
 
 function showPayload(p){
-  if (!p || !p.upiUrl || !p.amount) {
-    placeholder.textContent = "Waiting for QR...";
-    timerText.textContent = "05:00";
-    qrImg.style.display = "none";
-    upiText.textContent = "";
-    studentText.textContent = "Student: -";
-    document.getElementById("schoolImg").style.display = "block";
+  document.body.classList.remove("mode-qr");
+  if (!p) {
+    showIdle();
     return;
   }
+  showCard();
+  infoCard.style.display = "none";
+  if (p && p.mode === "info" && p.info) {
+    renderInfo(p.info);
+    return;
+  }
+  if (p && p.mode === "thanks") {
+    document.getElementById("thanksOverlay").style.display = "flex";
+    document.getElementById("receiptCard").style.display = "none";
+    placeholder.textContent = "";
+    qrImg.style.display = "none";
+    upiText.textContent = "";
+    document.getElementById("schoolImg").style.display = "none";
+    setTimeout(() => {
+      document.getElementById("thanksOverlay").style.display = "none";
+    }, 10000);
+    return;
+  }
+  document.getElementById("thanksOverlay").style.display = "none";
+  if (p && p.mode === "receipt" && p.receipt) {
+    const r = p.receipt || {};
+    document.getElementById("receiptCard").style.display = "block";
+    document.getElementById("rcName").textContent = r.name || "-";
+    document.getElementById("rcMeta").textContent = `${r.class || ""} | Roll: ${r.roll || ""} | Adm: ${r.admission_no || ""}`.trim();
+    document.getElementById("rcLatest").textContent = `Latest Paid: \u20B9${r.latestPaid || 0}`;
+    document.getElementById("rcTotalPaid").textContent = `Total Paid: \u20B9${r.totalPaid || 0}`;
+    document.getElementById("rcTotalDue").textContent = `Total Due: \u20B9${r.totalDue || 0}`;
+    const status = String(r.status || "Paid");
+    const pm = r.paymentMode ? ` | Mode: ${r.paymentMode}` : "";
+    document.getElementById("rcDate").textContent = `Status: ${status}${pm} | Date: ${r.date || "-"}`;
+    document.getElementById("rcDate").style.color = /pending/i.test(status) ? "var(--warn)" : "var(--ok)";
+    placeholder.textContent = "";
+    qrImg.style.display = "none";
+    upiText.textContent = "";
+    document.getElementById("schoolImg").style.display = "none";
+    document.getElementById("studentCard").style.display = "none";
+    document.getElementById("titleText").style.display = "none";
+    document.getElementById("amountText").style.display = "none";
+    document.getElementById("timerWrap").style.display = "none";
+    studentText.textContent = r.name ? `Student: ${r.name}` : "Student: -";
+    return;
+  }
+  if (p && p.mode === "cash" && p.cash) {
+    const c = p.cash || {};
+    document.getElementById("titleText").style.display = "none";
+    document.getElementById("amountText").style.display = "none";
+    document.getElementById("timerWrap").style.display = "none";
+    document.getElementById("studentCard").style.display = "none";
+    document.getElementById("receiptCard").style.display = "block";
+    document.getElementById("rcName").textContent = c.name || "-";
+    document.getElementById("rcMeta").textContent = `Adm: ${c.admission_no || "-"}`;
+    document.getElementById("rcLatest").textContent = `Submit \u20B9${c.amount || 0} to Counter`;
+    document.getElementById("rcTotalPaid").textContent = `Total Paid: \u20B9${c.totalPaid || 0}`;
+    document.getElementById("rcTotalDue").textContent = `Payment Mode: Cash`;
+    document.getElementById("rcDate").textContent = `Status: Pending`;
+    document.getElementById("rcDate").style.color = "var(--warn)";
+    placeholder.textContent = "";
+    qrImg.style.display = "none";
+    upiText.textContent = "";
+    document.getElementById("schoolImg").style.display = "none";
+    studentText.textContent = c.name ? `Student: ${c.name}` : "Student: -";
+    return;
+  }
+  if (p && p.mode === "student" && p.student) {
+    const s = p.student || {};
+    document.getElementById("titleText").style.display = "none";
+    document.getElementById("amountText").style.display = "none";
+    document.getElementById("timerWrap").style.display = "none";
+    document.getElementById("studentCard").style.display = "block";
+    document.getElementById("studentName").textContent = s.name || "-";
+    document.getElementById("studentMeta").textContent = `${s.class || ""} | Roll: ${s.roll || ""} | Adm: ${s.admission_no || ""}`.trim();
+    document.getElementById("studentPhoto").src = s.photoUrl || "images/logo1.png";
+    document.getElementById("studentLatestPaid").textContent = `Latest Paid: \u20B9${s.latestPaid || 0}`;
+    document.getElementById("studentTotalDue").textContent = `Total Due: \u20B9${s.totalDue || 0}`;
+    document.getElementById("studentPayStatus").textContent = `Status: ${s.status || "Pending"}`;
+    document.getElementById("receiptCard").style.display = "none";
+    placeholder.textContent = "";
+    qrImg.style.display = "none";
+    upiText.textContent = "";
+    studentText.textContent = "Student Details";
+    document.getElementById("schoolImg").style.display = "none";
+    return;
+  }
+
+  // QR mode (accept both explicit mode and legacy payloads)
+  const isQr = (p && (p.mode === "qr" || (!!p.upiUrl && !!p.amount)));
+  if (!isQr || !p.upiUrl || !p.amount) {
+    showIdle();
+    return;
+  }
+  document.body.classList.add("mode-qr");
   if (p.studentName) {
     studentText.textContent = `Student: ${p.studentName}`;
   } else {
     studentText.textContent = "Student: -";
   }
-  amountText.textContent = `₹${p.amount}`;
+  document.getElementById("receiptCard").style.display = "none";
+  document.getElementById("studentCard").style.display = "none";
+  document.getElementById("thanksOverlay").style.display = "none";
+  infoCard.style.display = "none";
+  document.getElementById("titleText").style.display = "block";
+  document.getElementById("amountText").style.display = "block";
+  document.getElementById("timerWrap").style.display = "block";
+  amountText.textContent = `\u20B9${p.amount}`;
   upiText.textContent = "";
-  qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=" + encodeURIComponent(p.upiUrl);
+  qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(p.upiUrl);
   qrImg.style.display = "block";
   document.getElementById("schoolImg").style.display = "none";
   placeholder.textContent = "";
@@ -107,8 +496,8 @@ function showPayload(p){
   if (newTs && newTs !== lastPayloadTs) {
     lastPayloadTs = newTs;
     endAt = newTs + Number(p.expiresSec || 600) * 1000;
-  setTimer(Number(p.expiresSec || 300));
-}
+    setTimer(Number(p.expiresSec || 300));
+  }
 }
 
 async function fetchPayload(){
@@ -125,6 +514,7 @@ async function poll(){
   const p = await fetchPayload();
   showPayload(p);
 }
+showIdle();
 poll();
 setInterval(poll, 2000);
 </script>
