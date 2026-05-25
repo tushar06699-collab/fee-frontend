@@ -3,31 +3,38 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Fee Receipt â€” P.S. Public School</title>
+<title>Fee Receipt - P.S. Public School</title>
 
 <style>
+:root{
+    --brand:#0f3c84;
+    --brand-2:#1f6feb;
+    --bg:#edf3fb;
+    --line:#d9e3f2;
+}
+*{box-sizing:border-box}
 body{
-    font-family:Arial,sans-serif;
-    background:#f3f4f6;
+    font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+    background:radial-gradient(1000px 320px at 0% 0%, #dce9ff 0%, transparent 50%),var(--bg);
     margin:0;
     padding:0 20px 20px;
     color:#111;
 }
 .topbar{
     width:100%;
-    padding:15px 20px;
-    background:#007bff;
+    padding:14px 20px;
+    background:linear-gradient(90deg,var(--brand),var(--brand-2));
     color:#fff;
     display:flex;
     align-items:center;
     gap:15px;
-    box-sizing:border-box;
     position:sticky;
     top:0;
     z-index:3000;
     margin:0 -20px 15px;
+    box-shadow:0 8px 22px rgba(15,60,132,.22);
 }
-.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
+.menu-btn{font-size:24px;cursor:pointer;color:#fff;font-weight:900;line-height:1;}
 .overlay {
     position: fixed;top:0;left:0;width:100%;height:100%;
     background: rgba(0,0,0,0.35);display:none;z-index:1500;
@@ -35,24 +42,26 @@ body{
 .overlay.show { display:block; }
 .side-menu{
     position:fixed;top:0;left:-280px;width:260px;height:100%;
-    background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+    background:#fff;box-shadow:2px 0 24px rgba(0,0,0,0.18);
     padding:20px;overflow-y:auto;z-index:2000;
     transition: left 0.35s;
-    border-radius:0 18px 18px 0;
+    border-radius:0 20px 20px 0;
 }
 .side-menu.open{ left:0; }
 .menu-item{
-    padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+    padding:12px 0;border-bottom:1px solid #ebf0f7;cursor:pointer;
     font-size:16px;font-weight:600;color:#333;
 }
+.menu-item:hover{color:var(--brand-2)}
 
 .container{
     max-width:980px;
     margin:auto;
     background:#fff;
     padding:18px;
-    border-radius:8px;
-    box-shadow:0 6px 18px rgba(0,0,0,.04);
+    border-radius:16px;
+    box-shadow:0 14px 30px rgba(14,49,112,.10);
+    border:1px solid var(--line);
 }
 
 .header{
@@ -83,13 +92,13 @@ table{
 }
 
 th,td{
-    border:1px solid #bbb;
+    border:1px solid #e1e8f2;
     padding:6px;
     text-align:center;
     font-size:13px;
 }
 
-th{background:#eef6ff;}
+th{background:#edf4ff;color:#163f7e;}
 
 .controls{
     display:flex;
@@ -100,8 +109,8 @@ th{background:#eef6ff;}
 }
 
 .btn{
-    padding:8px 12px;
-    border-radius:6px;
+    padding:9px 12px;
+    border-radius:8px;
     border:0;
     background:#25D366;
     color:#fff;
@@ -110,6 +119,11 @@ th{background:#eef6ff;}
 
 .btn.gray{background:#6c757d;}
 .btn.blue{background:#0d6efd;}
+@media (max-width:900px){
+  body{padding:0 10px 10px}
+  .topbar{margin:0 -10px 10px}
+  .container{padding:12px;border-radius:12px}
+}
 
 .status{
     padding:8px;
@@ -199,12 +213,11 @@ th{background:#eef6ff;}
 
 <body>
 <div class="topbar">
-  <div class="menu-btn" onclick="toggleMenu()">â˜°</div>
+  <div class="menu-btn" onclick="toggleMenu()">&#9776;</div>
   <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
 </div>
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
 <div class="side-menu" id="sideMenu">
-  <div class="menu-item" onclick="goToPage('index.html')">Home</div>
   <div class="menu-item" onclick="goToPage('index.html')">Home</div>
 
   <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
@@ -214,7 +227,7 @@ th{background:#eef6ff;}
   <div class="header">
     <div class="header-left">
       <img src="images/logo1.png" alt="School logo" class="schoolLogo">
-      <h1>P.S. Public School â€“ Fee Receipt</h1>
+      <h1>P.S. Public School - Fee Receipt</h1>
     </div>
     <div style="text-align:right">
       <div id="showTopReceipt" class="muted"></div>
@@ -334,10 +347,6 @@ data.class = data.class || data.class_name || "-";
 data.roll = data.roll != null ? String(data.roll) : "-";
 data.totalPaid = Number(data.totalPaid ?? data.total_paid ?? 0);
 data.totalDue = Number(data.totalDue ?? data.total_due ?? 0);
-data.gross_total = Number(data.gross_total ?? data.grossTotal ?? (data.totalPaid + data.totalDue) ?? 0);
-data.scholarship_amount = Number(data.scholarship_amount ?? data.scholarshipAmount ?? 0);
-data.concession_amount = Number(data.concession_amount ?? data.concessionAmount ?? 0);
-data.final_total = Number(data.final_total ?? data.finalTotal ?? (data.totalPaid + data.totalDue) ?? 0);
 data.advance = Number(data.advance||0);
 data.date = data.date||new Date().toLocaleDateString('en-IN');
 
@@ -550,10 +559,6 @@ function renderInfo(){
     <p class="muted"><strong>Books Fee:</strong> ${moneyOrNA(data.books_charge || 0)}</p>
     <p class="muted"><strong>Scholarship:</strong> ${escapeHtml(displayOrNA(discountLabel(data.scholarship)))}</p>
     <p class="muted"><strong>Concession:</strong> ${escapeHtml(displayOrNA(discountLabel(data.concession)))}</p>
-    <p class="muted"><strong>Gross Total:</strong> ${moneyOrNA(data.gross_total)}</p>
-    <p class="muted"><strong>Scholarship Amount:</strong> ${moneyOrNA(data.scholarship_amount)}</p>
-    <p class="muted"><strong>Concession Amount:</strong> ${moneyOrNA(data.concession_amount)}</p>
-    <p class="muted"><strong>Final Total:</strong> ${moneyOrNA(data.final_total)}</p>
     <p class="muted"><strong>Session:</strong> ${escapeHtml(displayOrNA(data.session))}</p>
     <p class="muted"><strong>Date:</strong> ${escapeHtml(displayOrNA(data.date))}</p>
     <p class="small muted"><strong>Receipt Key:</strong> ${escapeHtml(displayOrNA(data.receiptKey))}</p>
@@ -662,10 +667,6 @@ function buildSlipHTML(){
   const booksRow = Number(data.books_charge || 0) > 0 ? `<div>Books Fee: ${data.books_charge}</div>` : "";
   const scholarshipRow = `<div>Scholarship: ${discountLabel(data.scholarship)}</div>`;
   const concessionRow = `<div>Concession: ${discountLabel(data.concession)}</div>`;
-  const grossRow = `<div>Gross Total: ${data.gross_total}</div>`;
-  const scholarshipAmtRow = `<div>Scholarship Amount: ${data.scholarship_amount}</div>`;
-  const concessionAmtRow = `<div>Concession Amount: ${data.concession_amount}</div>`;
-  const finalTotalRow = `<div>Final Total: ${data.final_total}</div>`;
   const paidTypeRow = `<div>Paid Type: ${(data.paid_type || "-").toUpperCase()}</div>`;
 
   return `
@@ -688,10 +689,6 @@ function buildSlipHTML(){
     ${booksRow}
     ${scholarshipRow}
     ${concessionRow}
-    ${grossRow}
-    ${scholarshipAmtRow}
-    ${concessionAmtRow}
-    ${finalTotalRow}
     <div class="line"></div>
     <table>
       <thead>
@@ -735,10 +732,6 @@ function buildReceiptHTML(label){
       ${Number(data.books_charge || 0) > 0 ? `Books Fee: &#8377;${data.books_charge}<br>` : ""}
       Scholarship: ${discountLabel(data.scholarship)}<br>
       Concession: ${discountLabel(data.concession)}<br>
-      Gross Total: &#8377;${data.gross_total}<br>
-      Scholarship Amount: &#8377;${data.scholarship_amount}<br>
-      Concession Amount: &#8377;${data.concession_amount}<br>
-      Final Total: &#8377;${data.final_total}<br>
       Session: ${displayOrNA(data.session)}<br>
       Date: ${displayOrNA(data.date)}
     </div>

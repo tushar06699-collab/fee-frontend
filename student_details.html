@@ -112,15 +112,6 @@ th{background:#007bff;color:#fff}
 .btn.advance{background:#198754;color:#fff}
 .btn.back{background:#6c757d;color:#fff}
 .input-small{width:100px;padding:6px;border-radius:6px;border:1px solid #ccc}
-.totals-breakdown{
-  margin-top:12px;
-  display:flex;
-  gap:12px;
-  flex-wrap:wrap;
-}
-.totals-breakdown .card{
-  min-width:180px;
-}
 </style>
 </head>
 
@@ -243,13 +234,6 @@ th{background:#007bff;color:#fff}
     </tfoot>
   </table>
 
-  <div class="totals-breakdown">
-    <div class="card">Gross Total<br><strong id="grossTotalBox">Rs. 0</strong></div>
-    <div class="card">Scholarship Amount<br><strong id="schAmtBox">Rs. 0</strong></div>
-    <div class="card">Concession Amount<br><strong id="conAmtBox">Rs. 0</strong></div>
-    <div class="card">Final Total<br><strong id="finalTotalBox">Rs. 0</strong></div>
-  </div>
-
 </div>
 
 <script>
@@ -283,10 +267,23 @@ let registrationFee = 0;
 let idCardFee = 0;
 let examConfigs = [];   // [{name, months[], class_fees{class:fee}}]
 let lastPaymentAmount = 0;
+let autoReceiptTimer = null;
+let autoReceiptHoldUntil = 0;
 
 /* Utility: safe number */
 function cleanNumber(x){
   return isNaN(Number(x)) ? 0 : Number(x);
+}
+
+function scheduleAutoReceipt(){
+  if (autoReceiptTimer) clearTimeout(autoReceiptTimer);
+  const now = Date.now();
+  const holdDelay = Math.max(0, autoReceiptHoldUntil - now);
+  autoReceiptTimer = setTimeout(() => {
+    try{
+      generateReceipt();
+    }catch(e){}
+  }, holdDelay + 2000);
 }
 
 function calculateTotals(){
@@ -321,52 +318,6 @@ function discountText(d){
   const unit = x.type === "percentage" ? "%" : "Rs";
   const note = x.note ? ` | ${x.note}` : "";
   return `${x.value}${unit} (${x.scope})${note}`;
-}
-
-function getStudentGrossBuckets(){
-  const out = { previousDue: 0, annual: 0, monthly: 0, admission: 0, total: 0 };
-  if (!student || !student.months) return out;
-  monthsList.forEach(m => {
-    const rec = student.months[m] || {};
-    const amount = cleanNumber(rec.paid || 0) + cleanNumber(rec.due || 0);
-    if (m === "previousDue") out.previousDue += amount;
-    else if (m === "Annual") out.annual += amount;
-    else out.monthly += amount;
-  });
-  out.admission = student?.new_admission ? cleanNumber(getAdmissionFeeForClass(student.class_name)) : 0;
-  out.total = out.previousDue + out.annual + out.monthly;
-  return out;
-}
-
-function computeDiscountAmount(discount, buckets){
-  const d = normalizeDiscount(discount);
-  if (!d.enabled || d.value <= 0) return 0;
-  const map = {
-    monthly: cleanNumber(buckets?.monthly || 0),
-    annual: cleanNumber(buckets?.annual || 0),
-    admission: cleanNumber(buckets?.admission || 0),
-    all: cleanNumber(buckets?.total || 0)
-  };
-  const base = map[d.scope] ?? map.monthly;
-  const raw = d.type === "percentage" ? (base * d.value / 100) : d.value;
-  return Math.max(0, Math.min(base, cleanNumber(raw)));
-}
-
-function computeReceiptTotals(){
-  const totals = calculateTotals();
-  const buckets = getStudentGrossBuckets();
-  const scholarshipAmount = computeDiscountAmount(student?.scholarship, buckets);
-  const concessionAmount = computeDiscountAmount(student?.concession, buckets);
-  const finalTotal = cleanNumber(totals.totalPaid || 0) + cleanNumber(totals.totalDue || 0);
-  const grossTotal = finalTotal + scholarshipAmount + concessionAmount;
-  return {
-    grossTotal,
-    scholarshipAmount,
-    concessionAmount,
-    finalTotal,
-    totalPaid: cleanNumber(totals.totalPaid || 0),
-    totalDue: cleanNumber(totals.totalDue || 0)
-  };
 }
 
 function getPreviousSessionName(sessionName){
@@ -422,6 +373,7 @@ function toggleBooksFee(checked){
   student.months["Annual"] = annualRec;
   saveToBackend();
   render();
+  scheduleAutoReceipt();
 }
 
 function selectPaymentMethod(el){
@@ -623,6 +575,7 @@ function markUpiPaid(){
   const amt = cleanNumber(document.getElementById("payAmount").value);
   if (!amt) { alert("Enter amount first"); return; }
   setPaymentMethod("upi");
+  autoReceiptHoldUntil = Date.now() + 11000;
   showThanksOnTablet();
   setTimeout(() => {
     publishReceiptToTablet();
@@ -647,7 +600,7 @@ function showThanksOnTablet(){
 function publishReceiptToTablet(){
   if (!student) return;
   const apiBase = resolveApiBase();
-  const totals = computeReceiptTotals();
+  const totals = calculateTotals();
   const method = getSelectedPaymentMethod() || String(student?.last_payment_method || "");
   const qs = new URLSearchParams({
     mode: "receipt",
@@ -657,10 +610,6 @@ function publishReceiptToTablet(){
     admission_no: student.admission_no || "",
     totalPaid: String(cleanNumber(totals?.totalPaid || 0)),
     totalDue: String(cleanNumber(totals?.totalDue || 0)),
-    grossTotal: String(cleanNumber(totals?.grossTotal || 0)),
-    scholarshipAmount: String(cleanNumber(totals?.scholarshipAmount || 0)),
-    concessionAmount: String(cleanNumber(totals?.concessionAmount || 0)),
-    finalTotal: String(cleanNumber(totals?.finalTotal || 0)),
     latestPaid: String(cleanNumber(lastPaymentAmount || 0)),
     date: new Date().toLocaleDateString(),
     paymentMode: String(method || "").toUpperCase(),
@@ -1563,11 +1512,6 @@ function render(){
 
   document.getElementById("totalPaid").textContent = "Rs. " + totalPaid;
   document.getElementById("totalDue").textContent = "Rs. " + totalDue;
-  const receiptTotals = computeReceiptTotals();
-  document.getElementById("grossTotalBox").textContent = "Rs. " + cleanNumber(receiptTotals.grossTotal);
-  document.getElementById("schAmtBox").textContent = "Rs. " + cleanNumber(receiptTotals.scholarshipAmount);
-  document.getElementById("conAmtBox").textContent = "Rs. " + cleanNumber(receiptTotals.concessionAmount);
-  document.getElementById("finalTotalBox").textContent = "Rs. " + cleanNumber(receiptTotals.finalTotal);
 }
 
 /* ---------------- UPDATE PURPOSE/EXTRA ---------------- */
@@ -1616,6 +1560,7 @@ async function applyAdvance(){
   student.advance = adv;
   await saveToBackend();
   render();
+  scheduleAutoReceipt();
   alert("Advance applied.");
 }
 
@@ -1667,6 +1612,7 @@ async function submitPayment(){
   if (method === "cash") {
     publishReceiptToTablet();
   }
+  scheduleAutoReceipt();
 }
 
 /* ---------------- MARK PAID / DUE ---------------- */
@@ -1686,6 +1632,7 @@ async function markPaid(m){
   student.last_payment_method = method;
   await saveToBackend();
   render();
+  scheduleAutoReceipt();
 
   localStorage.setItem("paymentMade", Date.now());
 
@@ -1718,6 +1665,7 @@ async function markDue(m){
   rec.date = "";
   await saveToBackend();
   render();
+  scheduleAutoReceipt();
 }
 
 /* ---------------- GENERATE RECEIPT (simple open ) ---------------- */
@@ -1762,12 +1710,8 @@ function generateReceipt() {
             roll: student.roll,
             date: new Date().toLocaleDateString(),
 
-        totalPaid: computeReceiptTotals().totalPaid,
-        totalDue: computeReceiptTotals().totalDue,
-        gross_total: computeReceiptTotals().grossTotal,
-        scholarship_amount: computeReceiptTotals().scholarshipAmount,
-        concession_amount: computeReceiptTotals().concessionAmount,
-        final_total: computeReceiptTotals().finalTotal,
+        totalPaid: finalMonths.reduce((a, m) => a + m.paid, 0),
+        totalDue: finalMonths.reduce((a, m) => a + m.due, 0),
         advance: student.advance || 0,
         latest_paid: cleanNumber(lastPaymentAmount || 0),
 

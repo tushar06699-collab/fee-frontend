@@ -118,21 +118,7 @@
     #receiptCard #rcLatest{font-size:22px;font-weight:900;}
     #receiptCard #rcTotalPaid{font-size:22px;font-weight:900;}
     #receiptCard #rcTotalDue{font-size:22px;font-weight:900;}
-    #receiptCard #rcGross{font-size:20px;font-weight:900;}
-    #receiptCard #rcDiscounts{font-size:20px;font-weight:900;}
-    #receiptCard #rcFinal{font-size:24px;font-weight:900;}
     #receiptCard #rcDate{font-size:18px;font-weight:800;color:#cbd5f5;}
-    #stationaryCard{margin-top:18px;display:none;text-align:left;}
-    #stationaryCard .st-title{font-size:28px;font-weight:950;color:var(--ink);text-align:center;margin-bottom:8px;}
-    #stationaryCard .st-meta{font-size:18px;font-weight:800;color:#dbeafe;text-align:center;margin-bottom:6px;}
-    #stationaryCard .st-note{font-size:22px;font-weight:900;color:var(--warn);text-align:center;margin-bottom:12px;}
-    #stationaryCard .st-total{font-size:28px;font-weight:950;color:var(--ok);text-align:center;margin-bottom:10px;}
-    #stationaryCard .st-status{font-size:18px;font-weight:900;color:#cbd5f5;text-align:center;margin-bottom:14px;}
-    .stationary-table{width:100%;border-collapse:collapse;border:1px solid rgba(255,255,255,0.12);border-radius:12px;overflow:hidden;}
-    .stationary-table th,.stationary-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.10);font-size:16px;}
-    .stationary-table th{background:rgba(78,161,255,0.12);color:#dbeafe;text-align:left;}
-    .stationary-table td{color:#eaf2ff;}
-    .stationary-table td:last-child,.stationary-table th:last-child{text-align:right;}
 
     /* Info view (Result / Attendance / Fee Structure) */
     #infoCard{margin-top:18px;text-align:left;display:none;}
@@ -232,28 +218,7 @@
       <div id="rcLatest" style="color:var(--ok)">Latest Paid: &#8377;0</div>
       <div id="rcTotalPaid" style="color:#9fe7ff">Total Paid: &#8377;0</div>
       <div id="rcTotalDue" style="color:var(--warn)">Total Due: &#8377;0</div>
-      <div id="rcGross" style="color:#dbeafe">Gross Total: &#8377;0</div>
-      <div id="rcDiscounts" style="color:#facc15">Less Scholarship/Concession: &#8377;0</div>
-      <div id="rcFinal" style="color:#ffffff">Final Total: &#8377;0</div>
       <div id="rcDate" style="color:var(--muted)">Date: -</div>
-    </div>
-
-    <div id="stationaryCard">
-      <div class="st-title" id="stTitle">Stationary Payment</div>
-      <div class="st-meta" id="stMeta">-</div>
-      <div class="st-note" id="stNote">-</div>
-      <div class="st-total" id="stTotal">Total: &#8377;0</div>
-      <div class="st-status" id="stStatus">Status: Pending</div>
-      <table class="stationary-table">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Qty</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody id="stItemsBody"></tbody>
-      </table>
     </div>
 
     <div id="infoCard">
@@ -372,7 +337,6 @@ function renderInfo(info){
   document.getElementById("thanksOverlay").style.display = "none";
   document.getElementById("receiptCard").style.display = "none";
   document.getElementById("studentCard").style.display = "none";
-  document.getElementById("stationaryCard").style.display = "none";
   document.getElementById("titleText").style.display = "none";
   document.getElementById("amountText").style.display = "none";
   document.getElementById("timerWrap").style.display = "none";
@@ -428,7 +392,6 @@ function showPayload(p){
   if (p && p.mode === "thanks") {
     document.getElementById("thanksOverlay").style.display = "flex";
     document.getElementById("receiptCard").style.display = "none";
-    document.getElementById("stationaryCard").style.display = "none";
     placeholder.textContent = "";
     qrImg.style.display = "none";
     upiText.textContent = "";
@@ -442,19 +405,11 @@ function showPayload(p){
   if (p && p.mode === "receipt" && p.receipt) {
     const r = p.receipt || {};
     document.getElementById("receiptCard").style.display = "block";
-    document.getElementById("stationaryCard").style.display = "none";
     document.getElementById("rcName").textContent = r.name || "-";
     document.getElementById("rcMeta").textContent = `${r.class || ""} | Roll: ${r.roll || ""} | Adm: ${r.admission_no || ""}`.trim();
     document.getElementById("rcLatest").textContent = `Latest Paid: \u20B9${r.latestPaid || 0}`;
     document.getElementById("rcTotalPaid").textContent = `Total Paid: \u20B9${r.totalPaid || 0}`;
     document.getElementById("rcTotalDue").textContent = `Total Due: \u20B9${r.totalDue || 0}`;
-    const grossTotal = Number(r.grossTotal || 0);
-    const scholarshipAmount = Number(r.scholarshipAmount || 0);
-    const concessionAmount = Number(r.concessionAmount || 0);
-    const finalTotal = Number(r.finalTotal || (Number(r.totalPaid || 0) + Number(r.totalDue || 0)));
-    document.getElementById("rcGross").textContent = `Gross Total: \u20B9${grossTotal}`;
-    document.getElementById("rcDiscounts").textContent = `Less Scholarship/Concession: \u20B9${scholarshipAmount + concessionAmount}`;
-    document.getElementById("rcFinal").textContent = `Final Total: \u20B9${finalTotal}`;
     const status = String(r.status || "Paid");
     const pm = r.paymentMode ? ` | Mode: ${r.paymentMode}` : "";
     document.getElementById("rcDate").textContent = `Status: ${status}${pm} | Date: ${r.date || "-"}`;
@@ -470,52 +425,6 @@ function showPayload(p){
     studentText.textContent = r.name ? `Student: ${r.name}` : "Student: -";
     return;
   }
-  if (p && (p.mode === "stationary_cash" || p.mode === "stationary_qr" || p.mode === "stationary_status") && p.stationary) {
-    const s = p.stationary || {};
-    const items = Array.isArray(s.items) ? s.items : [];
-    const isQr = p.mode === "stationary_qr" && s.upiUrl && s.amount;
-    document.getElementById("stationaryCard").style.display = "block";
-    document.getElementById("receiptCard").style.display = "none";
-    document.getElementById("studentCard").style.display = "none";
-    document.getElementById("thanksOverlay").style.display = "none";
-    infoCard.style.display = "none";
-    document.getElementById("titleText").style.display = isQr ? "block" : "none";
-    document.getElementById("amountText").style.display = isQr ? "block" : "none";
-    document.getElementById("timerWrap").style.display = isQr ? "block" : "none";
-    document.getElementById("schoolImg").style.display = "none";
-    studentText.textContent = s.student_name ? `Student: ${s.student_name}` : "Stationary Receipt";
-    document.getElementById("stTitle").textContent = s.title || "Stationary Payment";
-    document.getElementById("stMeta").textContent = `${s.class_name || ""} | Roll: ${s.roll || ""} | Receipt: ${s.receipt_no || "-"}`.trim();
-    document.getElementById("stNote").textContent = s.note || "";
-    document.getElementById("stTotal").textContent = `Total: \u20B9${Number(s.amount || s.total || 0)}`;
-    document.getElementById("stStatus").textContent = `Status: ${s.status_label || "Pending"}${s.payment_mode ? ` | Mode: ${String(s.payment_mode).toUpperCase()}` : ""}`;
-    document.getElementById("stStatus").style.color =
-      /paid/i.test(String(s.status_label || "")) ? "var(--ok)" :
-      /cancel/i.test(String(s.status_label || "")) ? "var(--danger)" :
-      "var(--warn)";
-    document.getElementById("stItemsBody").innerHTML = items.length
-      ? items.map(it => `<tr><td>${escapeHtml(it.name || "-")}</td><td>${escapeHtml(it.qty || 0)}</td><td>\u20B9${escapeHtml(it.total || 0)}</td></tr>`).join("")
-      : `<tr><td colspan="3" style="text-align:center;">No items</td></tr>`;
-    if (isQr) {
-      document.body.classList.add("mode-qr");
-      amountText.textContent = `\u20B9${s.amount}`;
-      qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(s.upiUrl);
-      qrImg.style.display = "block";
-      upiText.textContent = "";
-      placeholder.textContent = "";
-      const newTs = Number(p.ts || 0);
-      if (newTs && newTs !== lastPayloadTs) {
-        lastPayloadTs = newTs;
-        setTimer(Number(p.expiresSec || 300));
-      }
-    } else {
-      document.body.classList.remove("mode-qr");
-      qrImg.style.display = "none";
-      upiText.textContent = "";
-      placeholder.textContent = "";
-    }
-    return;
-  }
   if (p && p.mode === "cash" && p.cash) {
     const c = p.cash || {};
     document.getElementById("titleText").style.display = "none";
@@ -523,7 +432,6 @@ function showPayload(p){
     document.getElementById("timerWrap").style.display = "none";
     document.getElementById("studentCard").style.display = "none";
     document.getElementById("receiptCard").style.display = "block";
-    document.getElementById("stationaryCard").style.display = "none";
     document.getElementById("rcName").textContent = c.name || "-";
     document.getElementById("rcMeta").textContent = `Adm: ${c.admission_no || "-"}`;
     document.getElementById("rcLatest").textContent = `Submit \u20B9${c.amount || 0} to Counter`;
@@ -551,7 +459,6 @@ function showPayload(p){
     document.getElementById("studentTotalDue").textContent = `Total Due: \u20B9${s.totalDue || 0}`;
     document.getElementById("studentPayStatus").textContent = `Status: ${s.status || "Pending"}`;
     document.getElementById("receiptCard").style.display = "none";
-    document.getElementById("stationaryCard").style.display = "none";
     placeholder.textContent = "";
     qrImg.style.display = "none";
     upiText.textContent = "";
@@ -567,7 +474,6 @@ function showPayload(p){
     return;
   }
   document.body.classList.add("mode-qr");
-  document.getElementById("stationaryCard").style.display = "none";
   if (p.studentName) {
     studentText.textContent = `Student: ${p.studentName}`;
   } else {

@@ -12,9 +12,7 @@
   .overlay.show{display:block;}
   .side-menu{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);padding:20px;overflow-y:auto;z-index:2000;transition:left 0.35s;border-radius:0 18px 18px 0;}
   .side-menu.open{left:0;}
-  .menu-item{padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600;color:#333;border-radius:12px;transition:background .2s,color .2s,box-shadow .2s;}
-  .menu-item:hover{background:#eff6ff;color:#1d4ed8}
-  .menu-item.active{background:#dbeafe;color:#1d4ed8;box-shadow:inset 0 0 0 1px #93c5fd}
+  .menu-item{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:16px;font-weight:600;color:#333;}
 
   .container{max-width:1200px;margin:15px auto;background:#fff;padding:20px;border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
@@ -38,12 +36,12 @@
 
   <div id="overlay" class="overlay" onclick="closeMenu()"></div>
   <div class="side-menu" id="sideMenu">
-    <div class="menu-item" data-page="index.html" onclick="goToPage('index.html')">Fee Overview</div>
-    <div class="menu-item" data-page="index.html" onclick="goToPage('index.html')">Home</div>
-    <div class="menu-item" data-page="stationary_items.html" onclick="goToPage('stationary_items.html')">Stationary Items</div>
-    <div class="menu-item" data-page="stationary_students.html" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
-    <div class="menu-item" data-page="stationary_receipt_history.html" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
-    <div class="menu-item" data-page="stationary_fee_ledger.html" onclick="goToPage('stationary_fee_ledger.html')">Stationary Fee Ledger</div>
+    <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
+        <div class="menu-item" onclick="goToPage('index.html')">Home</div>
+    <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
+    <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
+        <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('stationary_fee_ledger.html')">Stationary Fee Ledger</div>
   </div>
 
   <div class="container">
@@ -69,8 +67,6 @@
           <th>Roll</th>
           <th>Items</th>
           <th>Total (&#8377;)</th>
-          <th>Mode</th>
-          <th>Status</th>
           <th>Action</th>
         </tr>
       </thead>
@@ -87,12 +83,6 @@ let allRows = [];
 function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
 function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
 function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
-function setActiveMenu(){
-  const currentPage = window.location.pathname.split("/").pop() || "";
-  document.querySelectorAll(".side-menu .menu-item").forEach(item => {
-    item.classList.toggle("active", item.dataset.page === currentPage);
-  });
-}
 
 async function loadSessions(){
   try{
@@ -154,8 +144,6 @@ function renderRows(){
       <td>${r.roll || "-"}</td>
       <td>${items || "-"}</td>
       <td>${r.total || 0}</td>
-      <td>${String(r.payment_mode || "-").toUpperCase()}</td>
-      <td>${String(r.payment_status || "pending").replaceAll("_"," ").toUpperCase()}</td>
       <td>
         <button class="btn" onclick="openReceipt(${r.receipt_no})">View</button>
         <button class="btn" style="background:#ef4444;margin-left:6px" onclick="deleteReceipt(${r.receipt_no})">Delete</button>
@@ -181,7 +169,6 @@ async function deleteReceipt(no){
 }
 
 loadSessions();
-setActiveMenu();
 loadReceipts();
 </script>
 </body>
