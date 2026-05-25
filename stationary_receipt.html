@@ -26,8 +26,42 @@
   .total{font-size:18px;font-weight:700;margin-top:12px;}
   .codes{display:flex;gap:20px;align-items:center;margin-top:12px;flex-wrap:wrap;}
   .btn{padding:8px 12px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
+  .btn.secondary{background:#475569}
+  .btn.success{background:#16a34a}
+  .btn.warn{background:#d97706}
+  .btn.danger{background:#dc2626}
+  .btn:disabled{background:#94a3b8;cursor:not-allowed}
+  .pay-panel{margin-top:16px;padding:16px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff}
+  .pay-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+  .status-chip{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+  .status-chip.pending{background:#fff7ed;color:#c2410c}
+  .status-chip.paid{background:#dcfce7;color:#166534}
+  .status-chip.not_paid{background:#fee2e2;color:#b91c1c}
+  .status-chip.cancelled{background:#e5e7eb;color:#374151}
+  .muted{color:#6b7280;font-size:13px}
+  .action-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .panel-row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-top:14px}
+  .panel-main{flex:1 1 560px;min-width:280px}
+  .panel-print{display:flex;align-items:flex-start;justify-content:flex-end;min-width:180px}
+  .section-title{font-size:14px;font-weight:800;color:#334155;margin-bottom:8px}
+  .option-row{display:flex;gap:10px;flex-wrap:wrap}
+  .select-pill{display:flex;align-items:center;gap:8px;padding:11px 14px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-weight:800;color:#1e293b;cursor:pointer;user-select:none}
+  .select-pill input{margin:0}
+  .select-pill.active{border-color:#2563eb;background:#dbeafe;color:#0f172a}
+  .print-stack{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .qr-panel{display:none;margin-top:14px;padding:16px;border:1px solid #bfdbfe;border-radius:14px;background:linear-gradient(135deg,#eff6ff,#ffffff)}
+  .qr-panel.show{display:block}
+  .qr-panel-grid{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .qr-panel-text{flex:1 1 260px}
+  .qr-panel-title{font-size:20px;font-weight:900;color:#0f172a;margin-bottom:6px}
+  .qr-panel-amount{font-size:26px;font-weight:900;color:#15803d;margin-bottom:8px}
+  .qr-panel-note{font-size:13px;color:#475569;margin-bottom:8px}
+  .qr-panel-upi{font-size:12px;color:#64748b;word-break:break-all}
+  .qr-visual{position:relative;width:210px;height:210px}
+  #localUpiCanvas,#localUpiImage{position:absolute;inset:0;width:210px;height:210px;background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:8px;box-sizing:border-box}
+  #localUpiImage{display:none;object-fit:contain}
   @media print{
-    .topbar,.btn{display:none;}
+    .topbar,.pay-panel{display:none;}
     body{background:#fff;margin:0;padding:0;}
     .container{
       box-shadow:none;
@@ -55,7 +89,7 @@
     <div style="margin-left:auto;">
       <button class="btn" onclick="goBackToIssue()">Back</button>
       <button class="btn" onclick="goBackToHistory()">History</button>
-      <button class="btn" onclick="window.print()">Print</button>
+      <button class="btn success" id="topPrintBtn" onclick="printIfPaid()" disabled>Print</button>
     </div>
   </div>
 
@@ -66,7 +100,8 @@
     <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
     <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
         <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
-  </div>
+      <div class="menu-item" onclick="goToPage('stationary_fee_ledger.html')">Stationary Fee Ledger</div>
+      </div>
 
   <div class="container">
     <div class="header">
@@ -97,6 +132,71 @@
 
     <div class="total">Grand Total: &#8377;<span id="grandTotal">0</span></div>
 
+    <div class="pay-panel" id="paymentPanel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:#111827;">Payment Control</div>
+          <div class="muted">Send the payment view to the tablet, then save the final status here.</div>
+        </div>
+        <div id="paymentStatusChip" class="status-chip pending">Pending</div>
+      </div>
+      <div class="pay-grid">
+        <div>
+          <div class="muted">Selected Mode</div>
+          <div id="paymentModeText" style="font-size:18px;font-weight:800;color:#111827;">Not selected</div>
+        </div>
+        <div>
+          <div class="muted">Receipt Status</div>
+          <div id="paymentStatusText" style="font-size:18px;font-weight:800;color:#111827;">Pending</div>
+        </div>
+        <div>
+          <div class="muted">Last Updated</div>
+          <div id="paymentUpdatedText" style="font-size:18px;font-weight:800;color:#111827;">-</div>
+        </div>
+      </div>
+      <div class="panel-row">
+        <div class="panel-main">
+          <div class="section-title">1. Select Payment Mode</div>
+          <div class="option-row">
+            <label class="select-pill" id="cashPill">
+              <input type="radio" name="paymentMode" value="cash" onchange="selectPaymentMode('cash')">
+              <span>Pay With Cash</span>
+            </label>
+            <label class="select-pill" id="upiPill">
+              <input type="radio" name="paymentMode" value="upi" onchange="selectPaymentMode('upi')">
+              <span>Pay With UPI</span>
+            </label>
+          </div>
+          <div class="section-title" style="margin-top:14px;">2. Update Payment Result</div>
+          <div class="option-row">
+            <button class="btn success" id="paidBtn" onclick="markReceiptPaid()" disabled>Paid</button>
+            <button class="btn warn" id="notPaidBtn" onclick="markReceiptNotPaid()" disabled>Not Paid</button>
+            <button class="btn danger" id="cancelBtn" onclick="cancelReceiptPayment()" disabled>Cancel</button>
+          </div>
+          <div class="qr-panel" id="localQrPanel">
+            <div class="qr-panel-grid">
+              <div class="qr-panel-text">
+                <div class="qr-panel-title">UPI Payment QR</div>
+                <div class="qr-panel-amount">Amount: &#8377;<span id="localQrAmount">0</span></div>
+                <div class="qr-panel-note">Scan this QR to pay this stationery receipt.</div>
+                <div class="qr-panel-upi" id="localQrUpi"></div>
+              </div>
+              <div class="qr-visual">
+                <canvas id="localUpiCanvas" width="210" height="210"></canvas>
+                <img id="localUpiImage" alt="UPI QR">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-print">
+          <div class="print-stack">
+            <button class="btn success" id="printReceiptBtn" onclick="printIfPaid()" disabled>Print Receipt</button>
+            <div class="muted">Enabled only after paid</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="codes">
       <div>
         <div class="meta">Barcode</div>
@@ -112,10 +212,278 @@
 <script>
 const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
 let currentSession = localStorage.getItem("session") || "2024_25";
+let selectedPaymentMode = "";
 
 function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
 function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
 function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
+function resolveApiBase(){
+  let apiBase = FEE_API;
+  if (/127\.0\.0\.1|localhost/i.test(apiBase)) {
+    apiBase = `${window.location.protocol}//${window.location.hostname}:5000`;
+  }
+  return apiBase;
+}
+function getUpiId(){
+  let id = String(localStorage.getItem("upiId") || "").trim();
+  if (!id) {
+    id = "9416293661@okbizaxis";
+    localStorage.setItem("upiId", id);
+  }
+  return id;
+}
+function getUpiName(){
+  let name = String(localStorage.getItem("upiName") || "").trim();
+  if (!name) {
+    name = "P.S. Public School";
+    localStorage.setItem("upiName", name);
+  }
+  return name;
+}
+function buildUpiUrl(amount){
+  const upiId = getUpiId();
+  if (!upiId) return "";
+  const r = window.__stationaryReceipt || {};
+  const params = new URLSearchParams();
+  params.set("pa", upiId);
+  params.set("pn", getUpiName());
+  params.set("am", String(Number(amount || 0)));
+  params.set("cu", "INR");
+  params.set("tn", `Stationary ${r.student_name || ""} ${r.class_name || ""} ${r.roll || ""}`.trim());
+  return `upi://pay?${params.toString()}`;
+}
+function statusLabel(status){
+  const key = String(status || "pending").toLowerCase();
+  if (key === "paid") return "Paid";
+  if (key === "not_paid" || key === "unpaid") return "Not Paid";
+  if (key === "cancelled") return "Cancelled";
+  return "Pending";
+}
+function statusClass(status){
+  const key = String(status || "pending").toLowerCase();
+  if (key === "paid") return "paid";
+  if (key === "cancelled") return "cancelled";
+  if (key === "not_paid" || key === "unpaid") return "not_paid";
+  return "pending";
+}
+function setCachedReceipt(receipt){
+  window.__stationaryReceipt = receipt;
+  try{ localStorage.setItem("stationaryReceipt", JSON.stringify(receipt)); }catch(e){}
+}
+function setModeSelection(mode){
+  const selected = String(mode || "").toLowerCase();
+  const cashRadio = document.querySelector('input[name="paymentMode"][value="cash"]');
+  const upiRadio = document.querySelector('input[name="paymentMode"][value="upi"]');
+  if (cashRadio) cashRadio.checked = selected === "cash";
+  if (upiRadio) upiRadio.checked = selected === "upi";
+  document.getElementById("cashPill").classList.toggle("active", selected === "cash");
+  document.getElementById("upiPill").classList.toggle("active", selected === "upi");
+}
+function renderLocalUpiQr(){
+  const receipt = window.__stationaryReceipt || {};
+  const panel = document.getElementById("localQrPanel");
+  const canvas = document.getElementById("localUpiCanvas");
+  const img = document.getElementById("localUpiImage");
+  if (selectedPaymentMode !== "upi") {
+    panel.classList.remove("show");
+    if (canvas && canvas.getContext) {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    if (img) {
+      img.style.display = "none";
+      img.removeAttribute("src");
+    }
+    return;
+  }
+  const upiUrl = buildUpiUrl(receipt.total || 0);
+  document.getElementById("localQrAmount").textContent = String(Number(receipt.total || 0));
+  document.getElementById("localQrUpi").textContent = upiUrl;
+  panel.classList.add("show");
+  if (!upiUrl) {
+    if (canvas && canvas.getContext) {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    if (img) {
+      img.style.display = "none";
+      img.removeAttribute("src");
+    }
+    return;
+  }
+
+  const fallbackSrc = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(upiUrl);
+  if (canvas) canvas.style.display = "none";
+  if (img) {
+    img.src = fallbackSrc;
+    img.style.display = "block";
+  }
+  if (window.QRCode && typeof QRCode.toCanvas === "function" && canvas) {
+    QRCode.toCanvas(canvas, upiUrl, { width: 210, margin: 1 }, (err) => {
+      if (err) return;
+      canvas.style.display = "block";
+      if (img) img.style.display = "none";
+    });
+  }
+}
+function printIfPaid(){
+  const status = String((window.__stationaryReceipt || {}).payment_status || "").toLowerCase();
+  if (status !== "paid") {
+    alert("Mark this receipt as paid before printing.");
+    return;
+  }
+  window.print();
+}
+function updatePaymentUi(){
+  const receipt = window.__stationaryReceipt || {};
+  const mode = String(selectedPaymentMode || receipt.payment_mode || "").toLowerCase();
+  const status = String(receipt.payment_status || "pending").toLowerCase();
+  document.getElementById("paymentModeText").textContent = mode ? mode.toUpperCase() : "Not selected";
+  document.getElementById("paymentStatusText").textContent = statusLabel(status);
+  document.getElementById("paymentUpdatedText").textContent = receipt.paid_at || receipt.status_updated_at || "-";
+  const chip = document.getElementById("paymentStatusChip");
+  chip.textContent = statusLabel(status);
+  chip.className = `status-chip ${statusClass(status)}`;
+  const actionsEnabled = Boolean(mode);
+  document.getElementById("paidBtn").disabled = !actionsEnabled;
+  document.getElementById("notPaidBtn").disabled = !actionsEnabled;
+  document.getElementById("cancelBtn").disabled = !actionsEnabled;
+  const canPrint = status === "paid";
+  document.getElementById("printReceiptBtn").disabled = !canPrint;
+  document.getElementById("topPrintBtn").disabled = !canPrint;
+  setModeSelection(mode);
+  renderLocalUpiQr();
+}
+function buildStationaryPayload(mode, extra = {}){
+  const receipt = window.__stationaryReceipt || {};
+  return {
+    mode,
+    expiresSec: 300,
+    ts: Date.now(),
+    stationary: {
+      title: mode === "stationary_qr" ? "Stationary UPI Payment" : "Stationary Cash Payment",
+      student_name: receipt.student_name || "",
+      class_name: receipt.class_name || "",
+      roll: receipt.roll || "",
+      receipt_no: receipt.receipt_no || "",
+      amount: Number(receipt.total || 0),
+      total: Number(receipt.total || 0),
+      note: mode === "stationary_qr" ? "Scan the QR to pay this receipt." : `Submit \u20B9${Number(receipt.total || 0)} to Counter`,
+      status_label: statusLabel(receipt.payment_status || "pending"),
+      payment_mode: selectedPaymentMode || receipt.payment_mode || "",
+      items: Array.isArray(receipt.items) ? receipt.items.map(it => ({
+        name: it.name || "",
+        qty: Number(it.qty || 0),
+        total: Number(it.total || 0)
+      })) : [],
+      ...extra
+    }
+  };
+}
+function postTabletPayload(payload){
+  return fetch(`${resolveApiBase()}/upi/display`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ payload }),
+    keepalive: true
+  }).catch(() => null);
+}
+function clearTabletScreen(){
+  fetch(`${resolveApiBase()}/upi/display?clear=1`, { keepalive: true }).catch(() => {});
+}
+async function selectPaymentMode(mode){
+  if (mode === "cash") {
+    await startCashPayment();
+    return;
+  }
+  if (mode === "upi") {
+    await startUpiPayment();
+    return;
+  }
+}
+async function persistPaymentState(status){
+  const receipt = window.__stationaryReceipt || {};
+  if (!receipt.receipt_no) return;
+  const res = await fetch(`${FEE_API}/stationary/receipt/${receipt.receipt_no}/payment`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Session": currentSession
+    },
+    body: JSON.stringify({
+      payment_mode: selectedPaymentMode || receipt.payment_mode || "",
+      payment_status: status,
+      paid_at: status === "paid" ? new Date().toLocaleString() : ""
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) throw new Error(data.message || "Failed to save payment status");
+  setCachedReceipt(data.receipt || receipt);
+  updatePaymentUi();
+  return data.receipt;
+}
+async function pushStatusToTablet(status){
+  const receipt = window.__stationaryReceipt || {};
+  const payload = buildStationaryPayload("stationary_status", {
+    title: "Stationary Payment Status",
+    note: status === "paid" ? "Payment received successfully." : status === "cancelled" ? "Payment was cancelled." : "Payment not received yet.",
+    status_label: statusLabel(status),
+    payment_mode: selectedPaymentMode || receipt.payment_mode || ""
+  });
+  await postTabletPayload(payload);
+}
+async function startCashPayment(){
+  selectedPaymentMode = "cash";
+  try{ await persistPaymentState("pending"); }catch(e){}
+  updatePaymentUi();
+  await postTabletPayload(buildStationaryPayload("stationary_cash", {
+    status_label: "Pending",
+    payment_mode: "cash"
+  }));
+}
+async function startUpiPayment(){
+  const receipt = window.__stationaryReceipt || {};
+  const upiUrl = buildUpiUrl(receipt.total || 0);
+  if (!upiUrl) {
+    alert("UPI ID is missing.");
+    return;
+  }
+  selectedPaymentMode = "upi";
+  try{ await persistPaymentState("pending"); }catch(e){}
+  updatePaymentUi();
+  await postTabletPayload(buildStationaryPayload("stationary_qr", {
+    status_label: "Pending",
+    payment_mode: "upi",
+    upiUrl
+  }));
+}
+async function markReceiptPaid(){
+  try{
+    await persistPaymentState("paid");
+    await pushStatusToTablet("paid");
+    alert("Receipt marked as paid.");
+  }catch(e){
+    alert(e.message || "Unable to save payment status");
+  }
+}
+async function markReceiptNotPaid(){
+  try{
+    await persistPaymentState("not_paid");
+    await pushStatusToTablet("not_paid");
+    alert("Receipt marked as not paid.");
+  }catch(e){
+    alert(e.message || "Unable to save payment status");
+  }
+}
+async function cancelReceiptPayment(){
+  try{
+    await persistPaymentState("cancelled");
+    await pushStatusToTablet("cancelled");
+    alert("Receipt marked as cancelled.");
+  }catch(e){
+    alert(e.message || "Unable to save payment status");
+  }
+}
 
 async function loadReceipt(){
   const qs = new URLSearchParams(window.location.search);
@@ -137,9 +505,10 @@ async function loadReceipt(){
     if (!res.ok || !data.success) return alert(data.message || "Receipt not found");
     receipt = data.receipt;
   }
-  window.__stationaryReceipt = receipt;
+  setCachedReceipt(receipt);
   window.__stationaryClass = clsParam || receipt.class_name || "";
   window.__stationaryRoll = rollParam || receipt.roll || "";
+  selectedPaymentMode = String(receipt.payment_mode || "").toLowerCase();
 
   receiptNoEl = document.getElementById("receiptNo");
   receiptNoEl.textContent = `Receipt No: ${receipt.receipt_no}`;
@@ -160,6 +529,7 @@ async function loadReceipt(){
     </tr>
   `).join("");
   document.getElementById("grandTotal").textContent = receipt.total || 0;
+  updatePaymentUi();
 
   try{
     JsBarcode("#barcode", String(receipt.receipt_no), {format:"CODE128", width:2, height:50, displayValue:true});
@@ -188,6 +558,8 @@ function goBackToHistory(){
   const qs = new URLSearchParams({session: currentSession});
   window.location.href = `stationary_receipt_history.html?${qs.toString()}`;
 }
+
+window.addEventListener("afterprint", clearTabletScreen);
 
 loadReceipt();
 </script>

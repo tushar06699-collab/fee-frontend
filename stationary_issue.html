@@ -30,6 +30,13 @@
   .pager{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;}
   .pager button{padding:6px 10px;border:0;border-radius:6px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
   .pager button:disabled{opacity:.5;cursor:not-allowed;}
+  .items-toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px;}
+  .items-search{max-width:320px;}
+  .status-chip{display:inline-block;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
+  .status-chip.pending{background:#fff7ed;color:#c2410c}
+  .status-chip.paid{background:#dcfce7;color:#166534}
+  .status-chip.not_paid{background:#fee2e2;color:#b91c1c}
+  .status-chip.cancelled{background:#e5e7eb;color:#374151}
 </style>
 </head>
 <body>
@@ -44,12 +51,12 @@
   <div id="overlay" class="overlay" onclick="closeMenu()"></div>
   <div class="side-menu" id="sideMenu">
     <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
-    <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
-    <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
-    <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
+        <div class="menu-item" onclick="goToPage('index.html')">Home</div>
     <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
     <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
-  </div>
+        <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
+      <div class="menu-item" onclick="goToPage('stationary_fee_ledger.html')">Stationary Fee Ledger</div>
+      </div>
 
   <div class="container">
     <div class="card" id="studentCard">
@@ -67,6 +74,14 @@
 
     <div class="card">
       <div class="muted">Select items and quantity</div>
+      <div class="items-toolbar">
+        <input id="itemSearch" class="items-search" placeholder="Search item name..." oninput="applyItemFilter()">
+        <div class="pager">
+          <button id="itemsPrevBtn" onclick="changeItemsPage(-1)">Prev</button>
+          <div class="muted" id="itemsPageInfo">Page 1</div>
+          <button id="itemsNextBtn" onclick="changeItemsPage(1)">Next</button>
+        </div>
+      </div>
       <table>
         <thead>
           <tr>
@@ -99,6 +114,7 @@
             <th>Date</th>
             <th>Items</th>
             <th>Total (&#8377;)</th>
+            <th>Status</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -118,6 +134,10 @@ const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://studen
 let currentSession = localStorage.getItem("session") || "2024_25";
 let student = null;
 let items = [];
+let filteredItems = [];
+let itemsPage = 1;
+const ITEMS_PAGE_SIZE = 10;
+const itemState = {};
 let addedToFeeLedger = false;
 let historyPage = 1;
 const HISTORY_PAGE_SIZE = 6;
@@ -176,47 +196,94 @@ async function loadItems(){
   const res = await fetch(`${FEE_API}/stationary/items`, {headers:{"X-Session": currentSession}});
   const data = await res.json();
   items = data.items || [];
+  items.forEach(item => {
+    itemState[item.id] = itemState[item.id] || { checked: false, qty: 1 };
+  });
+  applyItemFilter();
+}
+
+function renderItemsPage(){
   const tbody = document.getElementById("itemsBody");
-  tbody.innerHTML = items.map(item=>`
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PAGE_SIZE));
+  if (itemsPage > totalPages) itemsPage = totalPages;
+  const start = (itemsPage - 1) * ITEMS_PAGE_SIZE;
+  const rows = filteredItems.slice(start, start + ITEMS_PAGE_SIZE);
+  tbody.innerHTML = rows.map(item=>{
+    const state = itemState[item.id] || { checked: false, qty: 1 };
+    return `
     <tr>
-      <td><input type="checkbox" data-id="${item.id}" onchange="recalc()"></td>
+      <td><input type="checkbox" data-id="${item.id}" ${state.checked ? "checked" : ""} onchange="updateItemSelection(${item.id}, this.checked)"></td>
       <td>${item.name}</td>
       <td>${item.price}</td>
-      <td><input type="number" min="1" value="1" data-qty="${item.id}" style="width:80px" oninput="recalc()"></td>
+      <td><input type="number" min="1" value="${state.qty}" data-qty="${item.id}" style="width:80px" oninput="updateItemQty(${item.id}, this.value)"></td>
       <td id="line-${item.id}">0</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
+  itemsPageInfo.textContent = `Page ${filteredItems.length ? itemsPage : 0} of ${filteredItems.length ? totalPages : 0}`;
+  itemsPrevBtn.disabled = itemsPage <= 1;
+  itemsNextBtn.disabled = itemsPage >= totalPages;
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">No items found.</td></tr>`;
+  }
+  recalc();
+}
+
+function applyItemFilter(){
+  const q = String(document.getElementById("itemSearch").value || "").trim().toLowerCase();
+  filteredItems = items.filter(item => String(item.name || "").toLowerCase().includes(q));
+  itemsPage = 1;
+  renderItemsPage();
+}
+
+function changeItemsPage(delta){
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PAGE_SIZE));
+  itemsPage = Math.min(totalPages, Math.max(1, itemsPage + delta));
+  renderItemsPage();
+}
+
+function updateItemSelection(itemId, checked){
+  itemState[itemId] = itemState[itemId] || { checked: false, qty: 1 };
+  itemState[itemId].checked = !!checked;
+  recalc();
+}
+
+function updateItemQty(itemId, value){
+  itemState[itemId] = itemState[itemId] || { checked: false, qty: 1 };
+  itemState[itemId].qty = Math.max(1, Number(value || 1));
   recalc();
 }
 
 function recalc(){
   let total = 0;
   items.forEach(item=>{
-    const chk = document.querySelector(`input[data-id='${item.id}']`);
-    const qtyInput = document.querySelector(`input[data-qty='${item.id}']`);
-    const qty = Math.max(1, Number(qtyInput.value || 1));
-    if (chk && chk.checked){
+    const state = itemState[item.id] || { checked: false, qty: 1 };
+    const qty = Math.max(1, Number(state.qty || 1));
+    const lineCell = document.getElementById(`line-${item.id}`);
+    if (state.checked){
       const line = item.price * qty;
       total += line;
-      document.getElementById(`line-${item.id}`).textContent = line;
-    } else {
-      document.getElementById(`line-${item.id}`).textContent = 0;
+      if (lineCell) lineCell.textContent = line;
+    } else if (lineCell) {
+      lineCell.textContent = 0;
     }
   });
   grandTotal.textContent = total;
 }
 
+function getSelectedItems(){
+  return items.reduce((acc, item) => {
+    const state = itemState[item.id] || { checked: false, qty: 1 };
+    if (state.checked) {
+      acc.push({ id: item.id, name: item.name, price: item.price, qty: Math.max(1, Number(state.qty || 1)) });
+    }
+    return acc;
+  }, []);
+}
+
 async function generateReceipt(){
   if (!student) return;
-  const selected = [];
-  items.forEach(item=>{
-    const chk = document.querySelector(`input[data-id='${item.id}']`);
-    const qtyInput = document.querySelector(`input[data-qty='${item.id}']`);
-    const qty = Math.max(1, Number(qtyInput.value || 1));
-    if (chk && chk.checked){
-      selected.push({id: item.id, name: item.name, price: item.price, qty});
-    }
-  });
+  const selected = getSelectedItems();
   if (!selected.length) return alert("Select at least one item");
 
   const payload = {
@@ -252,15 +319,7 @@ async function generateReceipt(){
 
 async function addToFeeLedger(){
   if (!student) return;
-  const selected = [];
-  items.forEach(item=>{
-    const chk = document.querySelector(`input[data-id='${item.id}']`);
-    const qtyInput = document.querySelector(`input[data-qty='${item.id}']`);
-    const qty = Math.max(1, Number(qtyInput.value || 1));
-    if (chk && chk.checked){
-      selected.push({id: item.id, name: item.name, price: item.price, qty});
-    }
-  });
+  const selected = getSelectedItems();
   if (!selected.length) return alert("Select at least one item");
 
   const payload = {
@@ -291,6 +350,22 @@ function goBack(){
   window.location.href = `stationary_students.html?session=${encodeURIComponent(currentSession)}`;
 }
 
+function statusLabel(status){
+  const key = String(status || "pending").toLowerCase();
+  if (key === "paid") return "Paid";
+  if (key === "not_paid" || key === "unpaid") return "Not Paid";
+  if (key === "cancelled") return "Cancelled";
+  return "Pending";
+}
+
+function statusClass(status){
+  const key = String(status || "pending").toLowerCase();
+  if (key === "paid") return "paid";
+  if (key === "cancelled") return "cancelled";
+  if (key === "not_paid" || key === "unpaid") return "not_paid";
+  return "pending";
+}
+
 const params = readParams();
 todayDate.textContent = new Date().toISOString().slice(0,10);
 loadStudent(params.cls, params.roll);
@@ -319,11 +394,13 @@ async function loadHistory(cls, roll){
   nextBtn.disabled = (data.page >= (data.total_pages || 1));
   body.innerHTML = rows.map(r=>{
     const items = (r.items || []).map(it=>`${it.name} x${it.qty}`).join(", ");
+    const paymentStatus = String(r.payment_status || "pending").toLowerCase();
     return `<tr>
       <td>${r.receipt_no}</td>
       <td>${r.date || "-"}</td>
       <td>${items || "-"}</td>
       <td>${r.total || 0}</td>
+      <td><span class="status-chip ${statusClass(paymentStatus)}">${statusLabel(paymentStatus)}</span></td>
       <td><button class="btn" onclick="openReceipt(${r.receipt_no})">View</button></td>
     </tr>`;
   }).join("");
