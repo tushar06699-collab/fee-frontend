@@ -7,32 +7,39 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
+:root{
+    --brand:#0f3c84;
+    --brand-2:#1f6feb;
+    --bg:#edf3fb;
+    --card:#ffffff;
+    --line:#d9e3f2;
+}
+*{box-sizing:border-box}
 body{
-    font-family:Poppins, sans-serif;
-    background:#f4f6f9;
+    font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+    background:radial-gradient(1000px 320px at 0% 0%, #dce9ff 0%, transparent 50%),var(--bg);
     margin:0;
-    padding:0;
 }
 .topbar{
     width:100%;
-    padding:15px 20px;
-    background:#007bff;
+    padding:14px 20px;
+    background:linear-gradient(90deg,var(--brand),var(--brand-2));
     color:#fff;
     display:flex;
     align-items:center;
     gap:15px;
-    box-sizing:border-box;
     position:sticky;
     top:0;
     z-index:3000;
     font-size:20px;
     font-weight:600;
+    box-shadow:0 8px 22px rgba(15,60,132,.22);
 }
 #sessionSelect{
     margin-left:auto;
-    padding:6px 10px;
-    border-radius:6px;
-    border:none;
+    padding:8px 10px;
+    border-radius:10px;
+    border:1px solid #bfd5f7;
     font-size:15px;
 }
 .menu-btn{
@@ -59,7 +66,7 @@ body{
     width:260px;
     height:100%;
     background:#fff;
-    box-shadow:2px 0 8px rgba(0,0,0,.15);
+    box-shadow:2px 0 24px rgba(0,0,0,.15);
     padding:20px;
     transition:left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
     z-index:2000;
@@ -68,19 +75,20 @@ body{
 .side-menu.open{ left:0; }
 .menu-item{
     padding:12px 0;
-    border-bottom:1px solid #eee;
+    border-bottom:1px solid #ebf0f7;
     cursor:pointer;
     font-size:16px;
     font-weight:600;
 }
-.menu-item:hover{ color:#007bff; }
+.menu-item:hover{ color:var(--brand-2); }
 .container{
     max-width:980px;
     margin:20px auto;
-    background:#fff;
+    background:var(--card);
     padding:20px;
-    border-radius:10px;
-    box-shadow:0 4px 12px rgba(0,0,0,.1);
+    border-radius:16px;
+    box-shadow:0 14px 32px rgba(14,49,112,.10);
+    border:1px solid var(--line);
 }
 .actions{
     display:flex;
@@ -95,8 +103,8 @@ body{
     margin:12px 0 18px;
 }
 .one-time .box{
-    background:#f5f9ff;
-    border:1px solid #d8e6ff;
+    background:#f3f8ff;
+    border:1px solid #dbe8f8;
     padding:12px;
     border-radius:10px;
 }
@@ -116,34 +124,41 @@ table{
     margin-top:20px;
 }
 th,td{
-    border:1px solid #ddd;
+    border:1px solid #e4ebf5;
     padding:10px;
     text-align:center;
 }
 th{
-    background:#007bff;
-    color:white;
+    background:#edf4ff;
+    color:#163f7e;
 }
 input{
-    padding:6px;
+    padding:8px;
     width:130px;
+    border:1px solid #cbd7ea;
+    border-radius:8px;
 }
 button{
-    padding:8px 12px;
-    background:#28a745;
+    padding:9px 12px;
+    background:#198754;
     color:white;
     border:none;
-    border-radius:5px;
+    border-radius:8px;
     cursor:pointer;
 }
-.btn-blue{ background:#007bff; }
+.btn-blue{ background:#0d6efd; }
 .btn-purple{ background:#6f42c1; }
+@media (max-width:900px){
+  .container{margin:12px;padding:14px}
+  th,td{font-size:12px;padding:8px}
+  input{width:100px}
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div class="menu-btn" onclick="toggleMenu()">&#9776;</div>
     Edit Fee Structure
     <select id="sessionSelect" onchange="changeSession()"></select>
 </div>
@@ -160,7 +175,7 @@ button{
             <div class="menu-item" onclick="goToPage('summary.html')">Summary Data</div>
     <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
     <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
-`;</div>
+</div>
 
 <div class="container">
     <div class="actions">
@@ -452,3 +467,4 @@ loadSessions().then(loadFees);
 <script src="feeshared_menu.js"></script>
 </body>
 </html>
+
