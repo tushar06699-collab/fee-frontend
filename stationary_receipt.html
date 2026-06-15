@@ -25,26 +25,34 @@
   th{background:#007bff;color:#fff}
   .total{font-size:18px;font-weight:700;margin-top:12px;}
   .codes{display:flex;gap:20px;align-items:center;margin-top:12px;flex-wrap:wrap;}
+  .payment-area{margin-top:20px; border-top:2px dashed #ccc; padding-top:15px;}
+  .method-row{display:flex; gap:15px; margin:10px 0; font-weight:700;}
+  .upi-box{text-align:center; background:#f8fafc; padding:15px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:10px; min-height:60px; display:flex; flex-direction:column; justify-content:center; align-items:center;}
   .btn{padding:8px 12px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
+  .btn.save{background:#059669;}
+  .btn.cancel{background:#dc2626;}
+  .print-only{display:none;}
   @media print{
-    .topbar,.btn{display:none;}
+    .topbar,.btn,.payment-area,.side-menu,.overlay{display:none !important;}
     body{background:#fff;margin:0;padding:0;}
     .container{
       box-shadow:none;
       margin:0;
       border-radius:0;
-      width:80mm;
+      width:100%;
       max-width:80mm;
       padding:8mm 6mm;
     }
     table{font-size:12px;}
     th,td{padding:4px;font-size:12px;}
+    th{background:#f3f4f6 !important; color:#000 !important; border:1px solid #ccc;}
     .school{font-size:16px;}
     .student-highlight{font-size:14px;}
-    .meta{font-size:11px;}
+    .meta{font-size:11px; color:#000;}
     .codes{gap:10px;}
     #barcode{max-width:100%;}
-    #qrcode{width:96px;height:96px;}
+      #qrcode_img{width:96px;height:96px;}
+    .print-only{display:flex !important;}
   }
 </style>
 </head>
@@ -97,6 +105,32 @@
 
     <div class="total">Grand Total: &#8377;<span id="grandTotal">0</span></div>
 
+    <div id="paymentArea" class="payment-area" style="display:none;">
+      <div style="font-weight:700; font-size:18px;">Complete Payment</div>
+      <div class="method-row">
+        <label><input type="radio" name="payMethod" value="cash" checked onchange="togglePayUI()"> Cash</label>
+        <label><input type="radio" name="payMethod" value="upi" onchange="togglePayUI()"> UPI</label>
+      </div>
+
+      <div id="cashSection" class="upi-box" style="display:none; color:#059669; font-size:18px; font-weight:800; border-color:#059669; background:#ecfdf5;">
+        <div class="meta" style="color:#065f46; margin-bottom:4px;">Cash Collection</div>
+        Collect &#8377;<span id="cashCollectAmount">0</span> Cash
+      </div>
+
+      <div id="upiSection" class="upi-box" style="display:none;">
+        <div class="meta" style="margin-bottom:8px;">Scan to Pay via UPI</div>
+        <img id="upiQrImage" style="background:#fff; padding:5px; border:1px solid #ddd; width:180px; height:180px;">
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:10px;">
+        <button class="btn save" id="paidBtn" onclick="saveDraft()">Paid</button>
+        <button class="btn" style="background:#4f46e5;" id="ledgerBtn" onclick="saveAsLedger()">Add to Fee Ledger</button>
+        <button class="btn cancel" onclick="goBackToIssue()">Not Paid</button>
+      </div>
+    </div>
+
+    <div id="printPaymentInfo" class="meta" style="margin-top:10px; font-weight:700; border-top:1px solid #eee; padding-top:8px; display:none;"></div>
+
     <div class="codes">
       <div>
         <div class="meta">Barcode</div>
@@ -104,8 +138,13 @@
       </div>
       <div>
         <div class="meta">QR Code</div>
-        <canvas id="qrcode" width="128" height="128"></canvas>
+        <img id="qrcode_img" width="128" height="128">
       </div>
+    </div>
+
+    <div class="print-only" style="margin-top:40px; justify-content:space-between; align-items:flex-end;">
+      <div class="meta" style="font-weight:700;">Customer's Sign</div>
+      <div class="meta" style="text-align:right; font-weight:700;">Authorized Signatory<br><br><br>_________________</div>
     </div>
   </div>
 
@@ -119,6 +158,7 @@ function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponen
 
 async function loadReceipt(){
   const qs = new URLSearchParams(window.location.search);
+  const mode = qs.get("mode");
   const receiptNo = qs.get("receipt");
   const sess = qs.get("session");
   const clsParam = qs.get("class") || "";
@@ -126,55 +166,181 @@ async function loadReceipt(){
   if (sess){ currentSession = sess; localStorage.setItem("session", currentSession); }
 
   let receipt = null;
-  try{
-    const cached = JSON.parse(localStorage.getItem("stationaryReceipt") || "{}");
-    if (cached && String(cached.receipt_no) === String(receiptNo)) receipt = cached;
-  }catch(e){}
 
-  if (!receipt){
+  if (mode === "issue") {
+    try {
+      receipt = JSON.parse(localStorage.getItem("stationaryDraft") || "null");
+      if (!receipt) { alert("Draft not found"); return goBackToIssue(); }
+      receipt.date = new Date().toISOString().slice(0, 10);
+      receipt.receipt_no = "DRAFT";
+
+      window.__stationaryReceipt = receipt;
+      renderUI(receipt);
+      document.getElementById("paymentArea").style.display = "block";
+      togglePayUI();
+      document.querySelector(".codes").style.display = "none";
+    } catch(e) { receipt = null; }
+  } else {
+    try{
+      const cached = JSON.parse(localStorage.getItem("stationaryReceipt") || "{}");
+      if (cached && String(cached.receipt_no) === String(receiptNo)) receipt = cached;
+    }catch(e){}
+
+    if (!receipt){
     const res = await fetch(`${FEE_API}/stationary/receipt/${receiptNo}`, {headers:{"X-Session": currentSession}});
     const data = await res.json();
     if (!res.ok || !data.success) return alert(data.message || "Receipt not found");
     receipt = data.receipt;
   }
-  window.__stationaryReceipt = receipt;
-  window.__stationaryClass = clsParam || receipt.class_name || "";
-  window.__stationaryRoll = rollParam || receipt.roll || "";
+  }
 
-  receiptNoEl = document.getElementById("receiptNo");
+  if (receipt) {
+     window.__stationaryReceipt = receipt;
+     window.__stationaryClass = clsParam || receipt.class_name || "";
+     window.__stationaryRoll = rollParam || receipt.roll || "";
+     renderUI(receipt);
+  }
+}
+
+function togglePayUI(){
+  const method = document.querySelector('input[name="payMethod"]:checked').value;
+  const upiSection = document.getElementById("upiSection");
+  const cashSection = document.getElementById("cashSection");
+  const receipt = window.__stationaryReceipt;
+
+  if (method === "upi") {
+    upiSection.style.display = "block";
+    cashSection.style.display = "none";
+    generateUPI();
+  } else {
+    upiSection.style.display = "none";
+    cashSection.style.display = "flex";
+    document.getElementById("cashCollectAmount").textContent = receipt.total || 0;
+  }
+}
+
+async function saveAsLedger(){
+  const receipt = window.__stationaryReceipt;
+  if(!confirm("Are you sure you want to add this amount to the student's Fee Ledger?")) return;
+  saveDraft(true);
+}
+
+function generateUPI(){
+  const receipt = window.__stationaryReceipt;
+  const upiId = localStorage.getItem("upiId") || "9416293661@okbizaxis";
+  const upiName = encodeURIComponent(localStorage.getItem("upiName") || "P.S. Public School");
+  const amount = receipt.total || 0;
+  const note = encodeURIComponent(`Stationary ${receipt.student_name} ${receipt.class_name}`);
+  const upiUrl = `upi://pay?pa=${upiId}&pn=${upiName}&am=${amount}&cu=INR&tn=${note}`;
+  document.getElementById("upiQrImage").src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUrl)}`;
+}
+
+async function saveDraft(isLedger = false){
+  const receipt = window.__stationaryReceipt;
+  let method = document.querySelector('input[name="payMethod"]:checked').value;
+  let addedToFee = receipt.added_to_fee;
+
+  if (isLedger) {
+    const resFee = await fetch(`${FEE_API}/stationary/add-to-fee`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json","X-Session": currentSession},
+      body: JSON.stringify({
+        student: {
+          name: receipt.student_name,
+          father: receipt.father,
+          class_name: receipt.class_name,
+          roll: receipt.roll,
+          admission_no: receipt.admission_no || ""
+        },
+        items: receipt.items,
+        date: receipt.date
+      })
+    });
+    const dataFee = await resFee.json();
+    if(!resFee.ok || !dataFee.success) return alert(dataFee.message || "Failed to update ledger");
+    addedToFee = true;
+    method = "ledger";
+  }
+
+  const payload = {
+    student: {
+      name: receipt.student_name,
+      father: receipt.father,
+      class_name: receipt.class_name,
+      roll: receipt.roll,
+      admission_no: receipt.admission_no || ""
+    },
+    items: receipt.items,
+    total: receipt.total,
+    date: receipt.date,
+    added_to_fee: addedToFee,
+    payment_mode: method
+  };
+
+  document.getElementById("paidBtn").disabled = true;
+  document.getElementById("paidBtn").textContent = "Saving...";
+
+  const res = await fetch(`${FEE_API}/stationary/receipt`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json","X-Session": currentSession},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    document.getElementById("paidBtn").disabled = false;
+    document.getElementById("paidBtn").textContent = "Paid";
+    return alert(data.message || "Save failed");
+  }
+
+  localStorage.removeItem("stationaryDraft");
+  window.location.href = `stationary_receipt.html?receipt=${data.receipt.receipt_no}&session=${currentSession}`;
+}
+
+function renderUI(receipt){
+  const receiptNoEl = document.getElementById("receiptNo");
   receiptNoEl.textContent = `Receipt No: ${receipt.receipt_no}`;
   document.getElementById("studentLine").textContent =
     `Student: ${receipt.student_name} | Father: ${receipt.father || "-"} | Class: ${receipt.class_name} | Roll: ${receipt.roll} | Admission: ${receipt.admission_no || "-"}`;
-  document.getElementById("dateLine").textContent = `Date: ${receipt.date} | Session: ${receipt.session}`;
+  document.getElementById("dateLine").textContent = `Date: ${receipt.date} | Session: ${receipt.session || currentSession}`;
   if (receipt.added_to_fee) {
     document.getElementById("ledgerNote").style.display = "block";
+  }
+
+  const payInfo = document.getElementById("printPaymentInfo");
+  if (receipt.payment_mode) {
+    payInfo.style.display = "block";
+    payInfo.textContent = `Payment Mode: ${receipt.payment_mode.toUpperCase()} ${receipt.added_to_fee ? '(Fee Account)' : ''}`;
+  } else {
+    payInfo.style.display = "none";
   }
 
   const tbody = document.getElementById("itemsBody");
   tbody.innerHTML = (receipt.items || []).map(it=>`
     <tr>
-      <td>${it.name}</td>
-      <td>${it.price}</td>
-      <td>${it.qty}</td>
-      <td>${it.total}</td>
+      <td>${it.name || "-"}</td>
+      <td>${it.price || 0}</td>
+      <td>${it.qty || 0}</td>
+      <td>${it.total || (it.price * it.qty) || 0}</td>
     </tr>
   `).join("");
   document.getElementById("grandTotal").textContent = receipt.total || 0;
 
-  try{
-    JsBarcode("#barcode", String(receipt.receipt_no), {format:"CODE128", width:2, height:50, displayValue:true});
-  }catch(e){}
-  try{
-    const qrText = JSON.stringify({
-      receipt: receipt.receipt_no,
-      student: receipt.student_name,
-      class: receipt.class_name,
-      roll: receipt.roll,
-      total: receipt.total,
-      date: receipt.date
-    });
-    QRCode.toCanvas(document.getElementById("qrcode"), qrText, {width:128});
-  }catch(e){}
+  if (receipt.receipt_no !== "DRAFT") {
+    try{
+      JsBarcode("#barcode", String(receipt.receipt_no), {format:"CODE128", width:2, height:50, displayValue:true});
+    }catch(e){}
+    try{
+      const qrText = JSON.stringify({
+        receipt: receipt.receipt_no,
+        student: receipt.student_name,
+        class: receipt.class_name,
+        roll: receipt.roll,
+        total: receipt.total,
+        date: receipt.date
+      });
+      document.getElementById("qrcode_img").src = `https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(qrText)}`;
+    }catch(e){}
+  }
 }
 
 function goBackToIssue(){
