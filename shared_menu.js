@@ -1,6 +1,6 @@
 (function () {
   const ADMIN_MENU_ITEMS = [
-    { label: "Home", page: "index.html" },
+    { label: "Home", page: "fee_students.html" },
     { label: "Student Fee Module", page: "outstanding.html" },
     { label: "Stationary Module", page: "stationary_students.html" },
     { label: "Students Transactions", page: "transactions.html" },

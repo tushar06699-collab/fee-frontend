@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -50,7 +50,7 @@ button,input,select{display:block;width:100%;padding:10px;margin-top:10px;border
 
 <body>
 <div class="topbar">
-  <div class="menu-btn" onclick="toggleMenu()">☰</div>
+  <div class="menu-btn" onclick="toggleMenu()">?</div>
   <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
 </div>
 <div id="overlay" class="overlay" onclick="closeMenu()"></div>
@@ -73,7 +73,7 @@ button,input,select{display:block;width:100%;padding:10px;margin-top:10px;border
 
   <button class="import" onclick="importExcel()">Import to Backend</button>
   <button class="download" onclick="downloadSample()">Download Sample</button>
-  <button onclick="location.href='index.html'">â¬… Back</button>
+  <button onclick="location.href='fee_students.html'">⬅ Back</button>
 
   <p id="status"></p>
 </div>
@@ -110,7 +110,7 @@ async function loadSessions(){
         };
     }
     catch(err){
-        alert("âŒ Failed to load sessions");
+        alert("❌ Failed to load sessions");
     }
 }
 loadSessions();
@@ -260,7 +260,7 @@ async function importExcel(){
     }
 
     alert(`Imported: ${imported}\nSkipped: ${skipped}`);
-    location.href = `index.html?session=${currentSession}`;
+    location.href = `fee_students.html?session=${currentSession}`;
   };
 
   reader.readAsArrayBuffer(file);

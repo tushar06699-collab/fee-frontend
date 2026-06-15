@@ -104,7 +104,7 @@ async function verifyOtp(){
   if (!res.ok || !data.success) return setStatus(data.message || "OTP verify failed", "err");
   setStatus("OTP verified. Redirecting...", "ok");
   localStorage.setItem("feeAdminToken", data.token || "ok");
-  window.location.href = "index.html";
+  window.location.href = "fee_students.html";
 }
 </script>
 </body>

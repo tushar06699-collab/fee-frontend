@@ -3,955 +3,348 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Student Fee Overview</title>
-
+<title>Fee Portal</title>
 <style>
-  body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0}
+  :root{
+    --blue:#0b63ce;
+    --blue-dark:#084e9f;
+    --green:#0f8a5f;
+    --green-dark:#0b6d4b;
+    --ink:#172033;
+    --muted:#667085;
+    --line:#d9e2ef;
+    --soft:#f4f7fb;
+    --panel:#ffffff;
+  }
 
-  /* TOP NAV BAR */
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:Poppins, Arial, sans-serif;
+    color:var(--ink);
+    background:
+      linear-gradient(135deg, rgba(11,99,206,.10), rgba(15,138,95,.08)),
+      #f7f9fc;
+  }
+
+  .page{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
   .topbar{
-      width:100%;padding:15px 20px;background:#007bff;color:#fff;
-      display:flex;justify-content:flex-start;align-items:center;
-      gap:15px;box-sizing:border-box;position:sticky;top:0;z-index:4000;
+    width:100%;
+    padding:14px 24px;
+    background:#fff;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    gap:14px;
   }
 
-  #sessionSelect {
-      padding:4px 8px;border-radius:6px;border:none;font-size:14px;
+  .logo{
+    width:48px;
+    height:48px;
+    border-radius:8px;
+    object-fit:contain;
+    background:#fff;
+    border:1px solid var(--line);
+    padding:4px;
   }
 
-  #createSessionBtn {
-      margin-left:10px;
-      padding:6px 10px;
-      border-radius:6px;
-      border:0;
-      background:#28a745;
-      color:#fff;
-      font-weight:700;
-      cursor:pointer;
+  .brand-title{
+    font-size:19px;
+    font-weight:800;
+    line-height:1.15;
   }
 
-  /* HAMBURGER */
-  .menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
-
-  .overlay {
-      position: fixed;top:0;left:0;width:100%;height:100%;
-      background: rgba(0,0,0,0.35);display:none;z-index:1500;
-  }
-  .overlay.show { display:block; }
-
-  .side-menu{
-      position:fixed;top:0;left:-280px;width:260px;height:100%;
-      background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
-      padding:20px;overflow-y:auto;z-index:2000;
-      transition: left 0.35s;
-      border-radius:0 18px 18px 0;
-  }
-  .side-menu.open{ left:0; }
-
-  .menu-item{
-      padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
-      font-size:16px;font-weight:600;color:#333;
+  .brand-subtitle{
+    margin-top:3px;
+    font-size:13px;
+    color:var(--muted);
+    font-weight:600;
   }
 
-  .container{
-      max-width:1600px;margin:auto;background:#fff;padding:25px;
-      border-radius:12px;box-shadow:0 3px 10px rgba(0,0,0,.08);
-      margin-top:15px
+  .session-pill{
+    margin-left:auto;
+    padding:8px 12px;
+    border-radius:8px;
+    background:#eef5ff;
+    color:var(--blue-dark);
+    font-size:13px;
+    font-weight:800;
+    white-space:nowrap;
   }
 
-  table{width:100%;border-collapse:collapse;margin-top:12px}
-  th,td{border:1px solid #e6e6e6;padding:8px;text-align:center;font-size:14px}
-  th{background:#007bff;color:#fff}
-
-  .paid{background:#c8ffc8;color:#0b7a0b;font-weight:700}
-  .partial{background:#fff3bf;color:#7a5a00;font-weight:700}
-  .due{background:#ffd2d2;color:#b30000;font-weight:700}
-
-  .class-row td{
-      background:#222;color:#fff;text-align:left;padding-left:12px;
-      font-weight:700
+  .hero{
+    width:min(1180px, calc(100% - 32px));
+    margin:28px auto;
+    display:grid;
+    grid-template-columns:1.1fr .9fr;
+    gap:20px;
+    align-items:stretch;
   }
 
-  .student-name{color:#007bff;cursor:pointer;font-weight:600}
-
-  #search{
-      padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;
-      margin-top:15px
-  }
-  .filters-bar{
-      display:flex;
-      gap:12px;
-      align-items:center;
-      margin-bottom:10px;
-      flex-wrap:wrap;
-  }
-  .class-picker{
-      min-width:260px;
-      background:linear-gradient(120deg,#0ea5e9,#2563eb);
-      color:#fff;
-      border-radius:12px;
-      padding:10px 12px;
-      box-shadow:0 6px 20px rgba(37,99,235,.25);
-  }
-  .class-picker label{
-      display:block;
-      font-size:12px;
-      opacity:.9;
-      margin-bottom:4px;
-  }
-  #classSelect{
-      width:100%;
-      border:0;
-      border-radius:10px;
-      padding:8px 10px;
-      font-weight:700;
-      background:#fff;
-      color:#0f172a;
-      outline:none;
+  .intro{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:26px;
+    box-shadow:0 16px 35px rgba(23,32,51,.08);
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    min-height:360px;
   }
 
-  .edit-btn{
-      margin-top:4px;padding:4px 8px;font-size:12px;background:#ffc107;
-      border:none;border-radius:6px;cursor:pointer;
+  .eyebrow{
+    color:var(--blue-dark);
+    font-size:13px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.08em;
   }
 
-  td:last-child, th:last-child {
-    background:#eaf2ff;
+  h1{
+    margin:12px 0 12px;
+    font-size:clamp(31px, 4vw, 48px);
+    line-height:1.05;
+    letter-spacing:0;
+  }
+
+  .lead{
+    margin:0;
+    max-width:680px;
+    color:#46556d;
+    font-size:16px;
+    line-height:1.6;
+    font-weight:500;
+  }
+
+  .quick-row{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:10px;
+    margin-top:24px;
+  }
+
+  .quick-item{
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:12px;
+    background:#fbfdff;
+  }
+
+  .quick-label{
+    color:var(--muted);
+    font-size:12px;
     font-weight:700;
-    color:#004aad;
-}
+  }
 
-  .prev-green{color:#0b7a0b;font-weight:700;}
-  .prev-red{color:#b30000;font-weight:700;}
+  .quick-value{
+    margin-top:5px;
+    font-size:15px;
+    font-weight:900;
+  }
+
+  .module-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:14px;
+  }
+
+  .module-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:22px;
+    box-shadow:0 16px 35px rgba(23,32,51,.08);
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    min-height:173px;
+  }
+
+  .module-top{
+    display:flex;
+    align-items:flex-start;
+    gap:14px;
+  }
+
+  .module-icon{
+    width:48px;
+    height:48px;
+    border-radius:8px;
+    display:grid;
+    place-items:center;
+    color:#fff;
+    font-size:24px;
+    font-weight:900;
+    flex:0 0 auto;
+  }
+
+  .fee-icon{background:var(--blue)}
+  .stock-icon{background:var(--green)}
+
+  .module-card h2{
+    margin:0;
+    font-size:22px;
+    letter-spacing:0;
+  }
+
+  .module-card p{
+    margin:7px 0 0;
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.5;
+    font-weight:500;
+  }
+
+  .open-btn{
+    margin-top:18px;
+    width:100%;
+    border:0;
+    border-radius:8px;
+    padding:12px 14px;
+    color:#fff;
+    font-size:15px;
+    font-weight:900;
+    cursor:pointer;
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+
+  .open-btn:hover{
+    transform:translateY(-1px);
+    box-shadow:0 10px 18px rgba(23,32,51,.14);
+  }
+
+  .fee-btn{background:var(--blue)}
+  .fee-btn:hover{background:var(--blue-dark)}
+  .stock-btn{background:var(--green)}
+  .stock-btn:hover{background:var(--green-dark)}
+
+  .footer-strip{
+    width:min(1180px, calc(100% - 32px));
+    margin:0 auto 28px;
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0,1fr));
+    gap:12px;
+  }
+
+  .shortcut{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:14px;
+    color:var(--muted);
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .shortcut strong{
+    display:block;
+    color:var(--ink);
+    font-size:14px;
+    margin-bottom:4px;
+  }
+
+  @media (max-width:850px){
+    .topbar{padding:12px 14px}
+    .session-pill{display:none}
+    .hero{grid-template-columns:1fr;margin:18px auto}
+    .intro{min-height:auto;padding:20px}
+    .quick-row,.footer-strip{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
-
-<!-- TOP BAR -->
-<div class="topbar">
-    <div class="menu-btn" onclick="toggleMenu()">☰</div>
-    <div style="font-size:20px;font-weight:600;">P.S. Public School</div>
-
-    <div style="margin-left:auto; display:flex; align-items:center;">
-        <select id="sessionSelect" onchange="changeSession()"></select>
+<div class="page">
+  <header class="topbar">
+    <img class="logo" src="images/logo.png" alt="School logo" />
+    <div>
+      <div class="brand-title">Fee Management Portal</div>
+      <div class="brand-subtitle">Select a module to continue</div>
     </div>
-</div>
+    <div class="session-pill" id="sessionPill">Session 2024_25</div>
+  </header>
 
-<!-- SIDEBAR -->
-<div id="overlay" class="overlay" onclick="closeMenu()"></div>
-<div class="side-menu" id="sideMenu">
-    <div class="menu-item" onclick="goToPage('edit.html')">Edit Student</div>
-    <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
-    <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
-    <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
-    <div class="menu-item" onclick="goToPage('export.html')">Export Data</div>
-    <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
-    <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
-    <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Stationary History</div>
+  <main class="hero">
+    <section class="intro">
+      <div>
+        <div class="eyebrow">Administration Dashboard</div>
+        <h1>Choose your working module</h1>
+        <p class="lead">
+          Open fee records or stationary operations from one clean start page.
+          Your selected academic session is kept from the browser settings used in the existing pages.
+        </p>
+      </div>
 
+      <div class="quick-row">
+        <div class="quick-item">
+          <div class="quick-label">Fee Module</div>
+          <div class="quick-value">Student fees</div>
+        </div>
+        <div class="quick-item">
+          <div class="quick-label">Stationary Module</div>
+          <div class="quick-value">Items and issue</div>
+        </div>
+        <div class="quick-item">
+          <div class="quick-label">Current Session</div>
+          <div class="quick-value" id="sessionValue">2024_25</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="module-grid" aria-label="Modules">
+      <article class="module-card">
+        <div class="module-top">
+          <div class="module-icon fee-icon">Rs</div>
+          <div>
+            <h2>Fee Module</h2>
+            <p>View students, monthly fee status, receipts, outstanding dues, scholarships, and fee reports.</p>
+          </div>
+        </div>
+        <button class="open-btn fee-btn" type="button" onclick="openModule('fee_students.html')">
+          Open Fee Module
+        </button>
+      </article>
+
+      <article class="module-card">
+        <div class="module-top">
+          <div class="module-icon stock-icon">S</div>
+          <div>
+            <h2>Stationary Module</h2>
+            <p>Manage stationary students, issued items, receipts, item list, and stationary fee ledger.</p>
+          </div>
+        </div>
+        <button class="open-btn stock-btn" type="button" onclick="openModule('stationary_students.html')">
+          Open Stationary Module
+        </button>
+      </article>
+    </section>
+  </main>
+
+  <section class="footer-strip" aria-label="Quick information">
+    <div class="shortcut"><strong>Receipts</strong>Generate and review payment receipts.</div>
+    <div class="shortcut"><strong>Reports</strong>Check outstanding and transaction records.</div>
+    <div class="shortcut"><strong>Students</strong>Open student-wise fee and item details.</div>
+    <div class="shortcut"><strong>Settings</strong>Uses saved API and session configuration.</div>
+  </section>
 </div>
 
 <script>
-function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
-function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
-function goToPage(p){ window.location.href = p + "?session=" + currentSession; }
+  const initParams = new URLSearchParams(window.location.search);
+  const currentSession = initParams.get("session") || localStorage.getItem("session") || "2024_25";
+  localStorage.setItem("session", currentSession);
+  document.getElementById("sessionPill").textContent = "Session " + currentSession;
+  document.getElementById("sessionValue").textContent = currentSession;
+
+  function openModule(page){
+    window.location.href = page + "?session=" + encodeURIComponent(currentSession);
+  }
 </script>
-
-<div class="container">
-  <div class="filters-bar">
-    <div class="class-picker">
-      <label>Select Class</label>
-      <select id="classSelect" onchange="changeClass()"></select>
-    </div>
-    <input id="search" placeholder="Search by name, Admission No..." />
-  </div>
-  <table id="feeTable">
-    <thead>
-  <tr>
-    <th>Student</th>
-    <th>Class</th>
-    <th>Roll</th>
-    <th>Admission No</th>
-    <th>Prev Due</th>
-    <th>Apr</th>
-    <th>May</th>
-    <th>Jun</th>
-    <th>Jul</th>
-    <th>Aug</th>
-    <th>Sep</th>
-    <th>Oct</th>
-    <th>Nov</th>
-    <th>Dec</th>
-    <th>Jan</th>
-    <th>Feb</th>
-    <th>Mar</th>
-    <th>Total Due</th>
-  </tr>
-</thead>
-
-    <tbody id="feeRows"></tbody>
-  </table>
-</div>
-
-<script>
-const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
-const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
-const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
-let currentSession = localStorage.getItem("session") || "2024_25";
-const STUDENT_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
-const STUDENT_CACHE_VERSION = "v3";
-let mergedStudentsMemory = [];
-let mergedStudentsSession = null;
-let selectedClass = "";
-let monthlyFeesByClass = {};
-let annualFeesByClass = {};
-let admissionFeesByClass = {};
-let examConfigs = [];
-const allMonths = [
-    "Apr","May","Jun","Jul","Aug","Sep",
-    "Oct","Nov","Dec","Jan","Feb","Mar"
-];
-
-function getSelectedClassStorageKey(sessionName){
-    return `selectedClass:${sessionName || currentSession || ""}`;
-}
-
-function saveSelectedClass(className){
-    try{
-        localStorage.setItem(getSelectedClassStorageKey(currentSession), className || "");
-    }catch(e){}
-}
-
-function readSelectedClass(sessionName){
-    try{
-        return localStorage.getItem(getSelectedClassStorageKey(sessionName || currentSession)) || "";
-    }catch(e){
-        return "";
-    }
-}
-
-/* -------------- SESSIONS ---------------- */
-async function loadSessions(){
-    try{
-        const res = await fetch(SESSION_API + "/session/list");
-        const data = await res.json();
-
-        if (!res.ok || !data.success || !Array.isArray(data.sessions) || data.sessions.length === 0) {
-            throw new Error(data?.message || data?.error || "Session list failed");
-        }
-
-        let sel = sessionSelect;
-        sel.innerHTML = "";
-
-        data.sessions.forEach(s => {
-            sel.innerHTML += `<option value="${s}">${s}</option>`;
-        });
-
-        if(!data.sessions.includes(currentSession)) currentSession = data.sessions[0];
-        sel.value = currentSession;
-        localStorage.setItem("session", currentSession);
-
-    } catch(e){
-        alert("Error loading sessions: " + (e?.message || e));
-        console.error(e);
-    }
-}
-
-
-async function createNewSession() {
-    let from = currentSession;
-
-    let extra = prompt("Enter extra fee to add (or 0):", "0");
-    if(extra === null) return; // Cancel clicked
-
-    extra = parseInt(extra) || 0;
-
-    try {
-        const res = await fetch(SESSION_API + "/session/create_auto", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Session": from
-            },
-            body: JSON.stringify({
-                from_session: from,
-                extra_fee: extra
-            })
-        });
-
-        const data = await res.json();
-
-        if (!data.success) {
-            alert("Session create failed: " + data.message);
-            return;
-        }
-
-        alert("New session created: " + data.new_session);
-
-        // reload dropdown
-        await loadSessions();
-
-        sessionSelect.value = data.new_session;
-        changeSession();
-
-    } catch (e) {
-        alert("Error: " + e);
-        console.error(e);
-    }
-}
-
-function changeSession(){
-    currentSession = sessionSelect.value;
-    localStorage.setItem("session", currentSession);
-    mergedStudentsMemory = [];
-    mergedStudentsSession = null;
-    selectedClass = readSelectedClass(currentSession) || "";
-    monthlyFeesByClass = {};
-    Promise.all([loadClassOptions(), loadFeeStructure(), loadExamConfig()]).then(() => renderTable());
-}
-
-async function loadFeeStructure(){
-    try{
-        const res = await fetch(`${FEE_API}/fees/get?session=${encodeURIComponent(currentSession)}`, {
-            headers: { "X-Session": currentSession }
-        });
-        const data = await res.json();
-        if (!res.ok || data?.success === false) return;
-
-        monthlyFeesByClass = {};
-        annualFeesByClass = {};
-        admissionFeesByClass = {};
-        (data.fees || []).forEach(f => {
-            const cls = normalizeClassName(f.class_name || "");
-            if (!cls) return;
-            monthlyFeesByClass[cls] = Number(f.monthly_fee || 0);
-            annualFeesByClass[cls] = Number(f.annual_fee || f.annual_charge || 0);
-            admissionFeesByClass[cls] = Number((f.admission_charge ?? f.admission_fee) || 0);
-        });
-    }catch(e){
-        console.warn("Fee structure load failed:", e);
-    }
-}
-
-async function loadExamConfig(){
-    try{
-        const res = await fetch(`${FEE_API}/exam/config?session=${encodeURIComponent(currentSession)}`, {
-            headers: { "X-Session": currentSession }
-        });
-        const data = await res.json().catch(() => ({}));
-        examConfigs = Array.isArray(data?.exams) ? data.exams : [];
-    }catch(e){
-        examConfigs = [];
-    }
-}
-
-function getExamFeeForClassMonth(cls, month){
-    const c = normalizeClassName(cls || "");
-    const m = String(month || "").trim();
-    if (!c || !m) return 0;
-    return examConfigs.reduce((sum, ex) => {
-        const months = Array.isArray(ex?.months) ? ex.months.map(x => String(x || "").trim()) : [];
-        if (!months.includes(m)) return sum;
-        const classFees = (ex && typeof ex.class_fees === "object") ? ex.class_fees : {};
-        return sum + Number(classFees[c] || 0);
-    }, 0);
-}
-
-function getTransportFeeForStudentMonth(student, month){
-    const m = String(month || "").trim();
-    const route = String(student?.transport_route || "").trim();
-    const monthly = Number(student?.transport_fee || 0);
-    const monthsCount = Math.max(0, Math.min(12, Number(student?.transport_months ?? 0) || 0));
-    if (!route || monthly <= 0 || monthsCount <= 0) return 0;
-    const idx = allMonths.indexOf(m);
-    if (idx < 0) return 0;
-    return idx < monthsCount ? monthly : 0;
-}
-
-function normalizeMonthRecord(rec, defaultDue, options = {}){
-    const targetExam = Number(options.targetExam || 0);
-    const targetTransport = Number(options.targetTransport || 0);
-
-    // If month record is missing in fee ledger, treat as Due by default.
-    if (!rec || typeof rec !== "object") {
-        return { paid: 0, due: Number(defaultDue || 0), status: "Due" };
-    }
-
-    const paid = Number(rec.paid || 0);
-    let due = Number(rec.due ?? defaultDue ?? 0);
-
-    // Keep index calculation aligned with student_details:
-    // if exam/transport target changed after old save, adjust due by delta.
-    const currentExam = Number(rec.exam_fee_applied || 0);
-    const currentTransport = Number(rec.transport_fee_applied || 0);
-    const feeDelta = (targetExam - currentExam) + (targetTransport - currentTransport);
-    if (feeDelta !== 0) {
-        due = Math.max(0, due + feeDelta);
-    }
-
-    // If untouched month row exists with zeros, apply class default due.
-    if (due === 0 && paid === 0 && Number(defaultDue || 0) > 0) {
-        due = Number(defaultDue || 0);
-    }
-
-    // Always derive status from corrected due/paid.
-    let status = "Due";
-    if (due <= 0) status = "Paid";
-    else if (paid > 0) status = "Partial";
-
-    return { paid, due, status };
-}
-
-async function loadClassOptions(){
-    const classSel = document.getElementById("classSelect");
-    classSel.innerHTML = "";
-    let classes = [];
-
-    // Try 1: student backend by session (primary source)
-    try {
-        const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
-        if (res.ok) {
-            const data = await res.json();
-            const rows = Array.isArray(data)
-                ? data
-                : (Array.isArray(data?.students) ? data.students : []);
-            classes = [...new Set(rows.map(s => normalizeClassName(s.class_name || s.class || "")).filter(Boolean))];
-        }
-    } catch (e) {
-        console.warn("Class source 1 failed (student API session):", e);
-    }
-
-    // Try 2: student backend all (fallback if session has too few classes)
-    if (classes.length <= 1) {
-        try {
-            const ares = await fetch(`${STUDENT_API}/students`);
-            if (ares.ok) {
-                const adata = await ares.json();
-                const allRows = Array.isArray(adata)
-                    ? adata
-                    : (Array.isArray(adata?.students) ? adata.students : []);
-                classes = [...new Set([...classes, ...allRows.map(s => normalizeClassName(s.class_name || s.class || "")).filter(Boolean)])];
-            }
-        } catch (e) {
-            console.warn("Class source 2 failed (student API all):", e);
-        }
-    }
-
-    // Try 3: fee backend class list (final fallback)
-    if (!classes.length) {
-        try {
-            const res = await fetch(`${FEE_API}/getClassList/${encodeURIComponent(currentSession)}`);
-            if (res.ok) {
-                const data = await res.json();
-                classes = Array.isArray(data) ? data.map(x => x.class_name).filter(Boolean) : [];
-            }
-        } catch (e) {
-            console.warn("Class source 3 failed (fee API):", e);
-        }
-    }
-
-    classes.sort((a,b)=>a.localeCompare(b, undefined, { numeric: true }));
-    classes.forEach(c => classSel.innerHTML += `<option value="${c}">${c}</option>`);
-    classSel.innerHTML += `<option value="">All Classes</option>`;
-    const urlClass = normalizeClassName(new URLSearchParams(window.location.search).get("class") || "");
-    const savedClass = normalizeClassName(readSelectedClass(currentSession));
-    const preferredClass = normalizeClassName(selectedClass || urlClass || savedClass);
-
-    if (preferredClass && classes.includes(preferredClass)) {
-        selectedClass = preferredClass;
-    } else if ((!selectedClass || !classes.includes(selectedClass)) && classes.length) {
-        selectedClass = classes[0];
-    }
-    classSel.value = selectedClass || "";
-    saveSelectedClass(selectedClass || "");
-
-    if (!classes.length) {
-        classSel.innerHTML = `<option value="">No classes found</option>`;
-    }
-}
-
-function changeClass(){
-    const classSel = document.getElementById("classSelect");
-    selectedClass = classSel.value || "";
-    saveSelectedClass(selectedClass);
-    mergedStudentsMemory = [];
-    mergedStudentsSession = null;
-    renderTable(search.value || "");
-}
-
-/* ----------- FETCH + MERGE STUDENTS ----------- */
-function normalizeRollKey(roll) {
-    let r = String(roll ?? "").trim();
-    if (r.endsWith(".0")) r = r.slice(0, -2);
-    if (/^\d+$/.test(r)) r = String(parseInt(r, 10));
-    return r;
-}
-
-function normalizeClassName(value){
-    const text = String(value || "").trim().replace(/\s+/g, " ");
-    if (!text) return "";
-    return text.replace(/\s+[AB]$/i, "").trim();
-}
-
-function toBool(value){
-    if (typeof value === "boolean") return value;
-    const t = String(value ?? "").trim().toLowerCase();
-    return t === "true" || t === "1" || t === "yes" || t === "y" || t === "on";
-}
-
-function studentKey(className, roll) {
-    return `${normalizeClassName(className)}|${normalizeRollKey(roll)}`;
-}
-
-function admissionKey(adm){
-    return String(adm ?? "").trim();
-}
-
-function normalizeMasterStudent(s) {
-    return {
-        id: s._id || s.id || null,
-        name: s.student_name || s.name || "",
-        father: s.father_name || s.father || "",
-        class_name: normalizeClassName(s.class_name || s.class || ""),
-        roll: normalizeRollKey(s.rollno ?? s.roll ?? ""),
-        admission_no: String(s.admission_no ?? s.admissionNo ?? "").trim(),
-        new_admission: toBool(s.new_admission),
-    };
-}
-
-function normalizeFeeStudent(s) {
-    return {
-        id: s.id || null,
-        name: s.name || "",
-        father: s.father || "",
-        class_name: normalizeClassName(s.class_name || ""),
-        roll: normalizeRollKey(s.roll ?? ""),
-        admission_no: String(s.admission_no ?? s.admissionNo ?? "").trim(),
-        previous_due: Number(s.previous_due || 0),
-        advance: Number(s.advance || 0),
-        months: s.months || {},
-        annual_charge: Number(s.annual_charge || 0),
-        transport_route: String(s.transport_route || "").trim(),
-        transport_fee: Number(s.transport_fee || 0),
-        transport_months: Number(s.transport_months || 0),
-    };
-}
-
-function getPreviousSessionName(sessionName){
-    const m = String(sessionName || "").match(/^(\d+)_/);
-    if(!m) return "";
-    const start = parseInt(m[1], 10);
-    if(!Number.isFinite(start)) return "";
-    const prevStart = start - 1;
-    const prevEnd = String(prevStart + 1).slice(-2);
-    return `${prevStart}_${prevEnd}`;
-}
-
-function getMasterStudentsCacheKey(sessionName, className) {
-    return `students_master_cache:${STUDENT_CACHE_VERSION}:${sessionName}:${className || "ALL"}`;
-}
-
-function readMasterStudentsCache(sessionName, className) {
-    try {
-        const raw = localStorage.getItem(getMasterStudentsCacheKey(sessionName, className));
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (!parsed || !Array.isArray(parsed.data) || !parsed.cached_at) return null;
-        if (!parsed.data.length) return null; // ignore empty cache entries
-        if ((Date.now() - Number(parsed.cached_at)) > STUDENT_CACHE_TTL_MS) return null;
-        return parsed.data;
-    } catch (e) {
-        return null;
-    }
-}
-
-function writeMasterStudentsCache(sessionName, className, rows) {
-    try {
-        if (!Array.isArray(rows) || rows.length === 0) return; // do not persist empty results
-        localStorage.setItem(
-            getMasterStudentsCacheKey(sessionName, className),
-            JSON.stringify({ cached_at: Date.now(), data: rows })
-        );
-    } catch (e) {
-        // ignore quota/caching errors
-    }
-}
-
-async function fetchMasterStudents(forceRefresh = false, className = "") {
-    const sessionName = currentSession;
-    if (!forceRefresh) {
-        const cached = readMasterStudentsCache(sessionName, className);
-        if (cached) return cached;
-    }
-
-    const parseRows = (data) => Array.isArray(data) ? data : (Array.isArray(data?.students) ? data.students : []);
-
-    // Primary: current session
-    const targetClass = normalizeClassName(className || "");
-
-    const fetchJsonRows = async (url) => {
-        const res = await fetch(url);
-        const text = await res.text();
-        let data = null;
-        try { data = JSON.parse(text); } catch (e) {}
-        if (!res.ok) throw new Error(`Master students fetch failed (${res.status})`);
-        return parseRows(data);
-    };
-
-    let rows = [];
-    try {
-        // Use session-only fetch and filter by class in frontend.
-        rows = await fetchJsonRows(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
-    } catch (e) {
-        rows = [];
-    }
-
-    if (!rows.length) {
-        try {
-            rows = await fetchJsonRows(`${STUDENT_API}/students`);
-        } catch (e) {
-            rows = [];
-        }
-    }
-
-    let normalized = rows.map(normalizeMasterStudent).filter(s => s.class_name && (s.roll || s.admission_no));
-    if (targetClass) {
-        normalized = normalized.filter(s => normalizeClassName(s.class_name) === targetClass);
-    }
-
-    // Fallback to all-students whenever session mapping is sparse.
-    if (normalized.length <= 2) {
-        try {
-            const allRes = await fetch(`${STUDENT_API}/students`);
-            if (allRes.ok) {
-                const allData = await allRes.json();
-                const allRows = parseRows(allData);
-                // Keep only rows for current session where session exists.
-                const filteredBySession = allRows.filter(r => {
-                    const s = String(r.session || "").trim();
-                    return !s || s === currentSession;
-                });
-                let allNormalized = filteredBySession
-                    .map(normalizeMasterStudent)
-                    .filter(s => s.class_name && (s.roll || s.admission_no));
-                if (targetClass) {
-                    allNormalized = allNormalized.filter(s => normalizeClassName(s.class_name) === targetClass);
-                }
-                if (allNormalized.length > normalized.length) {
-                    normalized = allNormalized;
-                }
-            }
-        } catch (e) {
-            console.warn("Master fallback (all students) failed:", e);
-        }
-    }
-
-    writeMasterStudentsCache(sessionName, className, normalized);
-    return normalized;
-}
-
-async function fetchFeeStudentsOnly(className = "") {
-    const headers = { "X-Session": currentSession };
-    const res = await fetch(`${FEE_API}/students?class_name=${encodeURIComponent(className || "")}`, { headers });
-    const text = await res.text();
-
-    let data = null;
-    try { data = JSON.parse(text); } catch (e) {}
-
-    if (!res.ok || (data && data.success === false)) {
-        throw new Error(data?.message || data?.error || `Fee students fetch failed (${res.status})`);
-    }
-
-    const rows = data?.students || [];
-    return rows.map(normalizeFeeStudent).filter(s => s.class_name && s.roll);
-}
-
-async function fetchPrevFeeStudents() {
-    const prevSession = getPreviousSessionName(currentSession);
-    if (!prevSession) return [];
-    const headers = { "X-Session": prevSession };
-    const res = await fetch(`${FEE_API}/students?session=${encodeURIComponent(prevSession)}`, { headers });
-    const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch (e) {}
-    if (!res.ok || (data && data.success === false)) {
-        return [];
-    }
-    const rows = data?.students || [];
-    return rows.map(normalizeFeeStudent).filter(s => (s.roll || s.admission_no));
-}
-
-async function fetchStudents(forceRefresh = false, className = ""){
-    const memoryKey = `${currentSession}|${className || "ALL"}`;
-    if (!forceRefresh && mergedStudentsSession === memoryKey && mergedStudentsMemory.length) {
-        return mergedStudentsMemory;
-    }
-
-    const [masterRes, feeRes, prevFeeRes] = await Promise.allSettled([
-        fetchMasterStudents(forceRefresh, className),
-        fetchFeeStudentsOnly(className),
-        fetchPrevFeeStudents(),
-    ]);
-
-    const masterStudents = masterRes.status === "fulfilled" ? masterRes.value : [];
-    const feeStudents = feeRes.status === "fulfilled" ? feeRes.value : [];
-    const prevFeeStudents = prevFeeRes.status === "fulfilled" ? prevFeeRes.value : [];
-
-    if (masterRes.status === "rejected") {
-        console.error("Master student backend error:", masterRes.reason);
-    }
-    if (feeRes.status === "rejected") {
-        console.error("Fee backend error:", feeRes.reason);
-    }
-
-    if (!masterStudents.length && !feeStudents.length) return [];
-
-    const feeMap = new Map();
-    feeStudents.forEach(s => feeMap.set(studentKey(s.class_name, s.roll), s));
-    const prevFeeMap = new Map();
-    const prevFeeMapByRoll = new Map();
-    const prevFeeMapByAdmission = new Map();
-    prevFeeStudents.forEach(s => {
-        const key = studentKey(s.class_name, s.roll);
-        prevFeeMap.set(key, s);
-        const r = normalizeRollKey(s.roll);
-        if (r) prevFeeMapByRoll.set(r, s);
-        const adm = admissionKey(s.admission_no);
-        if (adm) prevFeeMapByAdmission.set(adm, s);
-    });
-    const feeMapByAdmission = new Map();
-    feeStudents.forEach(s => {
-        const key = admissionKey(s.admission_no);
-        if (key) feeMapByAdmission.set(key, s);
-    });
-    const masterMapByAdmission = new Map();
-    masterStudents.forEach(s => {
-        const key = admissionKey(s.admission_no);
-        if (key) masterMapByAdmission.set(key, s);
-    });
-
-    const merged = [];
-    const seen = new Set();
-
-    masterStudents.forEach(ms => {
-        const key = studentKey(ms.class_name, ms.roll);
-        const admKey = admissionKey(ms.admission_no);
-        const fs = feeMap.get(key) || (admKey ? feeMapByAdmission.get(admKey) : null) || {};
-        const prev = prevFeeMap.get(key) || {};
-        const prevByRoll = prevFeeMapByRoll.get(normalizeRollKey(ms.roll)) || {};
-        const prevByAdm = admKey ? (prevFeeMapByAdmission.get(admKey) || {}) : {};
-        const prevDueResolved = Number(fs.previous_due || prev.previous_due || prevByRoll.previous_due || prevByAdm.previous_due || 0);
-
-        merged.push({
-            id: fs.id || ms.id || null,
-            name: ms.name || fs.name || "",
-            father: ms.father || fs.father || "",
-            class_name: ms.class_name || fs.class_name || "",
-            roll: ms.roll || fs.roll || "",
-            admission_no: ms.admission_no || fs.admission_no || "",
-            new_admission: Boolean(ms.new_admission),
-            previous_due: prevDueResolved,
-            advance: Number(fs.advance || 0),
-            months: fs.months || {},
-            annual_charge: Number(fs.annual_charge || 0),
-            transport_route: String(fs.transport_route || "").trim(),
-            transport_fee: Number(fs.transport_fee || 0),
-            transport_months: Number(fs.transport_months || 0),
-        });
-
-        seen.add(key);
-    });
-
-    // Do not append fee-only orphan rows.
-    // Index list should be driven by Students backend master records only,
-    // otherwise deleted/renamed students appear and open "Student not found".
-
-    const selected = normalizeClassName(className || "");
-    const filteredMerged = selected
-        ? merged.filter(s => normalizeClassName(s.class_name) === selected)
-        : merged;
-
-    mergedStudentsSession = memoryKey;
-    mergedStudentsMemory = filteredMerged;
-    return filteredMerged;
-}
-
-/* ----------------- TABLE ----------------- */
-async function renderTable(filter = "") {
-    const tbody = feeRows;
-    tbody.innerHTML = "";
-
-    const q = String(filter || "").trim();
-    const isGlobalSearch = q.length > 0;
-
-    const fetchClass = isGlobalSearch ? "" : selectedClass;
-    let students = await fetchStudents(false, fetchClass);
-    students.sort((a, b) => {
-        const classCmp = String(a.class_name || "").localeCompare(
-            String(b.class_name || ""),
-            undefined,
-            { numeric: true, sensitivity: "base" }
-        );
-        if (classCmp !== 0) return classCmp;
-
-        const rollA = parseInt(a.roll, 10);
-        const rollB = parseInt(b.roll, 10);
-        const aNum = Number.isFinite(rollA) ? rollA : Number.MAX_SAFE_INTEGER;
-        const bNum = Number.isFinite(rollB) ? rollB : Number.MAX_SAFE_INTEGER;
-        if (aNum !== bNum) return aNum - bNum;
-
-        return String(a.roll || "").localeCompare(String(b.roll || ""), undefined, { numeric: true, sensitivity: "base" });
-    });
-
-    let curClass = null;
-
-    students.forEach(s => {
-        s.months = s.months || {};
-        const classKey = normalizeClassName(s.class_name || "");
-        const classFee = Number(monthlyFeesByClass[classKey] || 0);
-        const classAnnual = Number(annualFeesByClass[classKey] || 0);
-        const classAdmission = Number(admissionFeesByClass[classKey] || 0);
-
-        let match = (
-            (s.name || "") + " " +
-            (s.admission_no || "")
-        ).toLowerCase();
-
-        if (q && !match.includes(q.toLowerCase())) return;
-
-        if (s.class_name !== curClass) {
-            curClass = s.class_name;
-            tbody.innerHTML += `<tr class="class-row"><td colspan="18">Class: ${curClass}</td></tr>`;
-        }
-
-        let prevClass = s.previous_due === 0 ? "prev-green" : "prev-red";
-
-        const monthOrder = [
-            
-             // 🔥 REQUIRED FIX
-            "Apr","May","Jun","Jul","Aug","Sep",
-            "Oct","Nov","Dec","Jan","Feb","Mar"
-        ];
-
-        let monthsHtml = "";
-        let totalDue = 0;
-
-        monthOrder.forEach(m => {
-            const examPart = Number(getExamFeeForClassMonth(s.class_name, m) || 0);
-            const transportPart = Number(getTransportFeeForStudentMonth(s, m) || 0);
-            const defaultMonthlyDue = classFee + examPart + transportPart;
-            const val = normalizeMonthRecord(s.months[m], defaultMonthlyDue, {
-                targetExam: examPart,
-                targetTransport: transportPart
-            });
-            let cls = val.status === "Paid" ? "paid" :
-                      val.status === "Partial" ? "partial" : "due";
-            const parts = [];
-            if (classFee > 0) parts.push(`M:${classFee}`);
-            if (examPart > 0) parts.push(`Ex:${examPart}`);
-            if (transportPart > 0) parts.push(`Tr:${transportPart}`);
-            const comp = parts.length ? ` | ${parts.join(" + ")}` : "";
-            monthsHtml += `<td class="${cls}" title="Paid: ${val.paid} | Due: ${val.due}${comp}">${val.status}<br><small>P:${val.paid} D:${val.due}</small></td>`;
-            totalDue += val.due || 0;
-        });
-        const prevDue = Number(s.months?.previousDue?.due ?? s.previous_due ?? 0);
-        const annualExpected = Number(classAnnual + (s.new_admission ? classAdmission : 0));
-        const annualRec = (s.months && typeof s.months.Annual === "object") ? s.months.Annual : null;
-        const annualPaid = Number(annualRec?.paid || 0);
-        let annualDue = Number(annualRec?.due);
-        if (!Number.isFinite(annualDue)) annualDue = annualExpected;
-        // Match student_details initialize behavior:
-        // if Annual record exists but untouched (paid=0,due=0), apply class annual+admission.
-        if (annualDue === 0 && annualPaid === 0 && annualExpected > 0) {
-            annualDue = annualExpected;
-        }
-        totalDue += prevDue + annualDue;
-
-
-        tbody.innerHTML += `
-        <tr>
-          <td>
-              <span class="student-name" data-roll="${s.roll}" data-class="${s.class_name}">
-                  ${s.name}
-              </span><br>
-          </td>
-          <td>${s.class_name}</td>
-          <td>${s.roll}</td>
-          <td>${s.admission_no || ""}</td>
-
-          <!-- previous due cell -->
-          <td class="${prevClass}">
-              ${prevDue}
-          </td>
-
-          <!-- insert all months including annual -->
-          ${monthsHtml}
-
-          <td style="font-weight:700;color:#0047b3;background:#e8f0ff;" title="Prev Due: ${prevDue} | Annual Due: ${annualDue} (Annual ${classAnnual}${s.new_admission ? ` + Admission ${classAdmission}` : ""})">${totalDue}</td>
-        </tr>`;
-    });
-
-    document.querySelectorAll(".student-name").forEach(el => {
-        el.onclick = () => {
-            const clickedClass = el.dataset.class || "";
-            selectedClass = clickedClass || selectedClass;
-            saveSelectedClass(selectedClass);
-            window.location.href =
-                `student_details.html?roll=${el.dataset.roll}&class=${clickedClass}&session=${currentSession}`;
-        };
-    });
-
-    document.querySelectorAll(".edit-btn").forEach(btn => {
-        btn.onclick = () => {
-            window.location.href =
-                `edit.html?roll=${btn.dataset.roll}&class=${btn.dataset.class}&session=${currentSession}`;
-        };
-    });
-}
-
-window.addEventListener("focus", () => {
-    const flag = localStorage.getItem("paymentMade");
-    if (flag) {
-        localStorage.removeItem("paymentMade");
-        mergedStudentsMemory = [];
-        mergedStudentsSession = null;
-
-        // Reload full student list automatically
-        setTimeout(() => {
-            renderTable();    // ✔ correct function
-        }, 300);
-    }
-});
-
-
-search.oninput = e => renderTable(e.target.value);
-
-/* INIT */
-const initParams = new URLSearchParams(window.location.search);
-const sessionFromUrl = initParams.get("session");
-const classFromUrl = normalizeClassName(initParams.get("class") || "");
-if (sessionFromUrl) {
-    currentSession = sessionFromUrl;
-    localStorage.setItem("session", currentSession);
-}
-if (classFromUrl) {
-    selectedClass = classFromUrl;
-}
-
-loadSessions().then(async () => {
-    await Promise.all([loadClassOptions(), loadFeeStructure(), loadExamConfig()]);
-    await renderTable();
-});
-
-/* 🔥 AUTO REFRESH WHEN PAYMENT IS MADE IN student_detail.html */
-
-</script>
-
-<script src="shared_menu.js"></script>
 </body>
 </html>
-
-
-
-
-

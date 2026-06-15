@@ -8,6 +8,8 @@
   .topbar{width:100%;padding:15px 20px;background:#007bff;color:#fff;display:flex;align-items:center;gap:15px;box-sizing:border-box;position:sticky;top:0;z-index:4000}
   .menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
   #sessionSelect{padding:4px 8px;border-radius:6px;border:none;font-size:14px;}
+  .module-btn{padding:8px 12px;border:1px solid rgba(255,255,255,.65);border-radius:8px;background:#fff;color:#0b63ce;font-weight:800;cursor:pointer;white-space:nowrap;}
+  .module-btn:hover{background:#eef5ff;}
   .overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);display:none;z-index:1500;}
   .overlay.show{display:block;}
   .side-menu{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);padding:20px;overflow-y:auto;z-index:2000;transition:left 0.35s;border-radius:0 18px 18px 0;}
@@ -32,17 +34,17 @@
   <div class="topbar">
     <div class="menu-btn" onclick="toggleMenu()">&#9776;</div>
     <div style="font-size:20px;font-weight:600;">Stationary Issue</div>
-    <div style="margin-left:auto; display:flex; align-items:center;">
+    <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+      <button class="module-btn" type="button" onclick="changeModule()">Change Module</button>
       <select id="sessionSelect" onchange="changeSession()"></select>
     </div>
   </div>
 
   <div id="overlay" class="overlay" onclick="closeMenu()"></div>
   <div class="side-menu" id="sideMenu">
-    <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
-        <div class="menu-item" onclick="goToPage('index.html')">Home</div>
+    <div class="menu-item" onclick="goToPage('fee_students.html')">Fee Overview</div>
+    <div class="menu-item" onclick="goToPage('stationary_students.html')">Home</div>
     <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
-    <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
     <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
     <div class="menu-item" onclick="goToPage('stationary_fee_ledger.html')">Stationary Fee Ledger</div>
   </div>
@@ -79,7 +81,9 @@
 const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
 const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
 const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
-let currentSession = localStorage.getItem("session") || "2024_25";
+const initParams = new URLSearchParams(window.location.search);
+let currentSession = initParams.get("session") || localStorage.getItem("session") || "2024_25";
+localStorage.setItem("session", currentSession);
 let studentsCache = [];
 let allStudents = [];
 let masterStudents = [];
@@ -100,6 +104,7 @@ function normalizeClass(val){
 function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
 function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
 function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
+function changeModule(){ window.location.href = "index.html?session=" + encodeURIComponent(currentSession); }
 
 async function loadSessions(){
   try{

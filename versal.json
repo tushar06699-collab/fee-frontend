@@ -3,6 +3,8 @@
   "name": "fee-frontend",
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
+    { "src": "fee_students.html", "use": "@vercel/static" },
+    { "src": "images/**", "use": "@vercel/static" },
     { "src": "assets/**", "use": "@vercel/static" }
   ],
   "routes": [

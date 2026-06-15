@@ -43,7 +43,7 @@
 
   <div id="overlay" class="overlay" onclick="closeMenu()"></div>
   <div class="side-menu" id="sideMenu">
-    <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
+    <div class="menu-item" onclick="goToPage('fee_students.html')">Fee Overview</div>
     <div class="menu-item" onclick="goToPage('dashboard.html')">Dashboard</div>
     <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
     <div class="menu-item" onclick="goToPage('receipt_history.html')">Receipt History</div>
@@ -140,18 +140,30 @@ function readParams(){
 }
 
 async function loadStudent(cls, roll){
-  const res = await fetch(`${FEE_API}/student/${encodeURIComponent(cls)}/${encodeURIComponent(roll)}`, {
-    headers: {"X-Session": currentSession}
-  });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    alert(data.message || "Student not found");
-    return;
-  }
-  student = data.student;
-  if (!student.father || !student.admission_no) {
+  try{
+    const res = await fetch(`${FEE_API}/student/${encodeURIComponent(cls)}/${encodeURIComponent(roll)}`, {
+      headers: {"X-Session": currentSession}
+    });
+    const data = await res.json();
+    if (res.ok && data.success && data.student) {
+      student = data.student;
+      student.class_name = student.class_name || cls;
+      student.roll = student.roll || roll;
+    }
+  }catch(e){}
+
+  if (!student) {
+    student = await findStudentFromStudentBackend(cls, roll);
+  } else if (!student.father || !student.admission_no) {
     await enrichFromStudentBackend(cls, roll);
   }
+
+  if (!student) {
+    alert("Student not found");
+    goBack();
+    return;
+  }
+
   stName.textContent = student.name || "-";
   stFather.textContent = student.father || "-";
   stClass.textContent = student.class_name || "-";
@@ -159,17 +171,49 @@ async function loadStudent(cls, roll){
   stAdmission.textContent = student.admission_no || "-";
 }
 
+async function findStudentFromStudentBackend(cls, roll){
+  try{
+    const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.students || []);
+    const match = rows.find(r =>
+      normalizeClass(r.class_name || r.class || "") === normalizeClass(cls) &&
+      String(r.rollno ?? r.roll ?? "").trim() === String(roll).trim()
+    );
+    if (!match) return null;
+    return {
+      name: match.student_name || match.name || "",
+      father: match.father_name || match.father || "",
+      class_name: match.class_name || match.class || cls,
+      roll: String(match.rollno ?? match.roll ?? roll).trim(),
+      admission_no: String(match.admission_no ?? match.admission ?? "").trim()
+    };
+  }catch(e){
+    return null;
+  }
+}
+
 async function enrichFromStudentBackend(cls, roll){
   try{
     const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
     const data = await res.json();
     const rows = Array.isArray(data) ? data : (data.students || []);
-    const match = rows.find(r => String(r.class_name || r.class || "").trim() === cls && String(r.rollno ?? r.roll ?? "").trim() === String(roll));
+    const match = rows.find(r =>
+      normalizeClass(r.class_name || r.class || "") === normalizeClass(cls) &&
+      String(r.rollno ?? r.roll ?? "").trim() === String(roll).trim()
+    );
     if (!match) return;
     student.name = student.name || match.student_name || match.name || "";
     student.father = student.father || match.father_name || match.father || "";
     student.admission_no = student.admission_no || match.admission_no || match.admission || "";
   }catch(e){}
+}
+
+function normalizeClass(val){
+  return String(val || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 async function loadItems(){

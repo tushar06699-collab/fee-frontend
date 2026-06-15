@@ -240,7 +240,7 @@ function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remov
 function goToPage(p){ window.location.href = p + "?session=" + encodeURIComponent(currentSession); }
 
 sideMenu.innerHTML = `
-  <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
+  <div class="menu-item" onclick="goToPage('fee_students.html')">Fee Overview</div>
     <div class="menu-item" onclick="goToPage('outstanding.html')">Outstanding List</div>
   <div class="menu-item" onclick="goToPage('fees.html')">Fees Modify</div>
         <div class="menu-item" onclick="goToPage('transport_fee.html')">Transport Fee</div>

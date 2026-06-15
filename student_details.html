@@ -1444,7 +1444,7 @@ async function saveToBackend(){
       return data;
     }
 
-    // Let index page know data changed and it should refresh cache.
+    // Let fee_students page know data changed and it should refresh cache.
     localStorage.setItem("paymentMade", String(Date.now()));
     return data;
   } catch(e){
@@ -1728,7 +1728,7 @@ function goBackToIndex(){
   const qs = new URLSearchParams();
   if (sessionParam) qs.set("session", sessionParam);
   if (classParam) qs.set("class", classParam);
-  window.location.href = `index.html?${qs.toString()}`;
+  window.location.href = `fee_students.html?${qs.toString()}`;
 }
 
 document.getElementById("payAmount").addEventListener("input", maybeOpenUpiQr);

@@ -26,6 +26,11 @@
   th,td{border:1px solid #e6e6e6;padding:8px;text-align:left;font-size:14px}
   th{background:#007bff;color:#fff}
   .actions button{margin-right:6px;}
+  .pager{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}
+  .pager-info{color:#6b7280;font-size:13px;font-weight:700;}
+  .pager-controls{display:flex;gap:8px;align-items:center;}
+  .pager button{padding:8px 12px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
+  .pager button:disabled{opacity:.5;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -39,11 +44,11 @@
 
   <div id="overlay" class="overlay" onclick="closeMenu()"></div>
   <div class="side-menu" id="sideMenu">
-    <div class="menu-item" onclick="goToPage('index.html')">Fee Overview</div>
-        <div class="menu-item" onclick="goToPage('index.html')">Home</div>
+    <div class="menu-item" onclick="goToPage('fee_students.html')">Fee Overview</div>
+    <div class="menu-item" onclick="goToPage('stationary_students.html')">Home</div>
     <div class="menu-item" onclick="goToPage('stationary_items.html')">Stationary Items</div>
-    <div class="menu-item" onclick="goToPage('stationary_students.html')">Stationary Issue</div>
-        <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('stationary_receipt_history.html')">Receipt History</div>
+    <div class="menu-item" onclick="goToPage('stationary_fee_ledger.html')">Stationary Fee Ledger</div>
   </div>
 
   <div class="container">
@@ -74,13 +79,25 @@
       </thead>
       <tbody id="itemsBody"></tbody>
     </table>
+    <div class="pager">
+      <div class="pager-info" id="itemsPageInfo">Showing 0 items</div>
+      <div class="pager-controls">
+        <button type="button" id="prevItemsBtn" onclick="changeItemsPage(-1)">Previous</button>
+        <button type="button" id="nextItemsBtn" onclick="changeItemsPage(1)">Next</button>
+      </div>
+    </div>
   </div>
 
 <script>
 const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
 const SESSION_API = localStorage.getItem("sessionApiBaseUrl") || "https://exam-backend-117372286918.asia-south1.run.app/";
-let currentSession = localStorage.getItem("session") || "2024_25";
+const initParams = new URLSearchParams(window.location.search);
+let currentSession = initParams.get("session") || localStorage.getItem("session") || "2024_25";
+localStorage.setItem("session", currentSession);
 let editId = null;
+let allItems = [];
+let itemsPage = 1;
+const ITEMS_PAGE_SIZE = 10;
 
 function toggleMenu(){ sideMenu.classList.toggle("open"); overlay.classList.toggle("show"); }
 function closeMenu(){ sideMenu.classList.remove("open"); overlay.classList.remove("show"); }
@@ -108,6 +125,7 @@ async function loadSessions(){
 function changeSession(){
   currentSession = sessionSelect.value;
   localStorage.setItem("session", currentSession);
+  itemsPage = 1;
   loadItems();
 }
 
@@ -147,8 +165,20 @@ async function saveItem(){
 async function loadItems(){
   const res = await fetch(`${FEE_API}/stationary/items`, {headers:{"X-Session": currentSession}});
   const data = await res.json();
-  const rows = data.items || [];
+  allItems = data.items || [];
+  renderItems();
+}
+
+function renderItems(){
   const tbody = document.getElementById("itemsBody");
+  const totalPages = Math.max(1, Math.ceil(allItems.length / ITEMS_PAGE_SIZE));
+  if (itemsPage > totalPages) itemsPage = totalPages;
+  const start = (itemsPage - 1) * ITEMS_PAGE_SIZE;
+  const rows = allItems.slice(start, start + ITEMS_PAGE_SIZE);
+
+  if (!rows.length){
+    tbody.innerHTML = `<tr><td colspan="3">No stationary items saved.</td></tr>`;
+  } else {
   tbody.innerHTML = rows.map(r=>`
     <tr>
       <td>${r.name}</td>
@@ -159,6 +189,19 @@ async function loadItems(){
       </td>
     </tr>
   `).join("");
+  }
+
+  const from = allItems.length ? start + 1 : 0;
+  const to = Math.min(start + rows.length, allItems.length);
+  itemsPageInfo.textContent = `Showing ${from}-${to} of ${allItems.length} items | Page ${itemsPage} of ${totalPages}`;
+  prevItemsBtn.disabled = itemsPage <= 1;
+  nextItemsBtn.disabled = itemsPage >= totalPages;
+}
+
+function changeItemsPage(delta){
+  const totalPages = Math.max(1, Math.ceil(allItems.length / ITEMS_PAGE_SIZE));
+  itemsPage = Math.min(totalPages, Math.max(1, itemsPage + delta));
+  renderItems();
 }
 
 function editItem(id, name, price){
