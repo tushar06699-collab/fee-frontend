@@ -31,7 +31,13 @@
   .pager-controls{display:flex;gap:8px;align-items:center;}
   .pager button{padding:8px 12px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;}
   .pager button:disabled{opacity:.5;cursor:not-allowed;}
+  .size-hint{color:#6b7280;font-size:13px;margin-bottom:8px;}
+  .size-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .size-row input{flex:1;min-width:80px;}
+  .size-row .remove-btn{flex:0 0 auto;padding:8px 12px;background:#ef4444;}
+  .size-tag{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:6px;padding:2px 8px;margin:2px 4px 2px 0;font-size:13px;font-weight:600;}
 </style>
+
 </head>
 <body>
   <div class="topbar">
@@ -59,10 +65,25 @@
           <input id="itemName" placeholder="Notebook, Pen, Copy..." />
         </div>
         <div>
-          <label>Price (&#8377;)</label>
+          <label>Base Price (&#8377;)</label>
           <input id="itemPrice" type="number" min="0" placeholder="0" />
         </div>
+        <div>
+          <label>Quick Sizes (e.g. 32, 34, 36)</label>
+          <input id="itemSizes" placeholder="Enter comma separated sizes" />
+        </div>
       </div>
+
+      <div style="margin-top:16px;">
+        <label>Sizes (optional)</label>
+        <div class="size-hint">
+          For items like shirts that come in multiple sizes (32, 34, 36...), add each size below.
+          Leave a size's price empty to use the Base Price above. Add this item only once &mdash; all its sizes stay together.
+        </div>
+        <div id="sizesContainer"></div>
+        <button type="button" class="btn secondary" onclick="addSizeRow()">+ Add Size</button>
+      </div>
+
       <div style="margin-top:12px;">
         <button class="btn" onclick="saveItem()">Save Item</button>
         <button class="btn secondary" onclick="resetForm()">Clear</button>
@@ -74,9 +95,11 @@
         <tr>
           <th>Item</th>
           <th>Price (&#8377;)</th>
+          <th>Sizes</th>
           <th>Actions</th>
         </tr>
       </thead>
+
       <tbody id="itemsBody"></tbody>
     </table>
     <div class="pager">
@@ -129,22 +152,66 @@ function changeSession(){
   loadItems();
 }
 
+function addSizeRow(size = "", price = ""){
+  const container = document.getElementById("sizesContainer");
+  const div = document.createElement("div");
+  div.className = "size-row";
+  const sizeVal = String(size == null ? "" : size).replace(/"/g, "&quot;");
+  const priceVal = (price === 0 || price === "0" || price == null) ? "" : price;
+  div.innerHTML = `
+    <input class="size-label" placeholder="Size (e.g. 32)" value="${sizeVal}" />
+    <input class="size-price" type="number" min="0" placeholder="Price (optional)" value="${priceVal}" />
+    <button type="button" class="btn remove-btn" onclick="this.parentElement.remove()">Remove</button>
+  `;
+  container.appendChild(div);
+}
+
+function getSizes(){
+  const out = [];
+  document.querySelectorAll("#sizesContainer .size-row").forEach(row=>{
+    const label = row.querySelector(".size-label").value.trim();
+    const price = Number(row.querySelector(".size-price").value || 0);
+    if (label) out.push({size: label, price: price});
+  });
+  return out;
+}
+
 function resetForm(){
   editId = null;
   itemName.value = "";
   itemPrice.value = "";
+  document.getElementById("itemSizes").value = "";
+  document.getElementById("sizesContainer").innerHTML = "";
 }
 
 async function saveItem(){
   const name = itemName.value.trim();
   const price = Number(itemPrice.value || 0);
+  // Get sizes from the quick entry field
+  const sizesInput = document.getElementById("itemSizes").value.trim();
+  const quickSizes = sizesInput ? sizesInput.split(",").map(s => ({
+    size: s.trim(),
+    price: 0
+  })).filter(s => s.size !== "") : [];
+
+  // Merge with advanced sizes if any (from the Add Size button section)
+  const advancedSizes = getSizes();
+  const combinedSizes = [...quickSizes];
+  advancedSizes.forEach(as => {
+    if (!combinedSizes.find(qs => qs.size === as.size)) {
+      combinedSizes.push(as);
+    }
+  });
+
   if (!name) return alert("Enter item name");
+
+  const payload = JSON.stringify({name, price, sizes: combinedSizes});
 
   if (editId){
     const res = await fetch(`${FEE_API}/stationary/items/${editId}`, {
       method:"PUT",
       headers:{"Content-Type":"application/json","X-Session": currentSession},
-      body: JSON.stringify({name, price})
+      body: payload
     });
     const data = await res.json();
     if (!res.ok || !data.success) return alert(data.message || "Save failed");
@@ -152,7 +219,7 @@ async function saveItem(){
     const res = await fetch(`${FEE_API}/stationary/items`, {
       method:"POST",
       headers:{"Content-Type":"application/json","X-Session": currentSession},
-      body: JSON.stringify({name, price})
+      body: payload
     });
     const data = await res.json();
     if (!res.ok || !data.success) return alert(data.message || "Save failed");
@@ -161,6 +228,7 @@ async function saveItem(){
   resetForm();
   loadItems();
 }
+
 
 async function loadItems(){
   const res = await fetch(`${FEE_API}/stationary/items`, {headers:{"X-Session": currentSession}});
@@ -177,19 +245,26 @@ function renderItems(){
   const rows = allItems.slice(start, start + ITEMS_PAGE_SIZE);
 
   if (!rows.length){
-    tbody.innerHTML = `<tr><td colspan="3">No stationary items saved.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4">No stationary items saved.</td></tr>`;
   } else {
-  tbody.innerHTML = rows.map(r=>`
+  tbody.innerHTML = rows.map(r=>{
+    const sizes = r.sizes || [];
+    const sizesHtml = sizes.length
+      ? sizes.map(s=>`<span class="size-tag">${s.size}${s.price ? ` &#8377;${s.price}` : ""}</span>`).join("")
+      : `<span style="color:#9ca3af;">&mdash;</span>`;
+    return `
     <tr>
       <td>${r.name}</td>
       <td>${r.price}</td>
+      <td>${sizesHtml}</td>
       <td class="actions">
-        <button class="btn secondary" onclick="editItem(${r.id},'${String(r.name).replace(/'/g,"&#39;")}',${r.price})">Edit</button>
+        <button class="btn secondary" onclick="editItem(${r.id})">Edit</button>
         <button class="btn" onclick="deleteItem(${r.id})">Delete</button>
       </td>
-    </tr>
-  `).join("");
+    </tr>`;
+  }).join("");
   }
+
 
   const from = allItems.length ? start + 1 : 0;
   const to = Math.min(start + rows.length, allItems.length);
@@ -204,11 +279,23 @@ function changeItemsPage(delta){
   renderItems();
 }
 
-function editItem(id, name, price){
+function editItem(id){
+  const r = allItems.find(x=>Number(x.id) === Number(id));
+  if (!r) return;
   editId = id;
-  itemName.value = name;
-  itemPrice.value = price;
+  itemName.value = r.name || "";
+  itemPrice.value = r.price || 0;
+  
+  // Populate quick sizes field for easy editing
+  const sizesStr = (r.sizes || []).map(s => s.size).join(", ");
+  document.getElementById("itemSizes").value = sizesStr;
+
+  const container = document.getElementById("sizesContainer");
+  container.innerHTML = "";
+  (r.sizes || []).forEach(s=>addSizeRow(s.size, s.price));
+  window.scrollTo({top:0, behavior:"smooth"});
 }
+
 
 async function deleteItem(id){
   if (!confirm("Delete item?")) return;
