@@ -251,13 +251,13 @@ function renderStudents(){
       <td>${s.admission_no || "-"}</td>
       <td>${renderMonthStatus(s.fee_info)}</td>
       <td>${renderTotalDue(s.fee_info, s)}</td>
-      <td><button class="btn" onclick="openIssue('${s.class_name}','${s.roll}')">Add Stationary</button></td>
+      <td><button class="btn" onclick="openIssue('${String(s.class_name).replace(/'/g, "\\'")}','${String(s.roll).replace(/'/g, "\\'")}','${String(s.admission_no).replace(/'/g, "\\'")}')">Add Stationary</button></td>
     </tr>
   `).join("");
 }
 
-function openIssue(cls, roll){
-  const qs = new URLSearchParams({session: currentSession, class: cls, roll: roll});
+function openIssue(cls, roll, adm){
+  const qs = new URLSearchParams({session: currentSession, class: cls, roll: roll, admission_no: adm});
   window.location.href = `stationary_issue.html?${qs.toString()}`;
 }
 

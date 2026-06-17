@@ -553,6 +553,36 @@ function renderInfo(){
   renderBarcode();
 }
 
+function deduplicatePurpose(p) {
+    if (!p) return "";
+    const parts = p.split("|").map(s => s.trim()).filter(Boolean);
+    const otherParts = [];
+    const statItems = new Set();
+
+    parts.forEach(part => {
+        const match = part.match(/^stationary\s*:\s*(.*)$/i);
+        if (match) {
+            // Split by comma to deduplicate internal items like "note bookx1, note bookx1"
+            match[1].split(",")
+                .map(i => i.trim())
+                .filter(Boolean)
+                .filter(item => !item.toLowerCase().startsWith("manual stationary")) // Filter out "Manual Stationary"
+                .forEach(it => statItems.add(it));
+        } else {
+            // Filter out "Manual Stationary" if it's not part of a "Stationary: " prefix
+            if (part.toLowerCase().startsWith("manual stationary")) {
+                // Ignore it, as it's likely a legacy or unwanted entry
+            } else {
+                otherParts.push(part);
+            }
+        }
+    });
+
+    const result = [...new Set(otherParts)];
+    if (statItems.size > 0) result.push("Stationary: " + [...statItems].join(", "));
+    return result.join(" | ");
+}
+
 function renderMonths(){
   const tbody = document.getElementById("monthsTable");
   const monthOrder = [
@@ -574,7 +604,7 @@ function renderMonths(){
       <td style="text-align:right">${escapeHtml(m.paid||0)}</td>
       <td style="text-align:right">${escapeHtml(m.due||0)}</td>
       <td>${escapeHtml(m.status||"")}</td>
-      <td>${escapeHtml(m.purpose||"")}${Number(m.transport_fee_applied||0)>0 ? `<br><span class="small muted">Transport: ${escapeHtml(m.transport_fee_applied||0)}</span>` : ""}</td>
+      <td>${escapeHtml(deduplicatePurpose(m.purpose))}${Number(m.transport_fee_applied||0)>0 ? `<br><span class="small muted">Transport: ${escapeHtml(m.transport_fee_applied||0)}</span>` : ""}</td>
       <td style="text-align:right">${escapeHtml(m.extra||0)}</td>
     </tr>
   `).join("");
@@ -644,7 +674,7 @@ function buildSlipHTML(){
       <td class="num">${m.paid||0}</td>
       <td class="num">${m.due||0}</td>
       <td>${m.status||""}</td>
-      <td>${m.purpose||""}${Number(m.transport_fee_applied||0)>0 ? ` | Transport: ${Number(m.transport_fee_applied||0)}` : ""}</td>
+      <td>${deduplicatePurpose(m.purpose)}${Number(m.transport_fee_applied||0)>0 ? ` | Transport: ${Number(m.transport_fee_applied||0)}` : ""}</td>
       <td class="num">${m.extra||0}</td>
     </tr>
   `).join("");
@@ -924,7 +954,7 @@ document.getElementById("btnWhats").addEventListener("click", ()=>{
         `Due ${m.due || 0}`
       ];
       if (transport > 0) parts.push(`Transport ${transport}`);
-      if (purpose) parts.push(`Purpose ${purpose}`);
+      if (purpose) parts.push(`Purpose ${deduplicatePurpose(purpose)}`);
       if (extra > 0) parts.push(`Extra ${extra}`);
       msg += `- ${parts.join(" | ")}\n`;
     });
@@ -969,4 +999,3 @@ if (isAccountantView) {
 </script>
 </body>
 </html>
-

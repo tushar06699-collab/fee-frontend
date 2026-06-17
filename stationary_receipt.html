@@ -163,6 +163,7 @@ async function loadReceipt(){
   const sess = qs.get("session");
   const clsParam = qs.get("class") || "";
   const rollParam = qs.get("roll") || "";
+  const admParam = qs.get("admission_no") || "";
   if (sess){ currentSession = sess; localStorage.setItem("session", currentSession); }
 
   let receipt = null;
@@ -198,6 +199,7 @@ async function loadReceipt(){
      window.__stationaryReceipt = receipt;
      window.__stationaryClass = clsParam || receipt.class_name || "";
      window.__stationaryRoll = rollParam || receipt.roll || "";
+     window.__stationaryAdm = admParam || receipt.admission_no || "";
      renderUI(receipt);
   }
 }
@@ -346,7 +348,8 @@ function renderUI(receipt){
 function goBackToIssue(){
   const cls = window.__stationaryClass || "";
   const roll = window.__stationaryRoll || "";
-  const qs = new URLSearchParams({session: currentSession, class: cls, roll: roll});
+  const adm = window.__stationaryAdm || "";
+  const qs = new URLSearchParams({session: currentSession, class: cls, roll: roll, admission_no: adm});
   window.location.href = `stationary_issue.html?${qs.toString()}`;
 }
 

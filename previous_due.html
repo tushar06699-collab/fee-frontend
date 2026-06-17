@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Previous Due Management</title>
+<style>
+body{font-family:Poppins, sans-serif;background:#f2f4f7;margin:0;padding:0 20px 20px}
+.topbar{
+  width:100%;padding:15px 20px;background:#007bff;color:#fff;
+  display:flex;align-items:center;gap:15px;box-sizing:border-box;
+  position:sticky;top:0;z-index:3000;margin:0 -20px 15px;
+}
+.menu-btn{font-size:28px;cursor:pointer;color:#fff;font-weight:900;}
+.overlay {
+  position: fixed;top:0;left:0;width:100%;height:100%;
+  background: rgba(0,0,0,0.35);display:none;z-index:1500;
+}
+.overlay.show { display:block; }
+.side-menu{
+  position:fixed;top:0;left:-280px;width:260px;height:100%;
+  background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.18);
+  padding:20px;overflow-y:auto;z-index:2000;
+  transition: left 0.35s;
+  border-radius:0 18px 18px 0;
+}
+.side-menu.open{ left:0; }
+.menu-item{
+  padding:12px 0;border-bottom:1px solid #eee;cursor:pointer;
+  font-size:16px;font-weight:600;color:#333;
+}
+.container{max-width:1000px;margin:auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.controls{display:flex;gap:15px;margin-bottom:20px;align-items:flex-end;flex-wrap:wrap;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+select, input{padding:8px;border-radius:6px;border:1px solid #ccc;}
+table{width:100%;border-collapse:collapse;margin-top:10px;}
+th,td{border:1px solid #ddd;padding:10px;text-align:left;}
+th{background:#007bff;color:#fff;}
+.btn{padding:10px 15px;border-radius:8px;border:none;cursor:pointer;font-weight:600;}
+.btn-primary{background:#007bff;color:#fff;}
+.btn-success{background:#28a745;color:#fff;}
+.input-due{width:120px;font-weight:bold;color:#b30000;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="menu-btn" onclick="toggleMenu()">☰</div>
+  <div style="font-size:20px;font-weight:600;">Previous Due Management</div>
+</div>
+<div id="overlay" class="overlay" onclick="closeMenu()"></div>
+<div class="side-menu" id="sideMenu"></div>
+
+<div class="container">
+  <h2>Edit Previous Dues Class-wise</h2>
+  <div class="controls">
+    <div class="form-group">
+      <label>Select Class</label>
+      <select id="classSelect">
+        <option value="">-- Choose Class --</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="loadStudents()">Load Students</button>
+    <button class="btn btn-success" id="saveBtn" style="display:none;" onclick="saveAll()">Save All Changes</button>
+  </div>
+
+  <table id="studentTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>Roll No</th>
+        <th>Admission No</th>
+        <th>Student Name</th>
+        <th>Father's Name</th>
+        <th>Previous Due (Rs.)</th>
+      </tr>
+    </thead>
+    <tbody id="studentBody"></tbody>
+  </table>
+</div>
+
+<script>
+const FEE_API = localStorage.getItem("apiBaseUrl") || "http://127.0.0.1:5000";
+const STUDENT_API = localStorage.getItem("studentApiBaseUrl") || "https://student-backend-117372286918.asia-south1.run.app/";
+const params = new URLSearchParams(window.location.search);
+const sessionParam = params.get("session") || "2024_25";
+
+let studentsList = [];
+
+function normalizeRoll(roll) {
+  let r = String(roll ?? "").trim();
+  if (r.endsWith(".0")) r = r.slice(0, -2);
+  if (/^\d+$/.test(r)) r = String(parseInt(r, 10));
+  return r;
+}
+
+function normalizeClassName(value) {
+  const text = String(value || "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  return text.replace(/\s+[AB]$/i, "").trim();
+}
+
+async function fetchClasses() {
+  try {
+    const res = await fetch(`${FEE_API}/fees/get`, { headers: { "X-Session": sessionParam } });
+    const data = await res.json();
+    if (data.success) {
+      const select = document.getElementById("classSelect");
+      data.fees.forEach(f => {
+        const opt = document.createElement("option");
+        opt.value = f.class_name;
+        opt.textContent = f.class_name;
+        select.appendChild(opt);
+      });
+    }
+  } catch (e) { console.error("Error fetching classes", e); }
+}
+
+async function loadStudents() {
+  const className = document.getElementById("classSelect").value;
+  if (!className) { alert("Please select a class"); return; }
+  const targetClass = normalizeClassName(className);
+
+  try {
+    // Fetch both master records and fee ledger records to ensure all students are visible
+    const [mRes, fRes] = await Promise.all([
+      fetch(`${STUDENT_API}/students?session=${encodeURIComponent(sessionParam)}`),
+      fetch(`${FEE_API}/students?session=${encodeURIComponent(sessionParam)}&class_name=${encodeURIComponent(className)}`, {
+        headers: { "X-Session": sessionParam }
+      })
+    ]);
+
+    const mData = await mRes.json();
+    const fData = await fRes.json();
+
+    const masterRows = (Array.isArray(mData) ? mData : (mData.students || []))
+        .map(s => ({
+            name: s.student_name || s.name || "",
+            father: s.father_name || s.father || "",
+            class_name: normalizeClassName(s.class_name || s.class || ""),
+            roll: normalizeRoll(s.rollno ?? s.roll ?? ""),
+            admission_no: String(s.admission_no ?? s.admissionNo ?? "").trim()
+        }))
+        .filter(s => s.class_name === targetClass);
+
+    const feeRows = (fData.students || []).map(s => ({
+        ...s,
+        class_name: normalizeClassName(s.class_name),
+        roll: normalizeRoll(s.roll)
+    }));
+
+    const feeMap = new Map();
+    feeRows.forEach(s => feeMap.set(`${s.class_name}|${s.roll}`, s));
+
+    // Merge data: prioritize master records for details, fee records for due amount
+    studentsList = masterRows.map(ms => {
+        const key = `${ms.class_name}|${ms.roll}`;
+        const fs = feeMap.get(key) || {};
+        return {
+            ...ms,
+            previous_due: fs.previous_due ?? 0,
+            advance: fs.advance ?? 0,
+            months: fs.months ?? {},
+            payment_methods: fs.payment_methods ?? { cash: 0, upi: 0, bank: 0 }
+        };
+    });
+    
+    if (studentsList.length > 0) {
+      renderTable();
+    } else {
+      alert("No students found in records for this class.");
+    }
+  } catch (e) {
+    console.error("Error loading students", e);
+    alert("Failed to load students.");
+  }
+}
+
+function renderTable() {
+  const body = document.getElementById("studentBody");
+  body.innerHTML = "";
+  
+  // Sort students numerically by roll number
+  studentsList.sort((a, b) => {
+      const rA = parseInt(a.roll, 10) || 0;
+      const rB = parseInt(b.roll, 10) || 0;
+      return rA - rB;
+  });
+
+  studentsList.forEach((s, index) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${s.roll || '-'}</td>
+      <td>${s.admission_no || '-'}</td>
+      <td>${s.name}</td>
+      <td>${s.father || '-'}</td>
+      <td>
+        <input type="number" class="input-due" 
+               value="${s.previous_due || 0}" 
+               onchange="updateLocalValue(${index}, this.value)">
+      </td>
+    `;
+    body.appendChild(tr);
+  });
+
+  document.getElementById("studentTable").style.display = "table";
+  document.getElementById("saveBtn").style.display = "inline-block";
+}
+
+function updateLocalValue(index, val) {
+  const numVal = parseFloat(val) || 0;
+  studentsList[index].previous_due = numVal;
+  
+  // Initialize months if missing
+  if (!studentsList[index].months) studentsList[index].months = {};
+  
+  // Sync the 'previousDue' month record so fee_students.html and others show updated due
+  const rec = studentsList[index].months.previousDue || { paid: 0, due: 0, status: "Due", date: "", purpose: "Previous Dues", extra: 0 };
+  const paid = parseFloat(rec.paid) || 0;
+  rec.due = Math.max(0, numVal - paid);
+  rec.status = rec.due === 0 ? "Paid" : (paid > 0 ? "Partial" : "Due");
+  
+  studentsList[index].months.previousDue = rec;
+}
+
+async function saveAll() {
+  const saveBtn = document.getElementById("saveBtn");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving...";
+
+  let successCount = 0;
+  
+  for (const student of studentsList) {
+    try {
+      const payload = {
+        class: student.class_name,
+        roll: student.roll,
+        student: student
+      };
+
+      const res = await fetch(`${FEE_API}/update_student?session=${encodeURIComponent(sessionParam)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Session": sessionParam },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      
+      // If update fails (student not in fee DB yet), add them
+      if (!res.ok || result.success === false) {
+          const createPayload = {
+              name: student.name,
+              father: student.father,
+              class_name: student.class_name,
+              roll: student.roll,
+              admission_no: student.admission_no,
+              previous_due: student.previous_due,
+              advance: student.advance || 0,
+              months: student.months || {}
+          };
+          const addRes = await fetch(`${FEE_API}/student/add?session=${encodeURIComponent(sessionParam)}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Session": sessionParam },
+              body: JSON.stringify(createPayload)
+          });
+          const addResult = await addRes.json();
+          if (addRes.ok && addResult.success) successCount++;
+      } else {
+          if (result.success) successCount++;
+      }
+    } catch (e) {
+      console.error(`Failed to update roll ${student.roll}`, e);
+    }
+  }
+
+  localStorage.setItem("paymentMade", Date.now()); // Signal other pages like fee_students.html to refresh
+  alert(`Successfully updated ${successCount} out of ${studentsList.length} students.`);
+  saveBtn.disabled = false;
+  saveBtn.textContent = "Save All Changes";
+}
+
+function toggleMenu(){ 
+  const menu = document.getElementById("sideMenu");
+  const overlay = document.getElementById("overlay");
+  menu.classList.toggle("open"); 
+  overlay.classList.toggle("show"); 
+}
+function closeMenu(){ 
+  const menu = document.getElementById("sideMenu");
+  const overlay = document.getElementById("overlay");
+  menu.classList.remove("open"); 
+  overlay.classList.remove("show"); 
+}
+function goToPage(p){ 
+  window.location.href = p + "?session=" + encodeURIComponent(sessionParam); 
+}
+
+window.onload = () => {
+  fetchClasses();
+  // If the shared menu script is loaded, it will populate the sideMenu div.
+};
+</script>
+<script src="feeshared_menu.js"></script>
+</body>
+</html>

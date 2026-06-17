@@ -129,32 +129,37 @@ function readParams(){
   const qs = new URLSearchParams(window.location.search);
   const cls = qs.get("class") || "";
   const roll = qs.get("roll") || "";
+  const adm = qs.get("admission_no") || "";
   const sess = qs.get("session");
   if (sess) {
     currentSession = sess;
     localStorage.setItem("session", currentSession);
   }
   sessionLabel.textContent = currentSession;
-  return {cls, roll};
+  return {cls, roll, adm};
 }
 
-async function loadStudent(cls, roll){
+async function loadStudent(cls, roll, adm){
   try{
     const res = await fetch(`${FEE_API}/student/${encodeURIComponent(cls)}/${encodeURIComponent(roll)}`, {
       headers: {"X-Session": currentSession}
     });
     const data = await res.json();
     if (res.ok && data.success && data.student) {
-      student = data.student;
-      student.class_name = student.class_name || cls;
-      student.roll = student.roll || roll;
+      const s = data.student;
+      // Use Admission Number to verify correctness if multiple students have same roll in same class
+      if (!adm || String(s.admission_no || "").trim() === String(adm).trim()) {
+        student = s;
+        student.class_name = student.class_name || cls;
+        student.roll = student.roll || roll;
+      }
     }
   }catch(e){}
 
   if (!student) {
-    student = await findStudentFromStudentBackend(cls, roll);
+    student = await findStudentFromStudentBackend(cls, roll, adm);
   } else if (!student.father || !student.admission_no) {
-    await enrichFromStudentBackend(cls, roll);
+    await enrichFromStudentBackend(cls, roll, adm);
   }
 
   if (!student) {
@@ -170,15 +175,23 @@ async function loadStudent(cls, roll){
   stAdmission.textContent = student.admission_no || "-";
 }
 
-async function findStudentFromStudentBackend(cls, roll){
+async function findStudentFromStudentBackend(cls, roll, adm){
   try{
     const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
     const data = await res.json();
     const rows = Array.isArray(data) ? data : (data.students || []);
-    const match = rows.find(r =>
-      normalizeClass(r.class_name || r.class || "") === normalizeClass(cls) &&
-      String(r.rollno ?? r.roll ?? "").trim() === String(roll).trim()
-    );
+
+    let match = null;
+    if (adm) {
+      match = rows.find(r => String(r.admission_no ?? r.admission ?? "").trim() === String(adm).trim());
+    }
+    if (!match) {
+      match = rows.find(r =>
+        normalizeClass(r.class_name || r.class || "") === normalizeClass(cls) &&
+        String(r.rollno ?? r.roll ?? "").trim() === String(roll).trim()
+      );
+    }
+
     if (!match) return null;
     return {
       name: match.student_name || match.name || "",
@@ -192,15 +205,23 @@ async function findStudentFromStudentBackend(cls, roll){
   }
 }
 
-async function enrichFromStudentBackend(cls, roll){
+async function enrichFromStudentBackend(cls, roll, adm){
   try{
     const res = await fetch(`${STUDENT_API}/students?session=${encodeURIComponent(currentSession)}`);
     const data = await res.json();
     const rows = Array.isArray(data) ? data : (data.students || []);
-    const match = rows.find(r =>
-      normalizeClass(r.class_name || r.class || "") === normalizeClass(cls) &&
-      String(r.rollno ?? r.roll ?? "").trim() === String(roll).trim()
-    );
+
+    let match = null;
+    if (adm) {
+      match = rows.find(r => String(r.admission_no ?? r.admission ?? "").trim() === String(adm).trim());
+    }
+    if (!match) {
+      match = rows.find(r =>
+        normalizeClass(r.class_name || r.class || "") === normalizeClass(cls) &&
+        String(r.rollno ?? r.roll ?? "").trim() === String(roll).trim()
+      );
+    }
+
     if (!match) return;
     student.name = student.name || match.student_name || match.name || "";
     student.father = student.father || match.father_name || match.father || "";
@@ -325,13 +346,21 @@ function goBack(){
 
 const params = readParams();
 todayDate.textContent = new Date().toISOString().slice(0,10);
-loadStudent(params.cls, params.roll);
+loadStudent(params.cls, params.roll, params.adm);
 loadItems();
-loadHistory(params.cls, params.roll);
+loadHistory(params.cls, params.roll, params.adm);
 
-async function loadHistory(cls, roll){
+async function loadHistory(cls, roll, adm){
   if (!cls || !roll) return;
-  const res = await fetch(`${FEE_API}/stationary/receipts?class=${encodeURIComponent(cls)}&roll=${encodeURIComponent(roll)}&page=${historyPage}&page_size=${HISTORY_PAGE_SIZE}`, {
+  const query = new URLSearchParams({
+    class: cls,
+    roll: roll,
+    page: historyPage,
+    page_size: HISTORY_PAGE_SIZE
+  });
+  if (adm) query.set("admission_no", adm);
+
+  const res = await fetch(`${FEE_API}/stationary/receipts?${query.toString()}`, {
     headers: {"X-Session": currentSession}
   });
   const data = await res.json();
@@ -371,7 +400,8 @@ function openReceipt(no){
     session: currentSession,
     receipt: String(no),
     class: params.cls || "",
-    roll: params.roll || ""
+    roll: params.roll || "",
+    admission_no: params.adm || ""
   });
   window.location.href = `stationary_receipt.html?${qs.toString()}`;
 }

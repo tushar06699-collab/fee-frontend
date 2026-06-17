@@ -112,6 +112,13 @@ th{background:#007bff;color:#fff}
 .btn.advance{background:#198754;color:#fff}
 .btn.back{background:#6c757d;color:#fff}
 .input-small{width:100px;padding:6px;border-radius:6px;border:1px solid #ccc}
+
+/* Stationary Table Styles */
+#stationaryTable {
+  margin-top: 30px;
+  margin-bottom: 50px;
+}
+#stationaryTable th { background: #6f42c1; }
 </style>
 </head>
 
@@ -173,11 +180,28 @@ th{background:#007bff;color:#fff}
 
   <div class="action-buttons">
     <button class="btn primary" onclick="submitPayment()">Submit Payment</button>
-    <button class="btn advance" onclick="applyAdvance()">Apply Advance</button>
+    <button class="btn advance" id="applyAdvanceBtn" onclick="applyAdvance()">Apply Advance</button>
     <button class="btn back" onclick="goBackToIndex()">Back</button>
     <button class="btn paid-btn" onclick="generateReceipt()">Generate Receipt</button>
   </div>
 </div>
+
+<h2 style="margin-top:40px;">Stationary Ledger (Month-wise)</h2>
+<table id="stationaryTable">
+  <thead>
+    <tr>
+      <th>Month</th>
+      <th>Date</th>
+      <th>Receipt No</th>
+      <th>Items</th>
+      <th>Amount (Rs.)</th>
+      <th>Type</th>
+      <th>Status</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody id="stationaryBody"></tbody>
+</table>
 
 <div class="tablet-panel">
   <div class="row">
@@ -267,12 +291,121 @@ let registrationFee = 0;
 let idCardFee = 0;
 let examConfigs = [];   // [{name, months[], class_fees{class:fee}}]
 let lastPaymentAmount = 0;
+let stationaryReceipts = [];
 let autoReceiptTimer = null;
 let autoReceiptHoldUntil = 0;
 
 /* Utility: safe number */
 function cleanNumber(x){
   return isNaN(Number(x)) ? 0 : Number(x);
+}
+
+function monthKeyFromDate(dateVal){
+  if (!dateVal) {
+    const d = new Date();
+    return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+  }
+  
+  let d = new Date(dateVal + "T00:00:00");
+  if (isNaN(d.getTime())) {
+    // Try parsing DD/MM/YYYY or DD-MM-YYYY
+    const parts = dateVal.split(/[\/\-]/);
+    if (parts.length === 3) {
+      if (parts[0].length === 4) d = new Date(parts[0], parts[1]-1, parts[2]); // YYYY-MM-DD
+      else d = new Date(parts[2], parts[1]-1, parts[0]); // DD-MM-YYYY
+    }
+  }
+  if (isNaN(d.getTime())) d = new Date();
+
+  const m = d.getMonth();
+  const map = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return map[m];
+}
+
+async function loadStationaryHistory(){
+  if (!student) return;
+  const cls = student.class_name;
+  const roll = student.roll;
+  const adm = student.admission_no;
+  
+  if (!cls || !roll) return;
+  
+  const query = new URLSearchParams({ class: cls, roll: roll });
+  if (adm) query.set("admission_no", adm);
+
+  try {
+    const res = await fetch(`${FEE_API}/stationary/receipts?${query.toString()}`, {
+      headers: {"X-Session": sessionParam}
+    });
+    const data = await res.json();
+    stationaryReceipts = data.receipts || [];
+    return stationaryReceipts;
+  } catch(e) {
+    console.error("Failed to load stationary history", e);
+    return [];
+  }
+}
+
+function renderStationaryTable(){
+  const host = document.getElementById("stationaryBody");
+  if (!host) return;
+  
+  const grouped = {};
+  stationaryReceipts.forEach(r => {
+    let m = monthKeyFromDate(r.date);
+    // Fallback if key doesn't match our month list
+    if (!monthsList.includes(m)) {
+        m = monthKeyFromDate(); 
+    }
+    if (!grouped[m]) grouped[m] = [];
+    grouped[m].push(r);
+  });
+  
+  let html = "";
+  monthsList.forEach(m => {
+    const list = grouped[m];
+    if (!list || !list.length) return;
+    
+    list.forEach((r, idx) => {
+      const itemsText = (r.items || []).map(it => `${it.name} x${it.qty}`).join(", ");
+      const mStatus = student?.months?.[m]?.status || "Due";
+      
+      let localStatusHtml = "";
+      if (r.added_to_fee) {
+        localStatusHtml = (mStatus === "Paid") ? '<span class="paid">Paid</span>' : '<span style="color:#0f4aa3;font-weight:700">Added to Ledger</span>';
+      } else {
+        localStatusHtml = '<span class="paid">Paid (Direct)</span>';
+      }
+
+      html += `
+        <tr>
+          ${idx === 0 ? `<td rowspan="${list.length}">${m}</td>` : ""}
+          <td>${r.date}</td>
+          <td>${r.receipt_no}</td>
+          <td style="text-align:left">${itemsText}</td>
+          <td>Rs. ${r.total}</td>
+          <td>${r.added_to_fee ? 'Fee Ledger' : 'Direct'}</td>
+          <td>${localStatusHtml}</td>
+          <td><button class="btn" onclick="openStationaryReceipt(${r.receipt_no})">View</button></td>
+        </tr>
+      `;
+    });
+  });
+  
+  if (!html) {
+    html = `<tr><td colspan="8" style="text-align:center;color:#666;padding:15px;">No stationary records found.</td></tr>`;
+  }
+  host.innerHTML = html;
+}
+
+function openStationaryReceipt(no){
+  const qs = new URLSearchParams({session: sessionParam, receipt: String(no), class: classParam, roll: rollParam});
+  window.location.href = `stationary_receipt.html?${qs.toString()}`;
+}
+
+function filterStationaryPurpose(p){
+  if(!p) return "";
+  return p.split("|").map(x => x.trim()).filter(x => !x.toLowerCase().startsWith("stationary")).join(" | ");
 }
 
 function scheduleAutoReceipt(){
@@ -373,7 +506,6 @@ function toggleBooksFee(checked){
   student.months["Annual"] = annualRec;
   saveToBackend();
   render();
-  scheduleAutoReceipt();
 }
 
 function selectPaymentMethod(el){
@@ -575,7 +707,6 @@ function markUpiPaid(){
   const amt = cleanNumber(document.getElementById("payAmount").value);
   if (!amt) { alert("Enter amount first"); return; }
   setPaymentMethod("upi");
-  autoReceiptHoldUntil = Date.now() + 11000;
   showThanksOnTablet();
   setTimeout(() => {
     publishReceiptToTablet();
@@ -1270,6 +1401,8 @@ async function loadStudent(){
       books_opt_in: Boolean(feeStudent?.books_opt_in)
     };
 
+    await loadStationaryHistory();
+
     // ensure numeric fields
     student.previous_due = cleanNumber(student.previous_due);
     student.advance = cleanNumber(student.advance);
@@ -1468,22 +1601,36 @@ function render(){
     if(!rec) {
       student.months[m] = { paid:0, due:0, extra:0, purpose:"", status: "Due", date: "" };
     }
+    
+    // Calculate stationary total for this month that was added to ledger
+    const statTotal = stationaryReceipts
+      .filter(r => r.added_to_fee && monthKeyFromDate(r.date) === m)
+      .reduce((sum, r) => sum + cleanNumber(r.total), 0);
 
     const displayedPaid = cleanNumber(rec.paid);
-
+    
+    // Robust due calculation: Base (Fee+Exam+Transport) + User's Extra + Stationary - Paid
+    let baseFee = 0;
+    if (m === "previousDue") baseFee = cleanNumber(student.previous_due);
+    else if (m === "Annual") baseFee = computeAnnualTotal();
+    else baseFee = getMonthlyFeeForClass(student.class_name) + cleanNumber(rec.exam_fee_applied) + cleanNumber(rec.transport_fee_applied);
+    
+    const userExtra = Math.max(0, cleanNumber(rec.extra) - statTotal);
+    const displayedDue = Math.max(0, baseFee + userExtra + statTotal - displayedPaid);
+    const displayedExtra = Math.max(0, cleanNumber(rec.extra) - statTotal);
+    const displayedPurpose = filterStationaryPurpose(rec.purpose);
+    
     const statusClass =
       rec.status === "Paid" ? "paid" :
       rec.status === "Partial" ? "partial" : "due";
 
-    let label = m;
-    if (m === "previousDue") label = "Previous Due";
-    else if (m === "Annual") label = "Annual Fee";
-    else label = `${m} Fee`;
+    let label = (m === "previousDue") ? "Previous Due" : ((m === "Annual") ? "Annual Fee" : `${m} Fee`);
     const extras = [];
     if (m === "Annual" && student?.new_admission) extras.push("Admission");
     if (m === "Annual" && registrationFee > 0) extras.push("Registration");
     if (m === "Annual" && idCardFee > 0) extras.push("ID Card");
     if (m === "Annual" && student?.books_opt_in && getBooksFeeForClass(student.class_name) > 0) extras.push("Books");
+    if (statTotal > 0) extras.push(`Stationary: Rs ${statTotal}`);
     if (m !== "previousDue" && m !== "Annual" && cleanNumber(rec.exam_fee_applied || 0) > 0) extras.push("Exam Fee");
     if (m !== "previousDue" && m !== "Annual" && cleanNumber(rec.transport_fee_applied || 0) > 0) extras.push("Transport");
     const monthCell = extras.length
@@ -1493,12 +1640,12 @@ function render(){
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${monthCell}</td>
-      <td><input class="input-small" value="${rec.purpose || ""}" onchange="updatePurpose('${m}', this.value)"></td>
-      <td><input class="input-small" type="number" value="${rec.extra || 0}" onchange="updateExtra('${m}', this.value)"></td>
+      <td><input class="input-small" value="${displayedPurpose}" onchange="updatePurpose('${m}', this.value)"></td>
+      <td><input class="input-small" type="number" value="${displayedExtra}" onchange="updateExtra('${m}', this.value)"></td>
       <td class="${statusClass}">${rec.status}</td>
       <td>Rs. ${displayedPaid}</td>
-      <td>Rs. ${rec.due}</td>
-      <td>${rec.date || ""}</td>
+      <td>Rs. ${displayedDue}</td>
+      <td>${displayedPaid > 0 ? (rec.date || "") : ""}</td>
       <td>
          <button class="btn paid-btn" onclick="markPaid('${m}')">Mark Paid</button>
          <button class="btn due-btn" onclick="markDue('${m}')">Mark Due</button>
@@ -1507,23 +1654,98 @@ function render(){
     tbody.appendChild(tr);
 
     totalPaid += displayedPaid;
-    totalDue += rec.due;
+    totalDue += displayedDue;
   });
 
   document.getElementById("totalPaid").textContent = "Rs. " + totalPaid;
-  document.getElementById("totalDue").textContent = "Rs. " + totalDue;
+  document.getElementById("totalDue").textContent = "Rs. " + totalDue + " (Incl. Stationary)";
+  renderStationaryTable();
+}
+
+function getDisplayedTotalDue() {
+  let total = 0;
+  monthsList.forEach(m => {
+    const rec = student.months[m];
+    if (!rec) return;
+    const statTotal = stationaryReceipts
+      .filter(r => r.added_to_fee && monthKeyFromDate(r.date) === m)
+      .reduce((sum, r) => sum + cleanNumber(r.total), 0);
+
+    const displayedPaid = cleanNumber(rec.paid);
+    let baseFee = 0;
+    if (m === "previousDue") baseFee = cleanNumber(student.previous_due);
+    else if (m === "Annual") baseFee = computeAnnualTotal();
+    else baseFee = getMonthlyFeeForClass(student.class_name) + cleanNumber(rec.exam_fee_applied) + cleanNumber(rec.transport_fee_applied);
+
+    const userExtra = Math.max(0, cleanNumber(rec.extra) - statTotal);
+    const displayedDue = Math.max(0, baseFee + userExtra + statTotal - displayedPaid);
+    total += displayedDue;
+  });
+  return total;
+}
+
+function handleAmountInput() {
+  maybeOpenUpiQr();
+  showCashCounterMessage();
+  const entered = cleanNumber(document.getElementById("payAmount").value);
+  const totalDue = getDisplayedTotalDue();
+  const advBtn = document.getElementById("applyAdvanceBtn");
+  if (advBtn) {
+    advBtn.style.display = (entered > totalDue) ? "none" : "inline-block";
+  }
+}
+
+function deduplicatePurposeString(p) {
+    if (!p) return "";
+    const parts = p.split("|").map(s => s.trim()).filter(Boolean);
+    const otherParts = [];
+    const statItems = new Set();
+
+    parts.forEach(part => {
+        const match = part.match(/^stationary\s*:\s*(.*)$/i);
+        if (match) {
+            match[1].split(",")
+                .map(i => i.trim())
+                .filter(Boolean)
+                .filter(item => !item.toLowerCase().startsWith("manual stationary")) // Filter out "Manual Stationary"
+                .forEach(it => statItems.add(it));
+        } else {
+            // Filter out "Manual Stationary" if it's not part of a "Stationary: " prefix
+            if (part.toLowerCase().startsWith("manual stationary")) {
+                // Ignore it, as it's likely a legacy or unwanted entry
+            } else {
+                otherParts.push(part);
+            }
+        }
+    });
+
+    const result = [...new Set(otherParts)];
+    if (statItems.size > 0) result.push("Stationary: " + [...statItems].join(", "));
+    return result.join(" | ");
 }
 
 /* ---------------- UPDATE PURPOSE/EXTRA ---------------- */
 function updatePurpose(m, val){
-  student.months[m].purpose = val;
+  const rec = student.months[m];
+  if(!rec) return;
+  
+  // Extract stationary parts from current purpose to prevent deletion
+  const statParts = (rec.purpose || "").split("|").map(x => x.trim()).filter(x => x.toLowerCase().startsWith("stationary"));
+  const combined = [val, ...statParts].filter(Boolean).join(" | ");
+  rec.purpose = deduplicatePurposeString(combined);
   saveToBackend();
 }
 function updateExtra(m, val){
   const rec = student.months[m];
   if(!rec) return;
+  
+  const statTotal = stationaryReceipts
+      .filter(r => r.added_to_fee && monthKeyFromDate(r.date) === m)
+      .reduce((sum, r) => sum + cleanNumber(r.total), 0);
+      
   const oldExtra = cleanNumber(rec.extra);
-  const newExtra = cleanNumber(val);
+  // The 'val' is the new user-defined extra. We add stationary back to it to maintain integrity.
+  const newExtra = cleanNumber(val) + statTotal;
   const delta = newExtra - oldExtra;
 
   rec.extra = newExtra;
@@ -1560,7 +1782,6 @@ async function applyAdvance(){
   student.advance = adv;
   await saveToBackend();
   render();
-  scheduleAutoReceipt();
   alert("Advance applied.");
 }
 
@@ -1570,6 +1791,13 @@ async function applyAdvance(){
 async function submitPayment(){
   const enteredAmount = cleanNumber(document.getElementById("payAmount").value);
   if(!enteredAmount){ alert("Enter amount"); return; }
+  
+  const totalDue = getDisplayedTotalDue();
+  if (enteredAmount > totalDue) {
+    alert("Error: Entered amount is higher than the total due amount!");
+    return;
+  }
+
   const method = getSelectedPaymentMethod();
   if (!method) { alert("Select payment method (Cash/UPI/Bank)"); return; }
   lastPaymentAmount = enteredAmount;
@@ -1612,7 +1840,6 @@ async function submitPayment(){
   if (method === "cash") {
     publishReceiptToTablet();
   }
-  scheduleAutoReceipt();
 }
 
 /* ---------------- MARK PAID / DUE ---------------- */
@@ -1632,7 +1859,6 @@ async function markPaid(m){
   student.last_payment_method = method;
   await saveToBackend();
   render();
-  scheduleAutoReceipt();
 
   localStorage.setItem("paymentMade", Date.now());
 
@@ -1665,7 +1891,6 @@ async function markDue(m){
   rec.date = "";
   await saveToBackend();
   render();
-  scheduleAutoReceipt();
 }
 
 /* ---------------- GENERATE RECEIPT (simple open ) ---------------- */
@@ -1731,8 +1956,7 @@ function goBackToIndex(){
   window.location.href = `fee_students.html?${qs.toString()}`;
 }
 
-document.getElementById("payAmount").addEventListener("input", maybeOpenUpiQr);
-document.getElementById("payAmount").addEventListener("input", showCashCounterMessage);
+document.getElementById("payAmount").addEventListener("input", handleAmountInput);
 
 window.addEventListener("focus", () => {
     const flag = localStorage.getItem("paymentMade");
