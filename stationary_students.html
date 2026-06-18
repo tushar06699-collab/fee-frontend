@@ -90,6 +90,9 @@ let masterStudents = [];
 let monthlyFeesByClass = {};
 let annualFeesByClass = {};
 let admissionFeesByClass = {};
+let booksFeesByClass = {};
+let registrationFee = 0;
+let idCardFee = 0;
 let examConfigs = [];
 const allMonths = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
 let globalSearchMode = false;
@@ -141,13 +144,27 @@ async function loadFeeStructure(){
     monthlyFeesByClass = {};
     annualFeesByClass = {};
     admissionFeesByClass = {};
+    booksFeesByClass = {};
     (data.fees || []).forEach(f => {
       const cls = normalizeClassName(f.class_name || "");
       if (!cls) return;
       monthlyFeesByClass[cls] = Number(f.monthly_fee || 0);
       annualFeesByClass[cls] = Number(f.annual_fee || f.annual_charge || 0);
       admissionFeesByClass[cls] = Number((f.admission_charge ?? f.admission_fee) || 0);
+      booksFeesByClass[cls] = Number(f.books_charge || 0);
     });
+
+    try {
+      const setRes = await fetch(`${FEE_API}/fees/settings?session=${encodeURIComponent(currentSession)}`, {
+        headers: { "X-Session": currentSession }
+      });
+      const setData = await setRes.json().catch(() => ({}));
+      registrationFee = Number(setData.registration_fee || 0);
+      idCardFee = Number(setData.id_card_fee || 0);
+    } catch (_) {
+      registrationFee = 0;
+      idCardFee = 0;
+    }
   }catch(e){}
 }
 
@@ -197,19 +214,23 @@ async function loadStudents(){
   const feeMap = buildFeeMap(feeRows);
   const masterRows = masterStudents.filter(s => normalizeClass(s.class_name || s.class) === target);
   if (masterRows.length) {
-    studentsCache = masterRows.map(s=>({
+    studentsCache = masterRows.map(s=>{
+      const feeInfo = findFeeInfo(feeMap, {
+        class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
+        roll: String(s.rollno ?? s.roll ?? "").trim(),
+        admission_no: String(s.admission_no ?? s.admission ?? "").trim()
+      });
+      return {
       name: s.student_name || s.name || "",
       father: s.father_name || s.father || "",
       class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
       roll: String(s.rollno ?? s.roll ?? "").trim(),
       admission_no: String(s.admission_no ?? s.admission ?? "").trim(),
       new_admission: Boolean(s.new_admission),
-      fee_info: findFeeInfo(feeMap, {
-        class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
-        roll: String(s.rollno ?? s.roll ?? "").trim(),
-        admission_no: String(s.admission_no ?? s.admission ?? "").trim()
-      })
-    }));
+      books_opt_in: Boolean(s.books_opt_in || feeInfo?.books_opt_in),
+      fee_info: feeInfo
+      };
+    });
   } else {
     studentsCache = feeRows.map(s=>({
       name: s.name || "",
@@ -218,6 +239,7 @@ async function loadStudents(){
       roll: String(s.roll ?? "").trim(),
       admission_no: String(s.admission_no ?? s.admission ?? "").trim(),
       new_admission: Boolean(s.new_admission),
+      books_opt_in: Boolean(s.books_opt_in),
       fee_info: findFeeInfo(feeMap, {
         class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
         roll: String(s.roll ?? "").trim(),
@@ -379,9 +401,18 @@ function renderTotalDue(feeInfo, student){
   if (!feeInfo) return "-";
   const cls = normalizeClassName(student?.class_name || feeInfo.class_name || "");
   const monthDefault = Number(monthlyFeesByClass[cls] || 0);
-  const annualDefault = Number(annualFeesByClass[cls] || 0) + (student?.new_admission ? Number(admissionFeesByClass[cls] || 0) : 0);
+
+  const isNewAdm = Boolean(student?.new_admission || feeInfo?.new_admission);
+  const isBooks = Boolean(student?.books_opt_in || feeInfo?.books_opt_in);
+  const annualDefault = Number(annualFeesByClass[cls] || 0) 
+    + (isNewAdm ? Number(admissionFeesByClass[cls] || 0) : 0)
+    + (isBooks ? Number(booksFeesByClass[cls] || 0) : 0)
+    + registrationFee + idCardFee;
+
   const months = feeInfo.months || {};
-  let total = Number(feeInfo.previous_due || 0);
+  const prevDueRec = normalizeMonthRecord(months.previousDue, Number(feeInfo.previous_due || 0));
+  let total = prevDueRec.due;
+
   allMonths.forEach(m=>{
     const examPart = Number(getExamFeeForClassMonth(cls, m) || 0);
     const transportPart = Number(getTransportFeeForStudentMonth(feeInfo, m) || 0);
@@ -410,19 +441,23 @@ async function loadGlobalSearch(){
   const master = await fetchMasterStudents();
   const feeRows = await fetchFeeStudents();
   const feeMap = buildFeeMap(feeRows);
-  studentsCache = master.map(s=>({
+  studentsCache = master.map(s=>{
+    const feeInfo = findFeeInfo(feeMap, {
+      class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
+      roll: String(s.rollno ?? s.roll ?? "").trim(),
+      admission_no: String(s.admission_no ?? s.admission ?? "").trim()
+    });
+    return {
     name: s.student_name || s.name || "",
     father: s.father_name || s.father || "",
     class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
     roll: String(s.rollno ?? s.roll ?? "").trim(),
     admission_no: String(s.admission_no ?? s.admission ?? "").trim(),
     new_admission: Boolean(s.new_admission),
-    fee_info: findFeeInfo(feeMap, {
-      class_name: String(s.class_name || s.class || "").trim().replace(/\s+/g," "),
-      roll: String(s.rollno ?? s.roll ?? "").trim(),
-      admission_no: String(s.admission_no ?? s.admission ?? "").trim()
-    })
-  }));
+    books_opt_in: Boolean(s.books_opt_in || feeInfo?.books_opt_in),
+    fee_info: feeInfo
+    };
+  });
   renderStudents();
 }
 
