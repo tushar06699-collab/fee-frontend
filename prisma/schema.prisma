@@ -1,0 +1,115 @@
+// Prisma schema — MongoDB (Atlas), Prisma ORM
+// Notes: MongoDB connector has no referential actions, so cascades
+// (section delete, sub-section delete, user delete) are handled in app code.
+// No groupBy / $queryRaw / case-insensitive filters — aggregated in JS in API routes.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model User {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  email         String          @unique
+  name          String?
+  passwordHash  String
+  role          Role            @default(VIEWER)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  peopleCreated Person[]        @relation("CreatedBy")
+  logs          ActivityLog[]
+  imports       ImportHistory[]
+}
+
+model Section {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  subSections SubSection[]
+  people      Person[]
+}
+
+model SubSection {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  order     Int      @default(0)
+  sectionId String   @db.ObjectId
+  section   Section  @relation(fields: [sectionId], references: [id])
+  people    Person[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sectionId])
+}
+
+model Person {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  sectionId    String      @db.ObjectId
+  section      Section     @relation(fields: [sectionId], references: [id])
+  subSectionId String?     @db.ObjectId
+  subSection   SubSection? @relation(fields: [subSectionId], references: [id])
+  serialNo     String?
+  name         String
+  remarks      String?     @default("")
+  phone        String?     @default("")
+  guestsCount  Int         @default(1)
+  invited      Boolean     @default(false)
+  invitedOn    DateTime?
+  invitedBy    String?     @default("")
+  mode         String?     @default("")
+  notes        String?     @default("")
+  isDeleted    Boolean     @default(false)
+  createdById  String?     @db.ObjectId
+  createdBy    User?       @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([sectionId])
+  @@index([invited])
+  @@index([invitedOn])
+  @@index([isDeleted])
+  @@index([name])
+}
+
+model ActivityLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?  @db.ObjectId
+  user      User?    @relation(fields: [userId], references: [id])
+  userEmail String   @default("")
+  action    String
+  entity    String
+  entityId  String   @default("")
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model ImportHistory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String?  @db.ObjectId
+  user        User?    @relation(fields: [userId], references: [id])
+  fileName    String
+  mode        String
+  sections    Int      @default(0)
+  subSections Int      @default(0)
+  names       Int      @default(0)
+  skipped     Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Setting {
+  key   String @id @map("_id")
+  value String
+}
